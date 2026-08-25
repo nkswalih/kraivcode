@@ -46,6 +46,7 @@ pub(crate) fn dir_label(path: &str) -> String {
 /// Compact home-relative directory label that elides intermediate segments,
 /// e.g. `/home/me/a/b/c` -> `…/b/c` and `~/a/b/c` -> `~/…/c`. Used where space
 /// is tight (status line, overscroll, compact fact stack).
+#[allow(dead_code)]
 pub(crate) fn dir_label_short(path: &str) -> Option<String> {
     let trimmed = path.trim().trim_end_matches('/');
     if trimmed.is_empty() {
