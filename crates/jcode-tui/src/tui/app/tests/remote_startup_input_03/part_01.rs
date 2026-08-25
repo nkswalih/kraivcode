@@ -424,9 +424,9 @@ fn test_paste_expansion_on_submit() {
     // Submit expands placeholder
     app.submit_input();
 
-    // Sent transcript renders the actual pasted content, while the composer above stayed compact.
+    // The visible transcript keeps the compact display representation.
     assert_eq!(app.display_messages().len(), 1);
-    assert_eq!(app.display_messages()[0].content, "A: 1\n2\n3\n4\n5 B");
+    assert_eq!(app.display_messages()[0].content, "A: [Pasted ~5 lines] B");
 
     // Model receives expanded content (actual pasted text). Local sessions keep the
     // provider message cache lazy, so inspect the materialized provider view.
@@ -461,8 +461,7 @@ fn test_multiple_pastes() {
     assert_eq!(app.pasted_contents, vec!["second\nline"]);
 
     app.submit_input();
-    // Display and model both get the same content (no expansion needed)
-    assert_eq!(app.display_messages()[0].content, "first second\nline");
+    assert_eq!(app.display_messages()[0].content, "first [Pasted ~2 lines]");
     let provider_messages = app.materialized_provider_messages();
     let user_message = provider_messages
         .iter()
@@ -472,6 +471,36 @@ fn test_multiple_pastes() {
     match &user_message.content[0] {
         crate::message::ContentBlock::Text { text, .. } => {
             assert_eq!(text, "first second\nline");
+        }
+        _ => panic!("Expected Text content block"),
+    }
+}
+
+#[test]
+fn test_multiple_pasted_blocks_keep_compact_display_and_expand_for_provider() {
+    let mut app = create_test_app();
+    let first = "a\nb\nc".to_string();
+    let second = "1\n2\n3\n4\n5\n6\n7\n8".to_string();
+
+    app.handle_paste(first.clone());
+    app.handle_key(KeyCode::Char(' '), KeyModifiers::empty())
+        .unwrap();
+    app.handle_paste(second.clone());
+    app.submit_input();
+
+    assert_eq!(
+        app.display_messages()[0].content,
+        "[Pasted ~3 lines] [Pasted ~8 lines]"
+    );
+    let provider_messages = app.materialized_provider_messages();
+    let user_message = provider_messages
+        .iter()
+        .rev()
+        .find(|message| message.role == Role::User)
+        .expect("expected submitted user message");
+    match &user_message.content[0] {
+        crate::message::ContentBlock::Text { text, .. } => {
+            assert_eq!(text, format!("{first} {second}"));
         }
         _ => panic!("Expected Text content block"),
     }
