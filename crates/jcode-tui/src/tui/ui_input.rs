@@ -1139,11 +1139,11 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             ));
         }
 
-        // Context usage, right-aligned: 3.1k/272k · ████████░░ · 1%
+        // Context usage, right-aligned: 3.1k/272k · ▰▰▰▱▱▱▱▱▱▱ 1%
+        // (historical slim segmented meter, Kraivcode yellow theme)
         let ctx_bar = if let Some((used, limit)) = overscroll_context_usage(&data) {
-            let pct = ((used as f64 / limit.max(1) as f64) * 100.0).round() as u16;
-            let bar_cells = 8usize;
-            let mut bar_spans = context_bar_yellow(used, limit, bar_cells);
+            let bar_cells = 10usize;
+            let mut bar_spans = overscroll_context_bar(used, limit, bar_cells);
             let mut right_side: Vec<Span> = Vec::new();
             right_side.push(Span::styled(
                 format!(
@@ -1155,11 +1155,6 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             ));
             right_side.push(Span::styled(" · ", Style::default().fg(dim_color())));
             right_side.append(&mut bar_spans);
-            right_side.push(Span::styled(" · ", Style::default().fg(dim_color())));
-            right_side.push(Span::styled(
-                format!("{}%", pct),
-                Style::default().fg(user_color()).bold(),
-            ));
             Some(right_side)
         } else {
             None
@@ -2422,8 +2417,8 @@ fn overscroll_format_tokens(tokens: usize) -> String {
     }
 }
 
-/// Render a compact rounded progress bar (◖████░░◗) plus a percentage label.
-#[allow(dead_code)]
+/// Render the slim segmented context meter (▰ filled / ▱ empty) plus a
+/// percentage label, in the Kraivcode yellow theme.
 fn overscroll_context_bar(used: usize, limit: usize, cells: usize) -> Vec<Span<'static>> {
     let limit = limit.max(1);
     let ratio = (used as f64 / limit as f64).clamp(0.0, 1.0);
@@ -2431,15 +2426,8 @@ fn overscroll_context_bar(used: usize, limit: usize, cells: usize) -> Vec<Span<'
     let filled = (ratio * cells as f64).round() as usize;
     let filled = filled.min(cells);
 
-    // Match the info widget usage bar palette (based on remaining context).
-    let left_pct = 100u16.saturating_sub(pct);
-    let fill_color = if left_pct <= 20 {
-        rgb(255, 100, 100)
-    } else if left_pct <= 50 {
-        rgb(255, 200, 100)
-    } else {
-        rgb(100, 200, 100)
-    };
+    // Kraivcode yellow fill on a dim warm-gray track.
+    let fill_color = user_color();
     let track_color = rgb(50, 50, 60);
 
     let mut spans = Vec::with_capacity(cells + 2);
@@ -2455,29 +2443,6 @@ fn overscroll_context_bar(used: usize, limit: usize, cells: usize) -> Vec<Span<'
     spans.push(Span::styled(
         format!(" {}%", pct),
         Style::default().fg(fill_color).bold(),
-    ));
-    spans
-}
-
-/// Render a yellow-filled context usage bar (████░░) for the status bar.
-/// No percentage, no green — just yellow fill on dark track.
-fn context_bar_yellow(used: usize, limit: usize, cells: usize) -> Vec<Span<'static>> {
-    let limit = limit.max(1);
-    let ratio = (used as f64 / limit as f64).clamp(0.0, 1.0);
-    let filled = (ratio * cells as f64).round() as usize;
-    let filled = filled.min(cells);
-
-    let fill_color = user_color(); // Kraivcode yellow
-    let track_color = rgb(50, 50, 60);
-
-    let mut spans = Vec::with_capacity(2);
-    spans.push(Span::styled(
-        "█".repeat(filled),
-        Style::default().fg(fill_color),
-    ));
-    spans.push(Span::styled(
-        "░".repeat(cells.saturating_sub(filled)),
-        Style::default().fg(track_color),
     ));
     spans
 }
