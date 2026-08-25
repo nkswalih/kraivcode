@@ -183,6 +183,7 @@ pub(super) struct PreparedInput {
     pub raw_input: String,
     pub expanded: String,
     pub images: Vec<(String, String)>,
+    pub has_pasted_content: bool,
 }
 
 // Roughly 500k English words at ~6 bytes/word including spaces. This is still
@@ -2884,6 +2885,7 @@ pub(super) fn take_prepared_input(app: &mut App) -> PreparedInput {
     let raw_input = std::mem::take(&mut app.input);
     app.record_prompt_history(&raw_input);
     let expanded = expand_paste_placeholders(app, &raw_input);
+    let has_pasted_content = raw_input != expanded;
     app.pasted_contents.clear();
     let images = std::mem::take(&mut app.pending_images);
     app.cursor_pos = 0;
@@ -2892,6 +2894,7 @@ pub(super) fn take_prepared_input(app: &mut App) -> PreparedInput {
         raw_input,
         expanded,
         images,
+        has_pasted_content,
     }
 }
 
@@ -3758,6 +3761,7 @@ impl App {
         // commands, secret-intercept inputs, and oversized pastes).
         self.record_prompt_history(&raw_input);
         let mut input = self.expand_paste_placeholders(&raw_input);
+        let has_pasted_content = raw_input != input;
         if let Some(notice) = input_exceeds_submit_limit(&input) {
             self.input = raw_input;
             self.cursor_pos = self.input.len();
@@ -3903,8 +3907,9 @@ impl App {
         // Leaving the preview should happen as soon as the user acts on it.
         self.onboarding_preview_mode = false;
 
-        // Add the expanded user message to the transcript. The composer remains compact
-        // while editing, but sent turns should show the actual pasted content.
+        // Keep the composer representation in the visible transcript. Pasted
+        // blocks remain compact there, while `input` below is the expanded
+        // payload sent to the provider.
         // Remember the typed prompt so we can restore it to the input box if this
         // turn fails (e.g. "token refresh needed"), instead of dropping it.
         self.last_submitted_input = Some(raw_input.clone());
@@ -3915,13 +3920,10 @@ impl App {
             return;
         }
 
-        self.push_display_message(DisplayMessage {
-            role: "user".to_string(),
-            content: input.clone(),
-            tool_calls: vec![],
-            duration_secs: None,
-            title: None,
-            tool_data: None,
+        self.push_display_message(if has_pasted_content {
+            DisplayMessage::pasted_user(raw_input.clone())
+        } else {
+            DisplayMessage::user(raw_input.clone())
         });
         // Send expanded content (with actual pasted text) to model
         let images = std::mem::take(&mut self.pending_images);
