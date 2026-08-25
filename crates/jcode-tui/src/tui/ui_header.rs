@@ -1,11 +1,7 @@
 use super::box_utils::render_rounded_box;
 use super::changelog::get_unseen_changelog_entries;
-use super::{
-    TuiState, dim_color, header_name_color, is_running_stable_release, semver, shorten_model_name,
-};
-use crate::auth::{AuthState, AuthStatus};
-use crate::tui::color_support::rgb;
-use crate::tui::connection_type_icon;
+use super::{TuiState, dim_color, header_name_color};
+use crate::auth::AuthStatus;
 use ratatui::prelude::*;
 #[cfg(test)]
 use std::sync::OnceLock;
@@ -41,466 +37,6 @@ pub(crate) fn capitalize(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(first) => first.to_uppercase().chain(chars).collect(),
-    }
-}
-
-/// Compact form of a full build version string: `v0.25.19-dev (abc1234, dirty)`
-/// becomes `v0.25.19-dev`. Used for the per-line server/client version labels.
-fn compact_version_label(version: &str) -> String {
-    let trimmed = version.trim();
-    match trimmed.split_once(" (") {
-        Some((head, _)) => head.trim().to_string(),
-        None => trimmed.to_string(),
-    }
-}
-
-/// Version label for a `server:`/`client:` header line. Normally compact
-/// (semver only); keeps the git-hash suffix when the two sides share a semver
-/// but differ by build, so the mismatch is still visible at a glance.
-fn header_version_label(version: &str, include_hash: bool) -> String {
-    if include_hash {
-        version.trim().to_string()
-    } else {
-        compact_version_label(version)
-    }
-}
-
-fn format_model_name(short: &str, provider_name: &str) -> String {
-    if short.contains('/') {
-        // Slashed model ids (e.g. `nvidia/nemotron-...`) are served by the
-        // OpenRouter slot, which also fronts direct OpenAI-compatible profiles
-        // such as NVIDIA NIM or DeepSeek. Label the line with the active
-        // provider's display name instead of hard-coding "OpenRouter" so the
-        // header matches the profile the user actually selected.
-        let label = {
-            let trimmed = provider_name.trim();
-            if trimmed.is_empty() {
-                "OpenRouter".to_string()
-            } else {
-                trimmed.to_string()
-            }
-        };
-        return format!("{}: {}", label, short);
-    }
-    if short.contains("opus") {
-        if short.contains("4.5") {
-            return "Claude 4.5 Opus".to_string();
-        }
-        return "Claude Opus".to_string();
-    }
-    if short.contains("sonnet") {
-        if short.contains("3.5") {
-            return "Claude 3.5 Sonnet".to_string();
-        }
-        return "Claude Sonnet".to_string();
-    }
-    if short.contains("haiku") {
-        return "Claude Haiku".to_string();
-    }
-    if short.starts_with("gpt") {
-        // Only the numeric GPT families (gpt-4o, gpt-5.2-codex, ...) have a
-        // curated form. Other gpt-prefixed ids (gpt-oss-120b) fall through to
-        // the generic prettifier instead of producing "GPT-oss120b".
-        let rest = short.trim_start_matches("gpt");
-        if rest.is_empty() || rest.starts_with(|c: char| c.is_ascii_digit()) {
-            return format_gpt_name(short);
-        }
-    }
-    short.to_string()
-}
-
-fn format_gpt_name(short: &str) -> String {
-    let rest = short.trim_start_matches("gpt");
-    if rest.is_empty() {
-        return "GPT".to_string();
-    }
-
-    if let Some(idx) = rest.find("codex") {
-        let version = &rest[..idx];
-        if version.is_empty() {
-            return "GPT Codex".to_string();
-        }
-        return format!("GPT-{} Codex", version);
-    }
-
-    format!("GPT-{}", rest)
-}
-
-/// Generic fallback for model ids with no curated pretty name: title-case the
-/// hyphen/underscore segments (`claude-fable-5` -> `Claude Fable 5`). Date or
-/// snapshot suffixes (6+ digit runs) are dropped, vowel-less short segments are
-/// treated as acronyms (`glm` -> `GLM`), and parameter sizes are uppercased
-/// (`70b` -> `70B`). Placeholder labels with spaces/ellipses pass through.
-fn prettify_model_id(model: &str) -> String {
-    if model.contains(' ') || model.contains('…') || model.contains('/') {
-        return model.to_string();
-    }
-
-    fn is_acronym(part: &str) -> bool {
-        // Well-known initialisms that contain vowels and would otherwise be
-        // title-cased as words.
-        const KNOWN: &[&str] = &["oss", "ai", "moe", "vl", "it", "fp8", "awq", "exp"];
-        if KNOWN.contains(&part.to_ascii_lowercase().as_str()) {
-            return true;
-        }
-        // Short, all-alphabetic, and vowel-less segments read as initialisms:
-        // glm, gpt, qwq, llm. Anything with a vowel (pro, max, mini, fable)
-        // reads as a word and gets normal title-casing.
-        part.len() <= 4
-            && part.chars().all(|c| c.is_ascii_alphabetic())
-            && !part
-                .chars()
-                .any(|c| matches!(c.to_ascii_lowercase(), 'a' | 'e' | 'i' | 'o' | 'u' | 'y'))
-    }
-
-    fn is_param_size(part: &str) -> bool {
-        // 70b / 8x7b / 32k style size or context markers.
-        part.len() >= 2
-            && part
-                .chars()
-                .last()
-                .is_some_and(|c| matches!(c.to_ascii_lowercase(), 'b' | 'm' | 'k'))
-            && part[..part.len() - 1]
-                .chars()
-                .all(|c| c.is_ascii_digit() || c == '.' || c == 'x')
-            && part.chars().any(|c| c.is_ascii_digit())
-    }
-
-    let parts: Vec<String> = model
-        .split(['-', '_'])
-        .filter(|part| !part.is_empty())
-        // Drop date/snapshot suffixes like 20241022.
-        .filter(|part| !(part.len() >= 6 && part.chars().all(|c| c.is_ascii_digit())))
-        .map(|part| {
-            if is_acronym(part) || is_param_size(part) {
-                return part.to_uppercase();
-            }
-            let mut chars = part.chars();
-            match chars.next() {
-                Some(first) if first.is_ascii_alphabetic() => {
-                    first.to_uppercase().chain(chars).collect::<String>()
-                }
-                Some(first) => first.to_string() + chars.as_str(),
-                None => String::new(),
-            }
-        })
-        .collect();
-    if parts.is_empty() {
-        model.to_string()
-    } else {
-        parts.join(" ")
-    }
-}
-
-/// Final display name for the header model line: curated pretty names first
-/// (Claude 4.5 Opus, GPT-5.2 Codex), generic title-cased prettification otherwise.
-fn header_model_display_name(model: &str, provider_name: &str) -> String {
-    let raw = model.trim();
-
-    // Claude family ids ("claude-opus-4-6", "claude-3-5-sonnet-latest",
-    // "claude-haiku-4.5") render as "Claude <version> <Family>" for any
-    // version, instead of only the hardcoded 3.5/4.5 cases.
-    if raw.starts_with("claude") {
-        for family in ["opus", "sonnet", "haiku"] {
-            if raw.contains(family) {
-                let family_pretty = capitalize(family);
-                let version = claude_version_segment(raw, family);
-                return match version {
-                    Some(version) => format!("Claude {} {}", version, family_pretty),
-                    None => format!("Claude {}", family_pretty),
-                };
-            }
-        }
-    }
-
-    // GPT ids are formatted from the raw segments ("gpt-5.1-codex-max" ->
-    // "GPT-5.1 Codex Max") rather than the legacy mashed short form, which
-    // produced "GPT-5.1codexmax"-style names.
-    if let Some(rest) = raw.strip_prefix("gpt-")
-        && rest.starts_with(|c: char| c.is_ascii_digit())
-    {
-        let mut segments = rest.split('-');
-        let version = segments.next().unwrap_or_default();
-        let mut name = format!("GPT-{}", version);
-        for segment in segments {
-            if segment.is_empty() {
-                continue;
-            }
-            let pretty = prettify_model_id(segment);
-            name.push(' ');
-            name.push_str(&pretty);
-        }
-        return name;
-    }
-
-    let short_model = shorten_model_name(raw);
-    let curated = format_model_name(&short_model, provider_name);
-    if curated == short_model {
-        // No curated pretty name matched; title-case the raw model id
-        // instead of showing the mangled short form (`claudefable5`).
-        prettify_model_id(raw)
-    } else {
-        curated
-    }
-}
-
-/// Extract the version from a Claude model id, e.g. "claude-opus-4-6" -> "4.6",
-/// "claude-3-5-sonnet-latest" -> "3.5", "claude-haiku-4.5" -> "4.5". Snapshot
-/// dates (6+ digit runs) are ignored.
-fn claude_version_segment(raw: &str, family: &str) -> Option<String> {
-    let digits: Vec<&str> = raw
-        .split(['-', '_'])
-        .filter(|part| *part != family)
-        .filter(|part| {
-            !part.is_empty()
-                && part.len() < 6
-                && part.chars().all(|c| c.is_ascii_digit() || c == '.')
-                && part.chars().any(|c| c.is_ascii_digit())
-        })
-        .collect();
-    match digits.as_slice() {
-        [] => None,
-        [single] => Some(single.to_string()),
-        [major, minor, ..] => Some(format!(
-            "{}.{}",
-            major.trim_matches('.'),
-            minor.trim_matches('.')
-        )),
-    }
-}
-
-fn auth_dot_color(state: AuthState) -> Color {
-    match state {
-        AuthState::Available => rgb(100, 200, 100),
-        AuthState::Expired => rgb(255, 200, 100),
-        AuthState::NotConfigured => rgb(80, 80, 80),
-    }
-}
-
-fn auth_dot_char(state: AuthState) -> &'static str {
-    match state {
-        AuthState::Available => "●",
-        AuthState::Expired => "◐",
-        AuthState::NotConfigured => "○",
-    }
-}
-
-/// Authoritative active credential per dual-auth provider, resolved by the app
-/// from the live provider/remote server. `None` entries mean "unknown, fall
-/// back to the cached `AuthStatus` + env heuristic".
-#[derive(Clone, Copy, Default)]
-pub(super) struct ActiveCredentialOverrides {
-    anthropic: Option<crate::auth::ActiveCredential>,
-    openai: Option<crate::auth::ActiveCredential>,
-}
-
-impl ActiveCredentialOverrides {
-    fn from_app(app: &dyn TuiState) -> Self {
-        Self {
-            anthropic: app.active_dual_credential(jcode_provider_core::ActiveProvider::Claude),
-            openai: app.active_dual_credential(jcode_provider_core::ActiveProvider::OpenAI),
-        }
-    }
-
-    fn get(
-        &self,
-        provider: jcode_provider_core::ActiveProvider,
-    ) -> Option<crate::auth::ActiveCredential> {
-        match provider {
-            jcode_provider_core::ActiveProvider::Claude => self.anthropic,
-            jcode_provider_core::ActiveProvider::OpenAI => self.openai,
-            _ => None,
-        }
-    }
-}
-
-/// Configured providers with their full labels, in display order.
-fn auth_full_specs(
-    auth: &AuthStatus,
-    active: ActiveCredentialOverrides,
-) -> Vec<(String, AuthState)> {
-    fn provider_label(name: &str, state: AuthState, method: Option<&str>) -> String {
-        match (state, method) {
-            (AuthState::NotConfigured, _) => name.to_string(),
-            (_, Some(method)) if !method.is_empty() => format!("{}({})", name, method),
-            _ => name.to_string(),
-        }
-    }
-
-    // The auth list is a credential *inventory* (what is configured), while
-    // the provider tag above reports the *active* route. When both credentials
-    // are configured, mark the active one with `*` so the two surfaces read as
-    // one consistent story ("oauth*+key" = both configured, OAuth in use)
-    // instead of an ambiguous "oauth+key" that looks like both are being used
-    // at once.
-    fn dual_method_label(
-        provider: jcode_provider_core::ActiveProvider,
-        auth: &AuthStatus,
-        active: ActiveCredentialOverrides,
-    ) -> Option<&'static str> {
-        use crate::auth::{ActiveCredential, resolve_dual_credential_auth};
-        let runtime_provider = std::env::var("JCODE_RUNTIME_PROVIDER").ok();
-        let resolved = resolve_dual_credential_auth(provider, auth, runtime_provider.as_deref())?;
-        // Prefer the app's authoritative answer over the env heuristic.
-        let active = active.get(provider).unwrap_or(resolved.active);
-        Some(match (resolved.has_oauth, resolved.has_api_key) {
-            (true, true) => match active {
-                ActiveCredential::OAuth => "oauth*+key",
-                ActiveCredential::ApiKey => "oauth+key*",
-            },
-            (true, false) => "oauth",
-            (false, true) => "key",
-            (false, false) => return None,
-        })
-    }
-
-    let anthropic_label = provider_label(
-        "anthropic",
-        auth.anthropic.state,
-        dual_method_label(jcode_provider_core::ActiveProvider::Claude, auth, active),
-    );
-
-    let openai_label = provider_label(
-        "openai",
-        auth.openai,
-        dual_method_label(jcode_provider_core::ActiveProvider::OpenAI, auth, active),
-    );
-
-    let gemini_label = if auth.gemini != AuthState::NotConfigured {
-        provider_label("gemini", auth.gemini, Some("oauth"))
-    } else {
-        provider_label("gemini", auth.gemini, None)
-    };
-
-    vec![
-        (anthropic_label, auth.anthropic.state),
-        ("openrouter".to_string(), auth.openrouter),
-        (openai_label, auth.openai),
-        (provider_label("cursor", auth.cursor, None), auth.cursor),
-        (provider_label("copilot", auth.copilot, None), auth.copilot),
-        (gemini_label, auth.gemini),
-        (
-            provider_label("antigravity", auth.antigravity, None),
-            auth.antigravity,
-        ),
-    ]
-}
-
-/// Vertical auth inventory: one line per provider. Configured providers get
-/// green/yellow dots; unconfigured ones get a dim hollow dot so they read as
-/// available-to-add without cluttering the `/login` heading.
-pub(super) fn build_auth_status_lines(
-    auth: &AuthStatus,
-    active: ActiveCredentialOverrides,
-) -> Vec<Line<'static>> {
-    let specs = auth_full_specs(auth, active);
-    // Only list providers the user actually has credentials for. When nothing
-    // is configured at all, fall back to the full list so the `/login` heading
-    // still shows what can be added.
-    let configured: Vec<_> = specs
-        .iter()
-        .filter(|(_, state)| *state != AuthState::NotConfigured)
-        .cloned()
-        .collect();
-    let shown = if configured.is_empty() {
-        specs
-    } else {
-        configured
-    };
-    shown
-        .into_iter()
-        .map(|(label, state)| {
-            Line::from(vec![
-                Span::styled(
-                    auth_dot_char(state),
-                    Style::default().fg(auth_dot_color(state)),
-                ),
-                Span::styled(format!(" {}", label), Style::default().fg(dim_color())),
-            ])
-        })
-        .collect()
-}
-
-fn header_provider_auth_tag(
-    name: &str,
-    auth: &AuthStatus,
-    active: ActiveCredentialOverrides,
-) -> &'static str {
-    let runtime_provider = std::env::var("JCODE_RUNTIME_PROVIDER").ok();
-
-    // Anthropic and OpenAI share one credential-resolution source of truth so
-    // the header tag never drifts from the info widget / model-switch line. We
-    // route through the canonical ActiveProvider rather than matching display
-    // strings, which is how this surface previously broke (name == "claude"
-    // never matched a "anthropic"-only arm and the tag silently vanished).
-    if let Some(provider) = jcode_provider_core::parse_provider_hint(name) {
-        use crate::auth::{ActiveCredential, resolve_dual_credential_auth};
-        match resolve_dual_credential_auth(provider, auth, runtime_provider.as_deref()) {
-            Some(resolved) => {
-                // The app's live answer wins over the env heuristic; the env
-                // var is frequently absent in the TUI client process.
-                let credential = active.get(provider).unwrap_or(resolved.active);
-                // Report exactly the credential the next request will use. The
-                // "both configured" inventory now lives in the auth status line
-                // (`oauth*+key`), so this tag never claims two credentials at
-                // once -- that ambiguity is how "Claude OAuth" and "API key"
-                // used to contradict each other across surfaces.
-                return match credential {
-                    ActiveCredential::OAuth => "oauth",
-                    ActiveCredential::ApiKey => "api-key",
-                };
-            }
-            // Provider recognized but no credentials configured: no tag.
-            None if matches!(
-                provider,
-                jcode_provider_core::ActiveProvider::Claude
-                    | jcode_provider_core::ActiveProvider::OpenAI
-            ) =>
-            {
-                return "";
-            }
-            None => {}
-        }
-    }
-
-    match name {
-        "copilot" => {
-            if auth.copilot_has_api_token {
-                "oauth"
-            } else {
-                ""
-            }
-        }
-        "openrouter" | "openai-compatible" => "api-key",
-        other
-            if crate::provider_catalog::resolve_openai_compatible_profile_selection(other)
-                .is_some()
-                || crate::provider_catalog::openai_compatible_profile_id_for_display_name(
-                    other,
-                )
-                .is_some() =>
-        {
-            "api-key"
-        }
-        _ => "",
-    }
-}
-
-fn header_provider_label(
-    provider_name: &str,
-    auth: &AuthStatus,
-    active: ActiveCredentialOverrides,
-) -> String {
-    let trimmed = provider_name.trim();
-    if trimmed.is_empty() {
-        return String::new();
-    }
-    let name = trimmed.to_lowercase();
-    let auth_tag = header_provider_auth_tag(&name, auth, active);
-    if auth_tag.is_empty() {
-        name
-    } else {
-        format!("{}:{}", auth_tag, name)
     }
 }
 
@@ -605,323 +141,80 @@ fn configured_auth_count(auth: &AuthStatus) -> usize {
 #[cfg(test)]
 pub(super) fn build_persistent_header(app: &dyn TuiState, width: u16) -> Vec<Line<'static>> {
     let auth = app.auth_status();
-    let active = ActiveCredentialOverrides::from_app(app);
-    build_persistent_header_with_auth(app, width, &auth, active)
+    build_persistent_header_with_auth(app, width, &auth)
 }
 
 fn build_persistent_header_with_auth(
     app: &dyn TuiState,
     width: u16,
-    auth: &AuthStatus,
-    active: ActiveCredentialOverrides,
+    _auth: &AuthStatus,
 ) -> Vec<Line<'static>> {
-    let model = app.provider_model();
-    let session_name = app.session_display_name().unwrap_or_default();
-    let server_name = app.server_display_name();
-    // The client line is identified by its session name, so show that name's
-    // icon (e.g. "ram" -> 🐏). Previously a remote http/ws connection icon
-    // (🌐/🔌) replaced it entirely, which hid the name icon for every remote
-    // client. Keep the connection icon as a separate trailing hint instead.
-    let icon = crate::id::session_icon(&session_name);
-    let connection_icon = connection_type_icon(app.connection_type().as_deref());
-    let nice_model = header_model_display_name(&model, &app.provider_name());
-    let align = Alignment::Left;
-    let mut lines: Vec<Line> = Vec::new();
-    let w = width as usize;
+    let width = width as usize;
 
-    let is_canary = app.is_canary();
-    let is_remote = app.is_remote_mode();
-    let server_update = app.server_update_available() == Some(true);
-    let client_update = app.client_update_available();
-    let mut status_items: Vec<&str> = Vec::new();
-    if app.is_replay() {
-        status_items.push("replay");
-    } else if is_remote {
-        status_items.push("client");
-    }
-    if server_update {
-        status_items.push("srv↑");
-    }
-    if client_update {
-        status_items.push("cli↑");
-    }
-    if let Some(badge) = crate::perf::profile().tier.badge() {
-        status_items.push(badge);
-    }
+    let project = app
+        .working_dir()
+        .map(|dir| abbreviate_home(&dir))
+        .unwrap_or_else(|| "project".to_string());
 
-    // Labeled versions for the `server:` / `client:` lines. Lots of users run
-    // mismatched client/server binaries, so both lines carry their own version
-    // label (and highlight on mismatch) instead of relying on the single
-    // ambiguous version line at the bottom.
-    let server_version_full = app.server_display_version();
-    let client_version_full = server_name
-        .as_ref()
-        .map(|_| jcode_build_meta::version().to_string());
-    let version_mismatch = matches!(
-        (&server_version_full, &client_version_full),
-        (Some(server), Some(client)) if server.trim() != client.trim()
-    );
-    let include_hash = version_mismatch
-        && matches!(
-            (&server_version_full, &client_version_full),
-            (Some(server), Some(client))
-                if compact_version_label(server) == compact_version_label(client)
-        );
-    let version_style = if version_mismatch {
-        Style::default().fg(rgb(255, 200, 100))
-    } else {
-        Style::default().fg(dim_color())
-    };
-    let server_version_label = server_version_full
-        .as_deref()
-        .map(|version| header_version_label(version, include_hash));
-    let client_version_label = client_version_full
-        .as_deref()
-        .map(|version| header_version_label(version, include_hash));
+    let project = if let Some(branch) = app.git_branch() {
+        let with_branch = format!("{project} ({branch})");
 
-    // First line: `jcode` (+ `self-dev` when running a dev/canary build),
-    // followed by any remaining status badges rendered dimly.
-    {
-        let mut spans = vec![Span::styled(
-            "jcode".to_string(),
-            Style::default().fg(header_name_color()).bold(),
-        )];
-        if is_canary {
-            spans.push(Span::styled(
-                " self-dev".to_string(),
-                Style::default().fg(dim_color()),
-            ));
-        }
-        if !status_items.is_empty() {
-            spans.push(Span::styled(
-                format!(" · {}", status_items.join(" · ")),
-                Style::default().fg(dim_color()),
-            ));
-        }
-        lines.push(Line::from(spans).alignment(align));
-    }
-
-    if let Some(server_name) = server_name.as_deref() {
-        let server_icon = app.server_display_icon().unwrap_or_default();
-        let server_text = if server_icon.is_empty() {
-            format!("server: {}", capitalize(server_name))
+        if with_branch.chars().count() <= width.saturating_sub(12) {
+            with_branch
         } else {
-            format!("server: {} {}", capitalize(server_name), server_icon)
-        };
-        let mut spans = vec![Span::styled(
-            server_text.clone(),
-            Style::default().fg(dim_color()),
-        )];
-        if let Some(version) = server_version_label.as_deref() {
-            let suffix = format!(" · {}", version);
-            if server_text.chars().count() + suffix.chars().count() <= w {
-                spans.push(Span::styled(suffix, version_style));
-            }
+            project
         }
-        lines.push(Line::from(spans).alignment(align));
+    } else {
+        project
+    };
+
+    let title = "KRAIVCODE";
+    let title_len = title.chars().count();
+    let project_len = project.chars().count();
+
+    let gap = width
+        .saturating_sub(title_len + project_len)
+        .max(2);
+
+    if title_len + gap + project_len > width {
+        return vec![Line::from(Span::styled(
+            title,
+            Style::default()
+                .fg(header_name_color())
+                .bold(),
+        ))];
     }
 
-    if !session_name.is_empty() {
-        let client_text = match connection_icon {
-            Some(conn) => format!("client: {} {} {}", capitalize(&session_name), icon, conn),
-            None => format!("client: {} {}", capitalize(&session_name), icon),
-        };
-        let mut spans = vec![Span::styled(
-            client_text.clone(),
-            Style::default().fg(dim_color()),
-        )];
-        if let Some(version) = client_version_label.as_deref() {
-            let suffix = format!(" · {}", version);
-            if client_text.chars().count() + suffix.chars().count() <= w {
-                spans.push(Span::styled(suffix, version_style));
-            }
-        }
-        lines.push(Line::from(spans).alignment(align));
-    } else if server_name.is_none() {
-        lines.push(
-            Line::from(Span::styled(
-                "JCode".to_string(),
-                Style::default().fg(header_name_color()),
-            ))
-            .alignment(align),
-        );
-    }
-
-    // Single model line: dim active-route method on the left, styled model
-    // name in the middle, dim upstream/hint detail after. This used to be a
-    // second, unstyled line in the secondary header duplicating the model name.
-    let model_is_placeholder = {
-        let trimmed = model.trim();
-        trimmed.is_empty()
-            || trimmed == "connected"
-            || trimmed.ends_with('…')
-            || trimmed.starts_with("connecting")
-    };
-    let provider_label = if model_is_placeholder {
-        String::new()
-    } else {
-        header_provider_label(&app.provider_name(), auth, active)
-    };
-    let upstream = if model_is_placeholder {
-        None
-    } else {
-        app.upstream_provider()
-    };
-    let mut model_spans: Vec<Span> = Vec::new();
-    let mut model_line_len = nice_model.chars().count();
-    // Keep a little headroom below the full width so the line never
-    // wraps when the render area subtracts side margins.
-    let fit_width = w.saturating_sub(4);
-    if !model_is_placeholder && !nice_model.is_empty() {
-        let hint = "/model to switch · ";
-        if model_line_len + hint.chars().count() <= fit_width {
-            model_line_len += hint.chars().count();
-            model_spans.push(Span::styled(
-                hint.to_string(),
+    vec![
+        Line::from(vec![
+            Span::styled(
+                title,
+                Style::default()
+                    .fg(header_name_color())
+                    .bold(),
+            ),
+            Span::raw(" ".repeat(gap)),
+            Span::styled(
+                project,
                 Style::default().fg(dim_color()),
-            ));
-        }
-    }
-    if !provider_label.is_empty() {
-        let prefix = format!("{} · ", provider_label);
-        if model_line_len + prefix.chars().count() <= fit_width {
-            model_line_len += prefix.chars().count();
-            model_spans.push(Span::styled(prefix, Style::default().fg(dim_color())));
-        }
-    }
-    model_spans.push(Span::styled(
-        nice_model.clone(),
-        // Match the info widget's model accent (pink, bold) instead of plain
-        // white so the model reads as a distinct, styled element.
-        Style::default().fg(rgb(255, 150, 200)).bold(),
-    ));
-    if let Some(upstream) = upstream.as_deref() {
-        let suffix = format!(" via {}", upstream);
-        if model_line_len + suffix.chars().count() <= fit_width {
-            model_spans.push(Span::styled(suffix, Style::default().fg(dim_color())));
-        }
-    }
-    if !nice_model.is_empty() {
-        lines.push(Line::from(model_spans).alignment(align));
-    }
-
-    // When there is no server/client version labeling (standalone mode),
-    // still surface the running version on the jcode line's own row.
-    if client_version_label.is_none() {
-        let version_text = if is_running_stable_release() {
-            let tag = jcode_build_meta::git_tag();
-            if tag.is_empty() || tag.contains('-') {
-                format!("{} · release", semver())
-            } else {
-                format!("{} · release {}", semver(), tag)
-            }
-        } else {
-            semver().to_string()
-        };
-        lines.push(
-            Line::from(Span::styled(version_text, Style::default().fg(dim_color())))
-                .alignment(align),
-        );
-    }
-
-    lines
+            ),
+        ])
+        .alignment(Alignment::Left),
+    ]
 }
 
 #[cfg(test)]
 pub(crate) fn build_header_lines(app: &dyn TuiState, width: u16) -> Vec<Line<'static>> {
     let auth = app.auth_status();
-    let active = ActiveCredentialOverrides::from_app(app);
-    build_header_lines_with_auth(app, width, &auth, active)
+    build_header_lines_with_auth(app, width, &auth)
 }
 
 fn build_header_lines_with_auth(
-    app: &dyn TuiState,
-    width: u16,
-    auth: &AuthStatus,
-    active: ActiveCredentialOverrides,
+    _app: &dyn TuiState,
+    _width: u16,
+    _auth: &AuthStatus,
 ) -> Vec<Line<'static>> {
-    let mut lines: Vec<Line> = Vec::new();
-    let align = ratatui::layout::Alignment::Left;
-    let w = width as usize;
-
-    // Auth inventory: `/login` heading, then one provider per line (dim
-    // hollow dot for unconfigured providers).
-    let auth_lines = build_auth_status_lines(auth, active);
-    let login_heading = "/login to add provider".to_string();
-    lines.push(
-        Line::from(Span::styled(
-            login_heading,
-            Style::default().fg(dim_color()),
-        ))
-        .alignment(align),
-    );
-    for line in auth_lines {
-        lines.push(line.alignment(align));
-    }
-
-    let mcps = app.mcp_servers();
-    if !mcps.is_empty() {
-        const MAX_MCPS: usize = 4;
-        let shown: Vec<String> = mcps
-            .iter()
-            .take(MAX_MCPS)
-            .map(|(name, count)| {
-                if *count > 0 {
-                    format!("{} ({} tools)", name, count)
-                } else {
-                    format!("{} (…)", name)
-                }
-            })
-            .collect();
-        let mut mcp_text = format!("mcp: {}", shown.join(", "));
-        if mcps.len() > MAX_MCPS {
-            mcp_text.push_str(&format!(" +{} more", mcps.len() - MAX_MCPS));
-        }
-        if mcp_text.chars().count() > w {
-            mcp_text = format!("mcp: {} servers", mcps.len());
-        }
-        lines.push(
-            Line::from(Span::styled(mcp_text, Style::default().fg(dim_color()))).alignment(align),
-        );
-    }
-
-    let skills = app.available_skills();
-    if !skills.is_empty() {
-        const MAX_SKILLS: usize = 6;
-        let shown: Vec<String> = skills
-            .iter()
-            .take(MAX_SKILLS)
-            .map(|s| format!("/{}", s))
-            .collect();
-        let mut skills_text = format!("skills: {}", shown.join(" "));
-        if skills.len() > MAX_SKILLS {
-            skills_text.push_str(&format!(" +{} more", skills.len() - MAX_SKILLS));
-        }
-        if skills_text.chars().count() > w {
-            skills_text = format!("skills: {} loaded", skills.len());
-        }
-        lines.push(
-            Line::from(Span::styled(skills_text, Style::default().fg(dim_color())))
-                .alignment(align),
-        );
-    }
-
-    if let Some(dir) = app.working_dir() {
-        let display_dir = abbreviate_home(&dir);
-        let mut text = display_dir;
-        if let Some(branch) = app.git_branch() {
-            let with_branch = format!("{} ({})", text, branch);
-            if with_branch.chars().count() <= w {
-                text = with_branch;
-            }
-        }
-        lines.push(
-            Line::from(Span::styled(text, Style::default().fg(dim_color()))).alignment(align),
-        );
-    }
-
-    lines.push(Line::from(""));
-    lines
+    Vec::new()
 }
 
 /// Build the "Updates" rounded box (unseen release notes) so it can be
@@ -987,10 +280,9 @@ pub(super) fn build_header_sections(
     width: u16,
 ) -> (Vec<Line<'static>>, Vec<Line<'static>>) {
     let auth = app.auth_status();
-    let active = ActiveCredentialOverrides::from_app(app);
     (
-        build_persistent_header_with_auth(app, width, &auth, active),
-        build_header_lines_with_auth(app, width, &auth, active),
+        build_persistent_header_with_auth(app, width, &auth),
+        build_header_lines_with_auth(app, width, &auth),
     )
 }
 
@@ -1411,139 +703,6 @@ mod tests {
         };
 
         assert_eq!(configured_auth_count(&auth), 4);
-    }
-
-    #[test]
-    fn header_provider_auth_tag_reports_active_credential_for_openai() {
-        let _guard = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_RUNTIME_PROVIDER");
-        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
-        let auth = AuthStatus {
-            openai: AuthState::Available,
-            openai_has_oauth: true,
-            openai_has_api_key: true,
-            ..AuthStatus::default()
-        };
-
-        // Auto mode prefers OAuth; the tag must report only the credential in
-        // use (the auth inventory line carries the "both configured" detail).
-        assert_eq!(
-            header_provider_auth_tag("openai", &auth, ActiveCredentialOverrides::default()),
-            "oauth"
-        );
-        if let Some(value) = prev {
-            crate::env::set_var("JCODE_RUNTIME_PROVIDER", value);
-        }
-    }
-
-    #[test]
-    fn header_provider_auth_tag_prefers_app_resolved_credential_over_env() {
-        let _guard = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_RUNTIME_PROVIDER");
-        // The TUI client usually does not inherit JCODE_RUNTIME_PROVIDER, so the
-        // env heuristic would answer "oauth" here; the app's resolution must win.
-        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
-        let both = AuthStatus {
-            anthropic: ProviderAuth {
-                // `state` must be set alongside the credential booleans:
-                // `build_auth_status_lines` filters `NotConfigured` providers out
-                // and falls back to the full "no credentials" list (issue #654).
-                state: AuthState::Available,
-                has_oauth: true,
-                oauth_state: AuthState::Available,
-                has_api_key: true,
-            },
-            ..AuthStatus::default()
-        };
-        let overrides = ActiveCredentialOverrides {
-            anthropic: Some(crate::auth::ActiveCredential::ApiKey),
-            openai: None,
-        };
-        assert_eq!(
-            header_provider_auth_tag("anthropic", &both, overrides),
-            "api-key"
-        );
-        let rendered = build_auth_status_lines(&both, overrides)
-            .iter()
-            .flat_map(|line| line.spans.iter())
-            .map(|span| span.content.as_ref())
-            .collect::<String>();
-        assert!(
-            rendered.contains("anthropic(oauth+key*)"),
-            "rendered: {rendered}"
-        );
-
-        if let Some(value) = prev {
-            crate::env::set_var("JCODE_RUNTIME_PROVIDER", value);
-        }
-    }
-
-    #[test]
-    fn header_provider_auth_tag_honors_runtime_selection_and_oauth_first() {
-        let _guard = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_RUNTIME_PROVIDER");
-
-        let both = AuthStatus {
-            anthropic: ProviderAuth {
-                has_oauth: true,
-                has_api_key: true,
-                ..Default::default()
-            },
-            ..AuthStatus::default()
-        };
-
-        // Explicit API-key selection wins even when OAuth is available.
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", "claude-api");
-        assert_eq!(
-            header_provider_auth_tag("anthropic", &both, ActiveCredentialOverrides::default()),
-            "api-key"
-        );
-
-        // Explicit OAuth selection.
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", "claude");
-        assert_eq!(
-            header_provider_auth_tag("anthropic", &both, ActiveCredentialOverrides::default()),
-            "oauth"
-        );
-
-        // Auto (unset) prefers OAuth when both credentials are present.
-        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
-        assert_eq!(
-            header_provider_auth_tag("anthropic", &both, ActiveCredentialOverrides::default()),
-            "oauth"
-        );
-
-        // The "claude" display name resolves to the same Anthropic tagging.
-        assert_eq!(
-            header_provider_auth_tag("claude", &both, ActiveCredentialOverrides::default()),
-            "oauth"
-        );
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", "claude-api");
-        assert_eq!(
-            header_provider_auth_tag("claude", &both, ActiveCredentialOverrides::default()),
-            "api-key"
-        );
-        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
-
-        // Auto falls back to the API key when no OAuth credential exists.
-        let api_only = AuthStatus {
-            anthropic: ProviderAuth {
-                has_oauth: false,
-                has_api_key: true,
-                ..Default::default()
-            },
-            ..AuthStatus::default()
-        };
-        assert_eq!(
-            header_provider_auth_tag("anthropic", &api_only, ActiveCredentialOverrides::default()),
-            "api-key"
-        );
-
-        if let Some(value) = prev {
-            crate::env::set_var("JCODE_RUNTIME_PROVIDER", value);
-        } else {
-            crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
-        }
     }
 
     #[test]
