@@ -1,4 +1,5 @@
 use super::*;
+use crate::tui::AgentMode;
 use crate::tui::TuiState as _;
 use std::cell::RefCell;
 use std::sync::Mutex;
@@ -1774,6 +1775,18 @@ impl crate::tui::TuiState for App {
 
     fn swarm_panel_full_page(&self) -> bool {
         self.swarm_panel_full_page && self.inline_swarm_gallery_active()
+    }
+
+    fn agent_mode(&self) -> AgentMode {
+        self.agent_mode
+    }
+
+    fn plan_active(&self) -> bool {
+        self.plan_active
+    }
+
+    fn plan_mode(&self) -> Option<&str> {
+        self.plan_mode.as_deref()
     }
 
     fn diagram_focus(&self) -> bool {
