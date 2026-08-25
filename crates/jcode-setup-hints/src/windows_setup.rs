@@ -604,7 +604,7 @@ pub(super) fn windows_launch_hotkeys_notice(state: &SetupHintsState) -> Option<S
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_default();
 
-    let rows: Vec<super::LaunchHotkeyRow> = resolve_windows_hotkeys()
+    let _rows: Vec<super::LaunchHotkeyRow> = resolve_windows_hotkeys()
         .into_iter()
         .filter(|hk| windows_hotkeys::hotkey_to_win32(hk).is_some())
         .map(|hk| {
@@ -619,17 +619,7 @@ pub(super) fn windows_launch_hotkeys_notice(state: &SetupHintsState) -> Option<S
         })
         .collect();
 
-    let lines =
-        super::launch_hotkey_notice_lines(&rows, &state.launch_hotkey_usage, state.launch_count)?;
-
-    Some(StartupHints::with_status_and_display(
-        "Launch hotkeys available".to_string(),
-        "Launch hotkeys",
-        format!(
-            "Configured Jcode launch hotkeys:\n{}\n\nThese fire system-wide.",
-            lines.join("\n")
-        ),
-    ))
+    None
 }
 
 /// Reinstall the Windows hotkey listener after the `[launch_hotkeys]` config
