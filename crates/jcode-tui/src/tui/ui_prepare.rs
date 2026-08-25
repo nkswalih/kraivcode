@@ -389,6 +389,98 @@ fn push_user_prompt_lines(
     }
 }
 
+fn pasted_placeholder_end(content: &str, start: usize) -> Option<usize> {
+    const PREFIX: &str = "[Pasted ~";
+    let rest = content.get(start..)?.strip_prefix(PREFIX)?;
+    let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 0 {
+        return None;
+    }
+    let suffix = rest.get(digits..)?;
+    let suffix_len = if suffix.starts_with(" line]") {
+        " line]".len()
+    } else if suffix.starts_with(" lines]") {
+        " lines]".len()
+    } else {
+        return None;
+    };
+    Some(start + PREFIX.len() + digits + suffix_len)
+}
+
+fn push_pasted_user_prompt_lines(
+    acc: &mut BodyAcc,
+    content: &str,
+    align: ratatui::layout::Alignment,
+    width: u16,
+) {
+    const PREFIX: &str = "[Pasted ~";
+    let mut cursor = 0usize;
+    let mut first_segment = true;
+
+    while let Some(relative) = content[cursor..].find(PREFIX) {
+        let start = cursor + relative;
+        let Some(end) = pasted_placeholder_end(content, start) else {
+            cursor = start + PREFIX.len();
+            continue;
+        };
+
+        let normal = &content[cursor..start];
+        if !normal.is_empty() && !normal.trim().is_empty() {
+            let prompt_indices_before = acc.user_line_indices.len();
+            push_user_prompt_lines(
+                &mut acc.lines,
+                &mut acc.raw_plain_lines,
+                &mut acc.line_raw_overrides,
+                &mut acc.line_copy_offsets,
+                &mut acc.user_line_indices,
+                normal,
+                align,
+            );
+            if !first_segment {
+                acc.user_line_indices.truncate(prompt_indices_before);
+            }
+            first_segment = false;
+        }
+
+        let placeholder = &content[start..end];
+        let available_width = width.saturating_sub(2) as usize;
+        let max_box_width = available_width.min(64);
+        let box_lines = render_rounded_box(
+            "Pasted content",
+            vec![Line::from(Span::styled(
+                placeholder.to_string(),
+                Style::default().fg(user_color()).bold(),
+            ))],
+            max_box_width,
+            Style::default().fg(user_color()),
+        );
+        if first_segment {
+            acc.user_line_indices.push(acc.lines.len());
+        }
+        for line in box_lines {
+            acc.push_auto(line.alignment(align));
+        }
+        first_segment = false;
+        cursor = end;
+    }
+
+    if cursor < content.len() {
+        let prompt_indices_before = acc.user_line_indices.len();
+        push_user_prompt_lines(
+            &mut acc.lines,
+            &mut acc.raw_plain_lines,
+            &mut acc.line_raw_overrides,
+            &mut acc.line_copy_offsets,
+            &mut acc.user_line_indices,
+            &content[cursor..],
+            align,
+        );
+        if !first_segment {
+            acc.user_line_indices.truncate(prompt_indices_before);
+        }
+    }
+}
+
 fn empty_prepared_messages() -> PreparedMessages {
     PreparedMessages {
         wrapped_lines: Vec::new(),
@@ -1356,15 +1448,19 @@ fn render_message_into(
         "user" => {
             acc.prompt_num += 1;
             acc.user_prompt_texts.push(msg.content.clone());
-            push_user_prompt_lines(
-                &mut acc.lines,
-                &mut acc.raw_plain_lines,
-                &mut acc.line_raw_overrides,
-                &mut acc.line_copy_offsets,
-                &mut acc.user_line_indices,
-                &msg.content,
-                align,
-            );
+            if msg.is_pasted_user() {
+                push_pasted_user_prompt_lines(acc, &msg.content, align, width);
+            } else {
+                push_user_prompt_lines(
+                    &mut acc.lines,
+                    &mut acc.raw_plain_lines,
+                    &mut acc.line_raw_overrides,
+                    &mut acc.line_copy_offsets,
+                    &mut acc.user_line_indices,
+                    &msg.content,
+                    align,
+                );
+            }
             if !crate::session::is_attached_image_label_text(&msg.content) {
                 let ordinal = acc.anchor_prompt_ordinal;
                 acc.anchor_prompt_ordinal += 1;
