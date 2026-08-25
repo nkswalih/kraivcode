@@ -1091,22 +1091,21 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         // >> prefix (dim)
         spans.push(Span::styled(">> ", Style::default().fg(dim_color())));
 
+        // Plan prefix (dim, when a swarm plan graph is active): >> Plan · Swarm · …
+        if app.plan_active() {
+            spans.push(Span::styled(
+                "Plan",
+                Style::default().fg(dim_color()).bold(),
+            ));
+            spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+        }
+
         // Agent mode label (accent color, bold)
         let mode_label = app.agent_mode().label();
         spans.push(Span::styled(
             mode_label.to_string(),
             Style::default().fg(user_color()).bold(),
         ));
-
-        // Plan mode prefix (dim, when active)
-        if app.plan_active() {
-            if let Some(plan_mode) = app.plan_mode() {
-                spans.push(Span::styled(
-                    format!(" ({})", plan_mode),
-                    Style::default().fg(dim_color()),
-                ));
-            }
-        }
 
         // · separator
         spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
@@ -1140,21 +1139,27 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             ));
         }
 
-        // Context usage with yellow bar (right-aligned)
+        // Context usage, right-aligned: 3.1k/272k · ████████░░ · 1%
         let ctx_bar = if let Some((used, limit)) = overscroll_context_usage(&data) {
-            let token_text = format!(
-                "{}/{} ",
-                overscroll_format_tokens(used),
-                overscroll_format_tokens(limit)
-            );
-            let bar_cells = 12usize;
+            let pct = ((used as f64 / limit.max(1) as f64) * 100.0).round() as u16;
+            let bar_cells = 8usize;
             let mut bar_spans = context_bar_yellow(used, limit, bar_cells);
             let mut right_side: Vec<Span> = Vec::new();
             right_side.push(Span::styled(
-                token_text,
+                format!(
+                    "{}/{}",
+                    overscroll_format_tokens(used),
+                    overscroll_format_tokens(limit)
+                ),
                 Style::default().fg(dim_color()),
             ));
+            right_side.push(Span::styled(" · ", Style::default().fg(dim_color())));
             right_side.append(&mut bar_spans);
+            right_side.push(Span::styled(" · ", Style::default().fg(dim_color())));
+            right_side.push(Span::styled(
+                format!("{}%", pct),
+                Style::default().fg(user_color()).bold(),
+            ));
             Some(right_side)
         } else {
             None
