@@ -17,6 +17,7 @@ pub struct DisplayMessage {
 }
 
 impl DisplayMessage {
+    pub const PASTED_CONTENT_TITLE: &'static str = "Pasted content";
     /// Create an error message.
     pub fn error(content: impl Into<String>) -> Self {
         Self {
@@ -128,6 +129,17 @@ impl DisplayMessage {
             title: None,
             tool_data: None,
         }
+    }
+
+    /// Create a user message whose visible content contains tracked paste
+    /// placeholders. The title is display-only provenance used by the TUI
+    /// renderer; provider/session payloads remain separate and expanded.
+    pub fn pasted_user(content: impl Into<String>) -> Self {
+        Self::user(content).with_title(Self::PASTED_CONTENT_TITLE)
+    }
+
+    pub fn is_pasted_user(&self) -> bool {
+        self.role == "user" && self.title.as_deref() == Some(Self::PASTED_CONTENT_TITLE)
     }
 
     /// Create an assistant message.
@@ -444,6 +456,15 @@ mod tests {
         first.duration_secs = Some(1.0);
         second.duration_secs = Some(9.0);
         assert_eq!(first.stable_cache_hash(), second.stable_cache_hash());
+    }
+
+    #[test]
+    fn pasted_user_metadata_is_explicit_and_not_content_inferred() {
+        let pasted = DisplayMessage::pasted_user("[Pasted ~4 lines]");
+        assert!(pasted.is_pasted_user());
+
+        let typed = DisplayMessage::user("[Pasted ~4 lines]");
+        assert!(!typed.is_pasted_user());
     }
 
     #[test]
