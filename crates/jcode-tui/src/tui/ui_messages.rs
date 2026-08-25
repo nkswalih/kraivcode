@@ -94,6 +94,11 @@ pub(crate) fn render_assistant_message(
     if centered {
         markdown::recenter_structured_blocks_for_display(&mut lines, width as usize);
     }
+    // Add 3-char left padding (OpenCode-style gutter) to each line.
+    let pad = Span::raw("   ");
+    for line in &mut lines {
+        line.spans.insert(0, pad.clone());
+    }
     if !msg.tool_calls.is_empty() {
         if lines.iter().any(|line| {
             line.spans
@@ -3996,12 +4001,26 @@ pub(crate) fn render_tool_message(
         .map(|counts| counts.failed > 0 && counts.succeeded > 0)
         .unwrap_or(false);
 
+    // OpenCode-style icons based on tool type.
+    let canonical = tools_ui::canonical_tool_name(&tc.name);
     let (icon, icon_color) = if is_partial_batch {
         ("⚠", rgb(214, 184, 92))
     } else if is_error {
-        ("✗", rgb(220, 100, 100))
+        ("✗", rgb(224, 108, 117))
     } else {
-        ("✓", rgb(100, 180, 100))
+        match canonical {
+            "read" => ("→", dim_color()),
+            "edit" | "write" => ("←", dim_color()),
+            "bash" => ("$", dim_color()),
+            "glob" | "grep" | "agentgrep" => ("✱", dim_color()),
+            "webfetch" => ("%", dim_color()),
+            "websearch" => ("◈", dim_color()),
+            "subagent" | "task" => ("✓", dim_color()),
+            "todowrite" | "todo" => ("⚙", dim_color()),
+            "question" => ("→", dim_color()),
+            "skill" => ("→", dim_color()),
+            _ => ("⚙", dim_color()),
+        }
     };
 
     let is_edit_tool = tools_ui::is_edit_tool_name(&tc.name);
@@ -4075,7 +4094,7 @@ pub(crate) fn render_tool_message(
     };
 
     let mut tool_line = vec![
-        Span::styled(format!("  {} ", icon), Style::default().fg(icon_color)),
+        Span::styled(format!("   {} ", icon), Style::default().fg(icon_color)),
         Span::styled(display_name, Style::default().fg(tool_color())),
     ];
     if let Some(intent) = intent {
@@ -4154,7 +4173,7 @@ pub(crate) fn render_tool_message(
         let command_detail = tools_ui::get_tool_summary_with_budget(tc, 80, Some(detail_width));
         if !command_detail.trim().is_empty() {
             let detail_line = Line::from(vec![
-                Span::raw("    "),
+                Span::raw("      "),
                 Span::styled(command_detail, Style::default().fg(dim_color())),
             ]);
             lines.push(super::truncate_line_with_ellipsis_to_width(
@@ -4164,7 +4183,7 @@ pub(crate) fn render_tool_message(
         } else if !command.trim().is_empty() {
             let fallback = format!("$ {}", command.trim());
             let detail_line = Line::from(vec![
-                Span::raw("    "),
+                Span::raw("      "),
                 Span::styled(fallback, Style::default().fg(dim_color())),
             ]);
             lines.push(super::truncate_line_with_ellipsis_to_width(
@@ -4183,7 +4202,7 @@ pub(crate) fn render_tool_message(
         let total = output_lines.clone().count();
         for output in output_lines.skip(total.saturating_sub(MAX_COLLAPSED_OUTPUT_LINES)) {
             let output_line = Line::from(vec![
-                Span::raw("      "),
+                Span::raw("         "),
                 Span::styled(output.to_string(), Style::default().fg(dim_color())),
             ]);
             lines.push(super::truncate_line_with_ellipsis_to_width(
@@ -4222,9 +4241,9 @@ pub(crate) fn render_tool_message(
                 })
             });
             let (sub_icon, sub_icon_color) = if sub_errored {
-                ("✗", rgb(220, 100, 100))
+                ("✗", rgb(224, 108, 117))
             } else {
-                ("✓", rgb(100, 180, 100))
+                ("✓", dim_color())
             };
 
             lines.push(tools_ui::render_batch_subcall_line(
