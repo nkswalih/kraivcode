@@ -558,6 +558,7 @@ fn format_stream_tokens(tokens: u64) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn occasional_session_history_warning(
     total_tokens: u64,
     compaction_count: usize,
@@ -1081,13 +1082,37 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         }
     } else if empty_session_home {
         home_idle_status_line(app, area.width)
-    } else if let Some((total_in, total_out)) = app.total_session_tokens() {
-        let total = total_in + total_out;
+    } else {
+        // Active session idle status: >> AgentMode · Model Provider  X.Xk/Y.Yk ████░░
+        let total_width = area.width as usize;
         let mut spans: Vec<Span> = Vec::new();
+        let data = app.info_widget_data();
 
-        // Model (Kraivcode yellow)
-        let model = app
-            .info_widget_data()
+        // >> prefix (dim)
+        spans.push(Span::styled(">> ", Style::default().fg(dim_color())));
+
+        // Agent mode label (accent color, bold)
+        let mode_label = app.agent_mode().label();
+        spans.push(Span::styled(
+            mode_label.to_string(),
+            Style::default().fg(user_color()).bold(),
+        ));
+
+        // Plan mode prefix (dim, when active)
+        if app.plan_active() {
+            if let Some(plan_mode) = app.plan_mode() {
+                spans.push(Span::styled(
+                    format!(" ({})", plan_mode),
+                    Style::default().fg(dim_color()),
+                ));
+            }
+        }
+
+        // · separator
+        spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+
+        // Model name (Kraivcode yellow, bold)
+        let model = data
             .model
             .clone()
             .filter(|m| !m.is_empty())
@@ -1100,8 +1125,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         }
 
         // Provider (dim)
-        let provider = app
-            .info_widget_data()
+        let provider = data
             .provider_name
             .clone()
             .filter(|p| !p.is_empty())
@@ -1116,65 +1140,48 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             ));
         }
 
-        // Context usage (dim)
-        if let Some((used, limit)) = overscroll_context_usage(
-            &app.info_widget_data(),
-        ) {
-            if !spans.is_empty() {
-                spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
-            }
-            spans.push(Span::styled(
-                format!(
-                    "Context {}/{}",
-                    overscroll_format_tokens(used),
-                    overscroll_format_tokens(limit)
-                ),
+        // Context usage with yellow bar (right-aligned)
+        let ctx_bar = if let Some((used, limit)) = overscroll_context_usage(&data) {
+            let token_text = format!(
+                "{}/{} ",
+                overscroll_format_tokens(used),
+                overscroll_format_tokens(limit)
+            );
+            let bar_cells = 12usize;
+            let mut bar_spans = context_bar_yellow(used, limit, bar_cells);
+            let mut right_side: Vec<Span> = Vec::new();
+            right_side.push(Span::styled(
+                token_text,
                 Style::default().fg(dim_color()),
             ));
-        }
+            right_side.append(&mut bar_spans);
+            Some(right_side)
+        } else {
+            None
+        };
 
-        if let Some(warning) = occasional_session_history_warning(
-            total,
-            app.session_compaction_count(),
-            app.context_limit(),
-            area.width as usize,
-            app.animation_elapsed() as u64,
-        ) {
-            let severe_token_threshold = app
-                .context_limit()
-                .and_then(|limit| u64::try_from(limit).ok())
-                .map(|limit| limit.saturating_mul(3))
-                .unwrap_or(1_000_000);
-            let warning_color =
-                if total >= severe_token_threshold || app.session_compaction_count() >= 3 {
-                    rgb(255, 100, 100)
-                } else {
-                    rgb(255, 193, 7)
-                };
-            spans.clear();
-            spans.push(Span::styled("⚠ ", Style::default().fg(warning_color)));
-            spans.push(Span::styled(warning, Style::default().fg(warning_color)));
-        }
+        let queued_suffix = if pending_count > 0 {
+            format!(" · +{} queued", pending_count)
+        } else {
+            String::new()
+        };
+        push_queued_suffix(&mut spans, &queued_suffix);
 
-        let total_width = area.width as usize;
-        if spans.is_empty() {
-            if let Some(tip) =
-                occasional_status_tip(total_width, app.animation_elapsed() as u64)
-            {
-                Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))])
-            } else {
-                Line::from("")
+        // Build final line: left side + padding + right side (context bar)
+        if let Some(right) = ctx_bar {
+            use unicode_width::UnicodeWidthStr;
+            let left_text: String = spans.iter().map(|s| s.content.as_ref()).collect();
+            let right_text: String = right.iter().map(|s| s.content.as_ref()).collect();
+            let right_width = UnicodeWidthStr::width(right_text.as_str());
+            let left_width = UnicodeWidthStr::width(left_text.as_str());
+            let padding = total_width.saturating_sub(left_width + right_width);
+            for _ in 0..padding {
+                spans.push(Span::styled(" ", Style::default()));
             }
+            spans.extend(right);
+            Line::from(overscroll_truncate_spans(spans, total_width))
         } else {
             Line::from(overscroll_truncate_spans(spans, total_width))
-        }
-    } else {
-        if let Some(tip) =
-            occasional_status_tip(area.width as usize, app.animation_elapsed() as u64)
-        {
-            Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))])
-        } else {
-            Line::from("")
         }
     };
 
@@ -2078,6 +2085,7 @@ pub(super) fn draw_notification(frame: &mut Frame, app: &dyn TuiState, area: Rec
 /// access method, reasoning level, and context usage percentage, with a live
 /// `(overscroll x.x)` countdown pinned to the right so users can see the line
 /// is temporary and rebounds away on its own.
+#[allow(dead_code)]
 pub(super) fn draw_overscroll_status(frame: &mut Frame, app: &dyn TuiState, area: Rect) {
     if area.height == 0 || area.width == 0 {
         return;
@@ -2284,6 +2292,7 @@ fn overscroll_truncate_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec
 /// Format a working dir path home-relative (~/foo/bar), keeping the last 2 segments.
 /// Compact git branch label for the status line and fact stack. Truncated so
 /// long branch names cannot crowd out the other facts.
+#[allow(dead_code)]
 fn overscroll_git_branch(data: &crate::tui::info_widget::InfoWidgetData) -> Option<String> {
     let branch = data.git_info.as_ref()?.branch.trim();
     if branch.is_empty() {
@@ -2296,6 +2305,7 @@ fn overscroll_git_branch(data: &crate::tui::info_widget::InfoWidgetData) -> Opti
     Some(label)
 }
 
+#[allow(dead_code)]
 fn overscroll_dir_label(path: &str) -> Option<String> {
     session_facts::dir_label_short(path)
 }
@@ -2339,6 +2349,7 @@ fn overscroll_provider_display(provider: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn overscroll_auth_label(
     method: crate::tui::info_widget::AuthMethod,
 ) -> Option<(&'static str, Color)> {
@@ -2407,6 +2418,7 @@ fn overscroll_format_tokens(tokens: usize) -> String {
 }
 
 /// Render a compact rounded progress bar (◖████░░◗) plus a percentage label.
+#[allow(dead_code)]
 fn overscroll_context_bar(used: usize, limit: usize, cells: usize) -> Vec<Span<'static>> {
     let limit = limit.max(1);
     let ratio = (used as f64 / limit as f64).clamp(0.0, 1.0);
@@ -2438,6 +2450,29 @@ fn overscroll_context_bar(used: usize, limit: usize, cells: usize) -> Vec<Span<'
     spans.push(Span::styled(
         format!(" {}%", pct),
         Style::default().fg(fill_color).bold(),
+    ));
+    spans
+}
+
+/// Render a yellow-filled context usage bar (████░░) for the status bar.
+/// No percentage, no green — just yellow fill on dark track.
+fn context_bar_yellow(used: usize, limit: usize, cells: usize) -> Vec<Span<'static>> {
+    let limit = limit.max(1);
+    let ratio = (used as f64 / limit as f64).clamp(0.0, 1.0);
+    let filled = (ratio * cells as f64).round() as usize;
+    let filled = filled.min(cells);
+
+    let fill_color = user_color(); // Kraivcode yellow
+    let track_color = rgb(50, 50, 60);
+
+    let mut spans = Vec::with_capacity(2);
+    spans.push(Span::styled(
+        "█".repeat(filled),
+        Style::default().fg(fill_color),
+    ));
+    spans.push(Span::styled(
+        "░".repeat(cells.saturating_sub(filled)),
+        Style::default().fg(track_color),
     ));
     spans
 }
