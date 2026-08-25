@@ -13,7 +13,7 @@ use crate::tui::detect_kv_cache_problem;
 use crate::tui::info_widget::occasional_status_tip;
 use crate::tui::layout_utils;
 use crate::tui::session_facts;
-use ratatui::{prelude::*, style::Modifier, widgets::Paragraph};
+use ratatui::{prelude::*, style::Modifier, widgets::{Block, BorderType, Borders, Paragraph}};
 
 fn shell_mode_color() -> Color {
     rgb(110, 214, 151)
@@ -276,7 +276,7 @@ fn command_suggestion_lines(
             let command_style = if is_selected {
                 Style::default().fg(rgb(255, 213, 128))
             } else {
-                Style::default().fg(rgb(128, 203, 196))
+                Style::default().fg(user_color())
             };
             let mut spans = highlight(cmd, command_style);
             spans.push(Span::styled(format!("  {}", desc), description_style));
@@ -421,7 +421,10 @@ pub(super) fn wrapped_input_line_count(
 ) -> usize {
     let reserved_width = send_mode_reserved_width(app);
     let prompt_len = input_prompt_len(app, next_prompt);
-    let line_width = (area_width as usize).saturating_sub(prompt_len + reserved_width);
+    // Account for the 2-column border (left + right) so the wrapping width
+    // matches what draw_input actually renders into the inner rect.
+    let inner_width = (area_width as usize).saturating_sub(2);
+    let line_width = inner_width.saturating_sub(prompt_len + reserved_width);
     if line_width == 0 {
         return 1;
     }
@@ -751,7 +754,7 @@ fn append_batch_progress_spans(
     }
 }
 
-pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pending_count: usize) {
+pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pending_count: usize, empty_session_home: bool) {
     let elapsed = app.elapsed().map(|d| d.as_secs_f32()).unwrap_or(0.0);
     let stale_secs = app.time_since_activity().map(|d| d.as_secs_f32());
     let (cache_read, cache_creation) = app.streaming_cache_tokens();
@@ -815,12 +818,22 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         match app.status() {
             ProcessingStatus::Idle => Line::from(""),
             ProcessingStatus::Sending => {
+                let model_name = app
+                    .info_widget_data()
+                    .model
+                    .clone()
+                    .filter(|m| !m.is_empty())
+                    .map(|m| crate::tui::session_facts::pretty_model(&m))
+                    .unwrap_or_default();
+                let base_label = format!(" sending… {}", format_elapsed(elapsed));
+                let label = if !model_name.is_empty() {
+                    format!("{}{}", model_name, base_label)
+                } else {
+                    base_label
+                };
                 let mut spans = vec![
                     Span::styled(spinner, Style::default().fg(ai_color())),
-                    Span::styled(
-                        format!(" sending… {}", format_elapsed(elapsed)),
-                        Style::default().fg(dim_color()),
-                    ),
+                    Span::styled(label, Style::default().fg(dim_color())),
                 ];
                 push_queued_suffix(&mut spans, &queued_suffix);
                 Line::from(spans)
@@ -859,7 +872,20 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 Line::from(spans)
             }
             ProcessingStatus::Thinking(_start) => {
-                let mut label = format!(" thinking… {}", format_elapsed(elapsed));
+                let model_name = app
+                    .info_widget_data()
+                    .model
+                    .clone()
+                    .filter(|m| !m.is_empty())
+                    .map(|m| crate::tui::session_facts::pretty_model(&m))
+                    .unwrap_or_default();
+                let base_label = format!(" thinking… {}", format_elapsed(elapsed));
+                let label = if !model_name.is_empty() {
+                    format!("{}{}", model_name, base_label)
+                } else {
+                    base_label
+                };
+                let mut label = label;
                 append_transport_context(&mut label, app);
                 let mut spans = vec![
                     Span::styled(spinner, Style::default().fg(ai_color())),
@@ -872,8 +898,19 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 let time_str = format_elapsed(elapsed);
                 let (input_tokens, output_tokens) = app.streaming_tokens();
                 let stream_message_ended = app.stream_message_ended();
-                let mut status_text =
-                    streaming_liveness_label(time_str, stale_secs, stream_message_ended);
+                // Prepend model name for OpenCode-style status.
+                let model_name = app
+                    .info_widget_data()
+                    .model
+                    .clone()
+                    .filter(|m| !m.is_empty())
+                    .map(|m| crate::tui::session_facts::pretty_model(&m))
+                    .unwrap_or_default();
+                let mut status_text = if !model_name.is_empty() {
+                    format!("{} · {}", model_name, streaming_liveness_label(time_str, stale_secs, stream_message_ended))
+                } else {
+                    streaming_liveness_label(time_str, stale_secs, stream_message_ended)
+                };
                 if let Some(tps) = app.output_tps() {
                     status_text = format!("{} · {:.1} tps", status_text, tps);
                 }
@@ -1042,8 +1079,60 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 Line::from(spans)
             }
         }
+    } else if empty_session_home {
+        home_idle_status_line(app, area.width)
     } else if let Some((total_in, total_out)) = app.total_session_tokens() {
         let total = total_in + total_out;
+        let mut spans: Vec<Span> = Vec::new();
+
+        // Model (Kraivcode yellow)
+        let model = app
+            .info_widget_data()
+            .model
+            .clone()
+            .filter(|m| !m.is_empty())
+            .unwrap_or_else(|| app.provider_model());
+        if !model.is_empty() && !overscroll_is_placeholder(&model) {
+            spans.push(Span::styled(
+                session_facts::pretty_model(&model),
+                Style::default().fg(user_color()).bold(),
+            ));
+        }
+
+        // Provider (dim)
+        let provider = app
+            .info_widget_data()
+            .provider_name
+            .clone()
+            .filter(|p| !p.is_empty())
+            .unwrap_or_else(|| app.provider_name());
+        if !provider.is_empty() && !overscroll_is_runtime_placeholder(&provider) {
+            if !spans.is_empty() {
+                spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+            }
+            spans.push(Span::styled(
+                overscroll_provider_display(&provider),
+                Style::default().fg(dim_color()),
+            ));
+        }
+
+        // Context usage (dim)
+        if let Some((used, limit)) = overscroll_context_usage(
+            &app.info_widget_data(),
+        ) {
+            if !spans.is_empty() {
+                spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+            }
+            spans.push(Span::styled(
+                format!(
+                    "Context {}/{}",
+                    overscroll_format_tokens(used),
+                    overscroll_format_tokens(limit)
+                ),
+                Style::default().fg(dim_color()),
+            ));
+        }
+
         if let Some(warning) = occasional_session_history_warning(
             total,
             app.session_compaction_count(),
@@ -1062,16 +1151,22 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 } else {
                     rgb(255, 193, 7)
                 };
-            Line::from(vec![
-                Span::styled("⚠ ", Style::default().fg(warning_color)),
-                Span::styled(warning, Style::default().fg(warning_color)),
-            ])
-        } else if let Some(tip) =
-            occasional_status_tip(area.width as usize, app.animation_elapsed() as u64)
-        {
-            Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))])
+            spans.clear();
+            spans.push(Span::styled("⚠ ", Style::default().fg(warning_color)));
+            spans.push(Span::styled(warning, Style::default().fg(warning_color)));
+        }
+
+        let total_width = area.width as usize;
+        if spans.is_empty() {
+            if let Some(tip) =
+                occasional_status_tip(total_width, app.animation_elapsed() as u64)
+            {
+                Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))])
+            } else {
+                Line::from("")
+            }
         } else {
-            Line::from("")
+            Line::from(overscroll_truncate_spans(spans, total_width))
         }
     } else {
         if let Some(tip) =
@@ -1102,6 +1197,77 @@ fn push_queued_suffix(spans: &mut Vec<Span<'static>>, queued_suffix: &str) {
             Style::default().fg(queued_color()),
         ));
     }
+}
+
+/// Build the idle status line for the empty-session home screen: model · provider · context.
+fn home_idle_status_line(app: &dyn TuiState, width: u16) -> Line<'static> {
+    let data = app.info_widget_data();
+    let sep = Span::styled(" · ", Style::default().fg(dim_color()));
+
+    let mut spans: Vec<Span> = Vec::new();
+
+    // Model (Kraivcode yellow)
+    let model = data
+        .model
+        .clone()
+        .filter(|m| !m.is_empty())
+        .unwrap_or_else(|| app.provider_model());
+    if !model.is_empty() && !overscroll_is_placeholder(&model) {
+        spans.push(Span::styled(
+            session_facts::pretty_model(&model),
+            Style::default().fg(user_color()).bold(),
+        ));
+        if let Some(effort) = data
+            .reasoning_effort
+            .as_deref()
+            .and_then(overscroll_short_reasoning)
+        {
+            spans.push(Span::styled(
+                format!(" {}", effort),
+                Style::default().fg(dim_color()),
+            ));
+        }
+    }
+
+    // Provider (dim)
+    let provider = data
+        .provider_name
+        .clone()
+        .filter(|p| !p.is_empty())
+        .unwrap_or_else(|| app.provider_name());
+    if !provider.is_empty() && !overscroll_is_runtime_placeholder(&provider) {
+        if !spans.is_empty() {
+            spans.push(sep.clone());
+        }
+        spans.push(Span::styled(
+            overscroll_provider_display(&provider),
+            Style::default().fg(dim_color()),
+        ));
+    }
+
+    // Context usage (dim)
+    if let Some((used, limit)) = overscroll_context_usage(&data) {
+        if !spans.is_empty() {
+            spans.push(sep.clone());
+        }
+        spans.push(Span::styled(
+            format!(
+                "Context {}/{}",
+                overscroll_format_tokens(used),
+                overscroll_format_tokens(limit)
+            ),
+            Style::default().fg(dim_color()),
+        ));
+    }
+
+    let total_width = width as usize;
+    if spans.is_empty() {
+        if let Some(tip) = occasional_status_tip(total_width, app.animation_elapsed() as u64) {
+            return Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))]);
+        }
+        return Line::from("");
+    }
+    Line::from(overscroll_truncate_spans(spans, total_width))
 }
 
 fn streaming_status_spans(
@@ -2276,307 +2442,6 @@ fn overscroll_context_bar(used: usize, limit: usize, cells: usize) -> Vec<Span<'
     spans
 }
 
-const RIGHT_FACT_CONTEXT_CELLS: usize = 6;
-const RIGHT_FACT_GAP: u16 = 2;
-const RIGHT_FACT_PAD: u16 = 1;
-const RIGHT_FACT_TRANSCRIPT_ROWS: u16 = 4;
-
-fn right_fact_neutral_style() -> Style {
-    Style::default().fg(rgb(140, 140, 150))
-}
-
-#[derive(Clone)]
-struct RightFactLine {
-    spans: Vec<Span<'static>>,
-    width: u16,
-}
-
-impl RightFactLine {
-    fn new(spans: Vec<Span<'static>>) -> Option<Self> {
-        use unicode_width::UnicodeWidthStr;
-        let width: usize = spans.iter().map(|span| span.content.width()).sum();
-        let width = u16::try_from(width).ok()?;
-        (width > 0).then_some(Self { spans, width })
-    }
-}
-
-#[derive(Clone)]
-struct RightFactPlacement {
-    line: RightFactLine,
-    area: Rect,
-}
-
-/// Draw session facts as a bottom-anchored stack in otherwise unused cells on
-/// the right side of the composer chrome. When chrome rows are occupied, the
-/// stack may climb into at most the last few transcript rows, but only where
-/// the final rendered buffer has a genuinely blank suffix. It never reflows or
-/// overwrites transcript, status, notification, inline UI, or input content.
-pub(super) fn draw_right_fact_stack(
-    frame: &mut Frame,
-    app: &dyn TuiState,
-    messages_area: Rect,
-    input_area: Rect,
-    transcript_scrollbar_visible: bool,
-    input_cursor: Option<Position>,
-) {
-    // The legacy overscroll row owns these same facts while it is visible.
-    // Standing down here avoids duplicates and keeps its elastic reveal from
-    // changing transcript-tail overlays mid-gesture. Users with overscroll off
-    // get the compact stack continuously.
-    if app.chat_overscroll_active() || input_area.width == 0 || input_area.height == 0 {
-        return;
-    }
-
-    let lines = right_fact_lines(app);
-    if lines.is_empty() {
-        return;
-    }
-
-    // Never composite into a live transcript while a turn is processing. Its
-    // tail changes every frame, so even collision-safe facts could appear to
-    // jump as streaming rows arrive. Chrome rows remain available.
-    let transcript_rows = if app.auto_scroll_paused() || app.is_processing() {
-        0
-    } else {
-        RIGHT_FACT_TRANSCRIPT_ROWS.min(messages_area.height)
-    };
-    let top = messages_area.bottom().saturating_sub(transcript_rows);
-    let bottom = input_area.bottom();
-    if top >= bottom {
-        return;
-    }
-
-    let placements = {
-        let buffer = frame.buffer_mut();
-        right_fact_placements(
-            buffer,
-            lines,
-            top,
-            bottom,
-            input_area.x,
-            input_area.right(),
-            messages_area,
-            transcript_scrollbar_visible,
-            input_cursor,
-        )
-    };
-
-    for placement in placements {
-        frame.render_widget(
-            Paragraph::new(Line::from(placement.line.spans)),
-            placement.area,
-        );
-    }
-}
-
-/// Build fact rows in their visual top-to-bottom order: provider/auth, model,
-/// directory, then context usage. Placement walks this list in reverse so the
-/// context row is anchored nearest the input whenever space permits.
-fn right_fact_lines(app: &dyn TuiState) -> Vec<RightFactLine> {
-    let data = app.info_widget_data();
-    let sep = || Span::styled(" · ", right_fact_neutral_style());
-    let mut lines = Vec::with_capacity(4);
-
-    let mut access = Vec::new();
-    let provider = data
-        .provider_name
-        .clone()
-        .filter(|provider| !provider.trim().is_empty())
-        .unwrap_or_else(|| app.provider_name());
-    if !provider.is_empty() && !overscroll_is_runtime_placeholder(&provider) {
-        access.push(Span::styled(
-            overscroll_provider_display(&provider),
-            right_fact_neutral_style(),
-        ));
-    }
-    if let Some((label, _)) = overscroll_auth_label(data.auth_method) {
-        if !access.is_empty() {
-            access.push(sep());
-        }
-        access.push(Span::styled(label.to_string(), right_fact_neutral_style()));
-    }
-    if let Some(line) = RightFactLine::new(access) {
-        lines.push(line);
-    }
-
-    let model = data
-        .model
-        .clone()
-        .filter(|model| !model.trim().is_empty())
-        .unwrap_or_else(|| app.provider_model());
-    if !model.is_empty() && !overscroll_is_placeholder(&model) {
-        let mut spans = vec![Span::styled(
-            session_facts::pretty_model(&model),
-            right_fact_neutral_style(),
-        )];
-        if let Some(effort) = data
-            .reasoning_effort
-            .as_deref()
-            .and_then(overscroll_short_reasoning)
-        {
-            spans.push(Span::styled(
-                format!(" {effort}"),
-                right_fact_neutral_style(),
-            ));
-        }
-        if let Some(line) = RightFactLine::new(spans) {
-            lines.push(line);
-        }
-    }
-
-    if let Some(dir) = app
-        .working_dir()
-        .and_then(|path| overscroll_dir_label(&path))
-    {
-        let mut spans = vec![Span::styled(dir, right_fact_neutral_style())];
-        if let Some(branch) = overscroll_git_branch(&data) {
-            spans.push(Span::styled(
-                format!("  {branch}"),
-                right_fact_neutral_style(),
-            ));
-        }
-        if let Some(line) = RightFactLine::new(spans) {
-            lines.push(line);
-        }
-    }
-
-    if let Some((used, limit)) = overscroll_context_usage(&data) {
-        let mut spans = vec![Span::styled(
-            format!(
-                "{}/{} ",
-                overscroll_format_tokens(used),
-                overscroll_format_tokens(limit)
-            ),
-            right_fact_neutral_style(),
-        )];
-        spans.extend(overscroll_context_bar(
-            used,
-            limit,
-            RIGHT_FACT_CONTEXT_CELLS,
-        ));
-        if let Some(line) = RightFactLine::new(spans) {
-            lines.push(line);
-        }
-    }
-
-    lines
-}
-
-#[allow(clippy::too_many_arguments)]
-fn right_fact_placements(
-    buffer: &ratatui::buffer::Buffer,
-    lines: Vec<RightFactLine>,
-    top: u16,
-    bottom: u16,
-    left: u16,
-    right: u16,
-    messages_area: Rect,
-    transcript_scrollbar_visible: bool,
-    protected_position: Option<Position>,
-) -> Vec<RightFactPlacement> {
-    if top >= bottom || left >= right || lines.is_empty() {
-        return Vec::new();
-    }
-
-    let Ok(block_height) = u16::try_from(lines.len()) else {
-        return Vec::new();
-    };
-    if bottom.saturating_sub(top) < block_height {
-        return Vec::new();
-    }
-
-    // Facts are one visual object. Probe complete consecutive blocks from the
-    // bottom upward; if any row collides, move the entire stack rather than
-    // skipping that row and letting unrelated content split the facts apart.
-    let mut block_bottom = bottom;
-    loop {
-        let Some(block_top) = block_bottom.checked_sub(block_height) else {
-            return Vec::new();
-        };
-        if block_top < top {
-            return Vec::new();
-        }
-
-        let areas = lines
-            .iter()
-            .enumerate()
-            .map(|(index, line)| {
-                let row = block_top + index as u16;
-                right_fact_area_on_row(
-                    buffer,
-                    line,
-                    row,
-                    left,
-                    right,
-                    messages_area,
-                    transcript_scrollbar_visible,
-                    protected_position,
-                )
-            })
-            .collect::<Option<Vec<_>>>();
-        if let Some(areas) = areas {
-            return lines
-                .into_iter()
-                .zip(areas)
-                .map(|(line, area)| RightFactPlacement { line, area })
-                .collect();
-        }
-
-        if block_top == top {
-            return Vec::new();
-        }
-        block_bottom = block_bottom.saturating_sub(1);
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn right_fact_area_on_row(
-    buffer: &ratatui::buffer::Buffer,
-    line: &RightFactLine,
-    row: u16,
-    left: u16,
-    right: u16,
-    messages_area: Rect,
-    transcript_scrollbar_visible: bool,
-    protected_position: Option<Position>,
-) -> Option<Rect> {
-    let row_right =
-        if transcript_scrollbar_visible && row >= messages_area.y && row < messages_area.bottom() {
-            right.saturating_sub(1)
-        } else {
-            right
-        };
-
-    let required = line
-        .width
-        .saturating_add(RIGHT_FACT_GAP)
-        .saturating_add(RIGHT_FACT_PAD);
-    if row_right.saturating_sub(left) < required {
-        return None;
-    }
-
-    let fact_right = row_right.saturating_sub(RIGHT_FACT_PAD);
-    let fact_left = fact_right.saturating_sub(line.width);
-    let probe_left = fact_left.saturating_sub(RIGHT_FACT_GAP);
-    if probe_left < left
-        || !(probe_left..row_right).all(|x| {
-            protected_position != Some(Position::new(x, row))
-                && right_fact_cell_is_blank(&buffer[(x, row)])
-        })
-    {
-        return None;
-    }
-
-    Some(Rect::new(fact_left, row, line.width, 1))
-}
-
-fn right_fact_cell_is_blank(cell: &ratatui::buffer::Cell) -> bool {
-    cell.symbol().trim().is_empty()
-        && cell.bg == Color::Reset
-        && cell.modifier.is_empty()
-        && !cell.skip
-}
-
 pub(super) fn draw_input(
     frame: &mut Frame,
     app: &dyn TuiState,
@@ -2597,8 +2462,16 @@ pub(super) fn draw_input(
     let num_str = format!("{}", next_prompt);
     let prompt_len = input_prompt_len(app, next_prompt);
     let reserved_width = send_mode_reserved_width(app);
-    let line_width = (area.width as usize).saturating_sub(prompt_len + reserved_width);
 
+    // ONE border owner: the Paragraph's `.block()` renders the rounded border
+    // and provides the inner rect. All text geometry uses inner dimensions.
+    let border_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(dim_color()));
+    let inner = border_block.inner(area);
+
+    let line_width = (inner.width as usize).saturating_sub(prompt_len + reserved_width);
     if line_width == 0 {
         return None;
     }
@@ -2663,7 +2536,7 @@ pub(super) fn draw_input(
 
     let suggestions_offset = lines.len();
     let total_input_lines = all_lines.len();
-    let visible_height = area.height as usize;
+    let visible_height = inner.height as usize;
 
     let scroll_offset = if total_input_lines + suggestions_offset <= visible_height {
         0
@@ -2703,15 +2576,15 @@ pub(super) fn draw_input(
                     .unwrap_or(0);
                 let mut margin = prompt_len;
                 if centered {
-                    margin += (area.width as usize).saturating_sub(prompt_len + text_width) / 2;
+                    margin += (inner.width as usize).saturating_sub(prompt_len + text_width) / 2;
                 }
-                margin.min(area.width as usize) as u16
+                margin.min(inner.width as usize) as u16
             })
             .collect();
         let input_rows_area = Rect::new(
-            area.x,
-            area.y.saturating_add(suggestions_offset as u16),
-            area.width,
+            inner.x,
+            inner.y.saturating_add(suggestions_offset as u16),
+            inner.width,
             visible_input_rows as u16,
         );
         super::record_input_copy_snapshot(
@@ -2767,29 +2640,31 @@ pub(super) fn draw_input(
                 .map(|l| l.clone().alignment(Alignment::Center))
                 .collect::<Vec<_>>(),
         )
+        .block(border_block)
     } else {
-        Paragraph::new(lines.clone())
+        Paragraph::new(lines.clone()).block(border_block)
     };
     frame.render_widget(paragraph, area);
 
     let cursor_screen_line = cursor_line.saturating_sub(scroll_offset) + suggestions_offset;
-    let cursor_y = area.y + (cursor_screen_line as u16).min(area.height.saturating_sub(1));
+    let cursor_y = inner.y
+        + (cursor_screen_line as u16).min(inner.height.saturating_sub(1));
 
     let cursor_x = if centered {
         let actual_line_width = lines
             .get(cursor_screen_line)
             .map(|l| l.width())
             .unwrap_or(prompt_len);
-        let center_offset = (area.width as usize).saturating_sub(actual_line_width) / 2;
+        let center_offset = (inner.width as usize).saturating_sub(actual_line_width) / 2;
         let cursor_offset = prompt_len + cursor_col;
-        area.x + center_offset as u16 + cursor_offset as u16
+        inner.x + center_offset as u16 + cursor_offset as u16
     } else {
-        area.x + prompt_len as u16 + cursor_col as u16
+        inner.x + prompt_len as u16 + cursor_col as u16
     };
 
     let cursor = Position::new(cursor_x, cursor_y);
     frame.set_cursor_position(cursor);
-    draw_send_mode_indicator(frame, app, area);
+    draw_send_mode_indicator(frame, app, inner);
     Some(cursor)
 }
 
@@ -2964,21 +2839,30 @@ pub(crate) fn input_cursor_pos_from_screen(
     column: u16,
     row: u16,
 ) -> Option<usize> {
-    if !layout_utils::point_in_rect(column, row, area) {
+    // Derive the inner rect matching draw_input's .block() geometry so mouse
+    // hit-testing uses the same coordinate space as the rendered text.
+    let border_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded);
+    let inner = border_block.inner(area);
+    if inner.width == 0 || inner.height == 0 {
+        return None;
+    }
+    if !layout_utils::point_in_rect(column, row, inner) {
         return None;
     }
 
     let input_text = app.input();
     let reserved_width = send_mode_reserved_width(app);
     let prompt_len = input_prompt_len(app, next_prompt);
-    let line_width = (area.width as usize).saturating_sub(prompt_len + reserved_width);
+    let line_width = (inner.width as usize).saturating_sub(prompt_len + reserved_width);
     if line_width == 0 {
         return Some(app.cursor_pos().min(input_text.len()));
     }
 
     let wrapped_lines = wrap_input_segments(input_text, line_width);
     let hint_lines = input_hint_line_height(app) as usize;
-    let visible_height = area.height as usize;
+    let visible_height = inner.height as usize;
     let total_input_lines = wrapped_lines.len().max(1);
 
     let scroll_offset = if total_input_lines + hint_lines <= visible_height {
@@ -3000,7 +2884,7 @@ pub(crate) fn input_cursor_pos_from_screen(
         }
     };
 
-    let screen_line = row.saturating_sub(area.y) as usize;
+    let screen_line = row.saturating_sub(inner.y) as usize;
     if screen_line < hint_lines {
         return None;
     }
@@ -3014,10 +2898,10 @@ pub(crate) fn input_cursor_pos_from_screen(
 
     let actual_line_width = prompt_len + segment.display_width;
     let text_start_x = if app.centered_mode() {
-        let center_offset = (area.width as usize).saturating_sub(actual_line_width) / 2;
-        area.x as usize + center_offset + prompt_len
+        let center_offset = (inner.width as usize).saturating_sub(actual_line_width) / 2;
+        inner.x as usize + center_offset + prompt_len
     } else {
-        area.x as usize + prompt_len
+        inner.x as usize + prompt_len
     };
     let target_col = column.saturating_sub(text_start_x as u16) as usize;
     let char_offset =
@@ -3139,7 +3023,9 @@ pub(crate) fn composer_line_width(
 ) -> Option<usize> {
     let prompt_len = input_prompt_len(app, next_prompt);
     let reserved = send_mode_reserved_width(app);
-    let width = (area_width as usize).saturating_sub(prompt_len + reserved);
+    // Subtract 2 for the rounded border (left + right column) so the width
+    // matches what draw_input renders into the inner rect.
+    let width = (area_width as usize).saturating_sub(prompt_len + reserved + 2);
     (width > 0).then_some(width)
 }
 
