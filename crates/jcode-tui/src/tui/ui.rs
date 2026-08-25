@@ -3057,7 +3057,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     !onboarding_welcome
         && !swarm_page_active
         && app.display_messages().is_empty()
-        && app.display_user_message_count() == 0;
+        && app.display_user_message_count() == 0
+        && app.queued_messages().is_empty();
 
     // The guided onboarding phases (login import, OpenAI prompt, continue prompt)
     // are entirely key-driven and own the whole chat column: they render their own
@@ -3209,8 +3210,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 } else if terminal_clear_collapsed {
                     Constraint::Length(0)
                 } else {
-                    Constraint::Length(content_height.max(1))
-                }, // 0 Messages (fill when empty home, exact height otherwise, 0 when terminal-cleared)
+                    Constraint::Fill(1)
+                }, // 0 Messages (fill remaining space; 0 when terminal-cleared)
                 Constraint::Length(queued_height), // 1 Queued messages
                 Constraint::Length(swarm_strip_height), // 2 Swarm strip
                 Constraint::Length(notification_height), // 3 Notification line
@@ -3408,24 +3409,14 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             ..Default::default()
         }
     } else {
-        // Active session: render a compact one-line persistent header above
-        // the transcript so the user always sees the project identity.
+        // Active session: the PreparedChatFrame already contains the header as
+        // its first section; draw_messages renders it as the first visible line.
+        // No manual header row needed — avoids the duplicate KRAIVCODE bug.
         clear_area(frame, messages_area);
-        let (active_header, _) = header::build_header_sections(app, messages_area.width);
-        let active_chunks = Layout::vertical([
-            Constraint::Length(1),  // header row
-            Constraint::Min(1),    // messages
-        ])
-        .split(messages_area);
-        clear_area(frame, active_chunks[0]);
-        if let Some(line) = active_header.into_iter().next() {
-            frame.render_widget(Paragraph::new(line), active_chunks[0]);
-        }
-
         draw_messages(
             frame,
             app,
-            active_chunks[1],
+            messages_area,
             prepared.clone(),
             chat_scrollbar_visible,
         )
