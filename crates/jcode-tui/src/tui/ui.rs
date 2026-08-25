@@ -3089,7 +3089,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let donut_height: u16 = idle_donut_reserved_height(show_donut, input_height);
     let notification_height: u16 = if app.has_notification() { 1 } else { 0 };
     // Elastic overscroll status line removed from layout; state tracking preserved.
-    let overscroll_height: u16 = 0;
+    let _overscroll_height: u16 = 0;
     let fixed_height = 1
         + queued_height
         + swarm_strip_height
