@@ -1,5 +1,5 @@
 [package]
-name = "jcode"
+name = "kraivcode"
 version = "0.80.0"
 description = "Possibly the greatest coding agent ever built — blazing-fast TUI, multi-model, swarm coordination, 30+ tools"
 edition = "2024"
@@ -94,11 +94,11 @@ members = [
 ]
 
 [lib]
-name = "jcode"
+name = "kraivcode"
 path = "src/lib.rs"
 
 [[bin]]
-name = "jcode"
+name = "kraivcode"
 path = "src/main.rs"
 
 [[bin]]

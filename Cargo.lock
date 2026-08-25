@@ -3384,59 +3384,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
 
 [[package]]
-name = "jcode"
-version = "0.80.0"
-dependencies = [
- "anyhow",
- "async-stream",
- "async-trait",
- "block2 0.6.2",
- "chrono",
- "clap",
- "crossterm",
- "dirs",
- "futures",
- "global-hotkey",
- "hex",
- "jcode-build-meta",
- "jcode-harness-api-server",
- "jcode-provider-anthropic-runtime",
- "jcode-provider-antigravity-runtime",
- "jcode-provider-claude-cli-runtime",
- "jcode-provider-copilot-runtime",
- "jcode-provider-core",
- "jcode-provider-cursor-runtime",
- "jcode-provider-doctor",
- "jcode-provider-gemini-runtime",
- "jcode-provider-grok-build-runtime",
- "jcode-provider-openai-runtime",
- "jcode-provider-openrouter-runtime",
- "jcode-selfdev-types",
- "jcode-tui",
- "jcode-tui-session-picker",
- "jcode-tui-style",
- "libc",
- "objc2 0.6.4",
- "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
- "objc2-user-notifications 0.3.2",
- "open",
- "ratatui",
- "reqwest 0.12.28",
- "rustls",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "tikv-jemallocator",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "toml",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "jcode-agent-runtime"
 version = "0.1.0"
 dependencies = [
@@ -4810,6 +4757,59 @@ name = "khronos_api"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
+
+[[package]]
+name = "kraivcode"
+version = "0.80.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "async-trait",
+ "block2 0.6.2",
+ "chrono",
+ "clap",
+ "crossterm",
+ "dirs",
+ "futures",
+ "global-hotkey",
+ "hex",
+ "jcode-build-meta",
+ "jcode-harness-api-server",
+ "jcode-provider-anthropic-runtime",
+ "jcode-provider-antigravity-runtime",
+ "jcode-provider-claude-cli-runtime",
+ "jcode-provider-copilot-runtime",
+ "jcode-provider-core",
+ "jcode-provider-cursor-runtime",
+ "jcode-provider-doctor",
+ "jcode-provider-gemini-runtime",
+ "jcode-provider-grok-build-runtime",
+ "jcode-provider-openai-runtime",
+ "jcode-provider-openrouter-runtime",
+ "jcode-selfdev-types",
+ "jcode-tui",
+ "jcode-tui-session-picker",
+ "jcode-tui-style",
+ "libc",
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "objc2-user-notifications 0.3.2",
+ "open",
+ "ratatui",
+ "reqwest 0.12.28",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tikv-jemallocator",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "toml",
+ "windows-sys 0.59.0",
+]
 
 [[package]]
 name = "kurbo"
