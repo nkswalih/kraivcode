@@ -189,6 +189,7 @@ const LAUNCH_HOTKEY_TRACKING_VERSION: u32 = 1;
 pub const MAX_TERMINAL_NUDGES: u64 = 5;
 const LAUNCH_HOTKEY_LEARNED_USES: u64 = 3;
 #[cfg(any(test, target_os = "macos", target_os = "linux", windows))]
+#[allow(dead_code)]
 const LAUNCH_HOTKEY_NOTICE_MIN_LAUNCHES_TO_STOP: u64 = 10;
 
 #[derive(Debug, Clone, Default)]
@@ -1413,13 +1414,7 @@ fn macos_launch_hotkeys_notice(state: &SetupHintsState) -> Option<StartupHints> 
         })
         .collect();
 
-    let lines = launch_hotkey_notice_lines(&rows, &state.launch_hotkey_usage, state.launch_count)?;
-
-    Some(StartupHints::with_status_and_display(
-        "Launch hotkeys available".to_string(),
-        "Launch hotkeys",
-        format!("Configured Jcode launch hotkeys:\n{}", lines.join("\n")),
-    ))
+    None
 }
 
 // ===========================================================================
@@ -2225,21 +2220,7 @@ fn linux_launch_hotkeys_notice(state: &SetupHintsState) -> Option<StartupHints> 
     if !linux_hotkeys_installed(comp) {
         return None;
     }
-    let footer = format!(
-        "Bound via {} and available system-wide.",
-        linux_hotkey_target_description(comp)
-    );
-
-    Some(StartupHints::with_status_and_display(
-        "Launch hotkeys available".to_string(),
-        "Launch hotkeys",
-        format!(
-            "Configured Jcode launch hotkeys ({}): {} {}",
-            comp.name(),
-            lines.join("; "),
-            footer
-        ),
-    ))
+    None
 }
 
 /// One resolved launch hotkey row for the startup notice.
@@ -2266,6 +2247,7 @@ pub(crate) struct LaunchHotkeyRow {
 ///   notice so it never lingers for an experienced user.
 /// - Returns `None` when nothing should be shown.
 #[cfg(any(test, target_os = "macos", target_os = "linux", windows))]
+#[allow(dead_code)]
 pub(crate) fn launch_hotkey_notice_lines(
     rows: &[LaunchHotkeyRow],
     usage: &HashMap<String, u64>,
