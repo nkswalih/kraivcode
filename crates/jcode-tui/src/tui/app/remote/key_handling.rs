@@ -269,6 +269,9 @@ async fn handle_remote_key_internal(
     remote: &mut RemoteConnection,
     text_input: Option<String>,
 ) -> Result<()> {
+    if input::observe_paste_key_event(code, modifiers, text_input.as_deref()) {
+        return Ok(());
+    }
     let mut code = code;
     let mut modifiers = modifiers;
     ctrl_bracket_fallback_to_esc(&mut code, &mut modifiers);
@@ -825,6 +828,13 @@ async fn handle_remote_key_internal(
         return Ok(());
     }
 
+    if code == KeyCode::Enter
+        && modifiers.is_empty()
+        && input::handle_possible_raw_paste_enter(app)
+    {
+        return Ok(());
+    }
+
     if crate::tui::app::input::newline::enter_inserts_newline(app, code, modifiers) {
         return Ok(());
     }
@@ -836,6 +846,9 @@ async fn handle_remote_key_internal(
     }
 
     if let Some(text) = text_input.or_else(|| input::text_input_for_key(code, modifiers)) {
+        if input::handle_raw_paste_newline_text(app, &text) {
+            return Ok(());
+        }
         input::handle_text_input(app, &text);
         return Ok(());
     }
