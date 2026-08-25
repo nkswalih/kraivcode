@@ -618,7 +618,10 @@ where
 }
 
 pub(in crate::tui::app) mod newline;
+mod paste_burst;
 mod paste_guard;
+#[cfg(test)]
+pub(in crate::tui::app) use paste_burst::reset_for_test as paste_burst_reset_for_test;
 #[cfg(test)]
 pub(in crate::tui::app) use paste_guard::expire_for_test as paste_guard_expire_for_test;
 use paste_guard::image_media_type;
@@ -798,8 +801,7 @@ pub(super) fn handle_text_paste(app: &mut App, text: String) {
         text.lines().count()
     ));
 
-    let line_count = text.lines().count().max(1);
-    if line_count < 5 {
+    if !text.contains(['\r', '\n']) {
         insert_input_text(app, &text);
         return;
     }
@@ -810,6 +812,90 @@ pub(super) fn handle_text_paste(app: &mut App, text: String) {
     let placeholder = paste_placeholder(&text);
     app.pasted_contents.push(text);
     insert_input_text(app, &placeholder);
+}
+
+pub(super) fn observe_paste_key_event(
+    code: KeyCode,
+    modifiers: KeyModifiers,
+    text_input: Option<&str>,
+) -> bool {
+    paste_burst::observe_key(code, modifiers, text_input)
+}
+
+pub(super) fn handle_possible_raw_paste_enter(app: &mut App) -> bool {
+    // Clipboard matching is authoritative and does not depend on terminal
+    // event timing. This is the normal recovery path for Windows/conhost and
+    // remote sessions that deliver pasted newlines as ordinary Enter events.
+    if recover_raw_multiline_paste(app) {
+        return true;
+    }
+    if !paste_burst::enter_is_synthetic() {
+        return false;
+    }
+    // Clipboard access can fail (remote desktop restrictions, clipboard
+    // ownership races). In that case at least preserve the pasted newline and
+    // prevent submission; the draft remains editable instead of sending a
+    // partial request.
+    insert_input_text(app, "\n");
+    paste_guard::note_paste();
+    true
+}
+
+/// A few Windows console paths expose pasted CR/LF bytes as printable text
+/// events instead of `KeyCode::Enter`. Recover those before the normal text
+/// insertion path can process them.
+pub(super) fn handle_raw_paste_newline_text(app: &mut App, text: &str) -> bool {
+    if !text.chars().any(|ch| ch == '\r' || ch == '\n') {
+        return false;
+    }
+    recover_raw_multiline_paste(app)
+}
+
+/// Recover a multiline paste when a terminal does not emit bracketed-paste
+/// events and instead injects the clipboard as ordinary keys. The first line
+/// has already been inserted by the time the synthetic Enter is observed.
+fn recover_raw_multiline_paste(app: &mut App) -> bool {
+    let Some(text) = read_clipboard_text() else {
+        return false;
+    };
+    recover_raw_multiline_paste_with_text(app, text)
+}
+
+pub(in crate::tui::app) fn recover_raw_multiline_paste_with_text(
+    app: &mut App,
+    text: String,
+) -> bool {
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    if !normalized.contains('\n') {
+        return false;
+    }
+
+    // Clipboard access can briefly fail while the terminal still owns it. If
+    // the first injected newline had to fall back to inserting `\n`, recover
+    // on a later newline by matching the longest clipboard prefix already in
+    // the composer. This also preserves blank lines and indentation exactly.
+    let input_before_cursor = &app.input[..app.cursor_pos];
+    let Some(newline) = normalized
+        .match_indices('\n')
+        .map(|(index, _)| index)
+        .rev()
+        .find(|&index| input_before_cursor.ends_with(&normalized[..index]))
+    else {
+        return false;
+    };
+
+    let matched_prefix = &normalized[..newline];
+    let start = app.cursor_pos.saturating_sub(matched_prefix.len());
+    let placeholder = paste_placeholder(&text);
+    let remainder = normalized[newline + 1..].to_string();
+    app.remember_input_undo_state();
+    app.pasted_contents.push(text);
+    app.input.replace_range(start..app.cursor_pos, &placeholder);
+    app.cursor_pos = start + placeholder.len();
+    app.reset_tab_completion();
+    app.sync_model_picker_preview_from_input();
+    paste_burst::begin_raw_paste_recovery(&remainder);
+    true
 }
 
 fn expand_matching_paste(app: &mut App, text: &str) -> bool {
@@ -2831,9 +2917,21 @@ fn attach_image(app: &mut App, media_type: String, base64_data: String) {
 }
 
 fn paste_placeholder(content: &str) -> String {
-    let line_count = content.lines().count().max(1);
+    let mut line_count = 1usize;
+    let mut previous_was_cr = false;
+    for byte in content.bytes() {
+        match byte {
+            b'\r' => {
+                line_count += 1;
+                previous_was_cr = true;
+            }
+            b'\n' if previous_was_cr => previous_was_cr = false,
+            b'\n' => line_count += 1,
+            _ => previous_was_cr = false,
+        }
+    }
     format!(
-        "[pasted {} line{}]",
+        "[Pasted ~{} line{}]",
         line_count,
         if line_count == 1 { "" } else { "s" }
     )
@@ -2895,6 +2993,15 @@ impl App {
         modifiers: KeyModifiers,
         text_input: Option<String>,
     ) -> Result<()> {
+        // Once a non-bracketed paste is recovered atomically from the
+        // clipboard, consume the terminal's remaining injected key events
+        // before they can mutate the composer or reach Enter/submit handling.
+        if paste_burst::observe_key(code, modifiers, text_input.as_deref()) {
+            return Ok(());
+        }
+        // Timing sample for paste-burst classification; must land before any
+        // dispatch decision that consults enter_is_synthetic().
+        paste_burst::note_key_event();
         let mut code = code;
         let mut modifiers = modifiers;
         ctrl_bracket_fallback_to_esc(&mut code, &mut modifiers);
@@ -3048,6 +3155,9 @@ impl App {
         }
 
         if let Some(text) = text_input.or_else(|| text_input_for_key(code, modifiers)) {
+            if handle_raw_paste_newline_text(self, &text) {
+                return Ok(());
+            }
             handle_text_input(self, &text);
             return Ok(());
         }
@@ -3062,6 +3172,14 @@ impl App {
         if code == KeyCode::Enter {
             // Stray post-paste Enter from some terminals is not a submit (#544).
             if paste_guard::consume_paste_trailing_enter() {
+                return Ok(());
+            }
+            // Terminals without bracketed paste inject multiline pastes as raw
+            // key events whose newlines arrive as an Enter storm. Reconstruct
+            // the newline instead of submitting mid-paste, and re-arm the
+            // stray-Enter guard so the terminal's final trailing Enter after
+            // the burst is swallowed too.
+            if handle_possible_raw_paste_enter(self) {
                 return Ok(());
             }
             // During the onboarding model-selection phase, Enter on an empty
