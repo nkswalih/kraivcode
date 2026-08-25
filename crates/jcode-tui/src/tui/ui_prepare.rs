@@ -914,35 +914,10 @@ fn prepare_messages_inner(app: &dyn TuiState, width: u16, height: u16) -> Prepar
     }
 
     let compose_start = Instant::now();
-    // Re-apply the initial-screen centering pad above the header so the
-    // transition from the empty screen to the first message does not shift
-    // anything. The pad scrolls off naturally as the transcript grows.
-    let pad_top = initial_header_pad_top(height, header_prepared.wrapped_lines.len());
-    let padded_header = if pad_top > 0 {
-        let mut lines = build_top_pad_lines(width, pad_top);
-        lines.reserve(header_prepared.wrapped_lines.len());
-        lines.extend(header_prepared.wrapped_lines.iter().cloned());
-        let count = lines.len();
-        let plain = Arc::new(lines.iter().map(ui::line_plain_text).collect());
-        Arc::new(PreparedMessages {
-            wrapped_lines: lines,
-            wrapped_plain_lines: plain,
-            wrapped_copy_offsets: Arc::new(vec![0; count]),
-            raw_plain_lines: Arc::new(Vec::new()),
-            wrapped_line_map: Arc::new(Vec::new()),
-            wrapped_user_indices: Vec::new(),
-            wrapped_user_prompt_starts: Vec::new(),
-            wrapped_user_prompt_ends: Vec::new(),
-            user_prompt_texts: Vec::new(),
-            image_regions: Vec::new(),
-            edit_tool_ranges: Vec::new(),
-            copy_targets: Vec::new(),
-            message_boundaries: Vec::new(),
-            mermaid_pending_epoch: None,
-        })
-    } else {
-        header_prepared
-    };
+    // Active sessions are top-aligned: no vertical centering pad above the
+    // header. The transcript starts directly below the compact top header on
+    // the very first frame after submission.
+    let padded_header = header_prepared;
     let frame = PreparedChatFrame::from_sections(vec![
         (PreparedSectionKind::Header, padded_header),
         (PreparedSectionKind::Body, body_prepared),
