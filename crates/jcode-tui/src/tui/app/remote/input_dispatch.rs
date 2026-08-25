@@ -126,13 +126,10 @@ pub(in crate::tui::app) async fn submit_prepared_remote_input(
     // Remember the typed prompt so we can restore it to the input box if this turn
     // fails (e.g. "token refresh needed"), instead of dropping it.
     app.last_submitted_input = Some(prepared.raw_input.clone());
-    app.push_display_message(DisplayMessage {
-        role: "user".to_string(),
-        content: prepared.raw_input,
-        tool_calls: vec![],
-        duration_secs: None,
-        title: None,
-        tool_data: None,
+    app.push_display_message(if prepared.has_pasted_content {
+        DisplayMessage::pasted_user(prepared.raw_input)
+    } else {
+        DisplayMessage::user(prepared.raw_input)
     });
     let _ = app
         .begin_remote_send(remote, prepared.expanded, prepared.images, false)
@@ -223,6 +220,7 @@ pub(in crate::tui::app) async fn submit_remote_slash_input(
             raw_input: prepared.raw_input,
             expanded: expanded_prompt,
             images: prepared.images,
+            has_pasted_content: prepared.has_pasted_content,
         },
     )
     .await
@@ -255,6 +253,7 @@ pub(in crate::tui::app) async fn route_prepared_input_to_new_remote_session(
                     raw_input: prepared.raw_input,
                     expanded: prompt.content,
                     images: prompt.images,
+                    has_pasted_content: prepared.has_pasted_content,
                 });
             app.pending_split_model_override = None;
             app.pending_split_provider_key_override = None;
@@ -277,6 +276,7 @@ pub(in crate::tui::app) async fn route_prepared_input_to_new_remote_session(
                 raw_input: prepared.raw_input,
                 expanded: prompt.content,
                 images: prompt.images,
+                has_pasted_content: prepared.has_pasted_content,
             });
         app.pending_split_model_override = None;
         app.pending_split_provider_key_override = None;
@@ -394,13 +394,10 @@ async fn submit_remote_transcript_input(
     match app.send_action(false) {
         SendAction::Submit => {
             let prepared = input::take_prepared_input(app);
-            app.push_display_message(DisplayMessage {
-                role: "user".to_string(),
-                content: prepared.raw_input,
-                tool_calls: vec![],
-                duration_secs: None,
-                title: None,
-                tool_data: None,
+            app.push_display_message(if prepared.has_pasted_content {
+                DisplayMessage::pasted_user(prepared.raw_input)
+            } else {
+                DisplayMessage::user(prepared.raw_input)
             });
             app.begin_remote_send(remote, prepared.expanded, prepared.images, false)
                 .await?;
