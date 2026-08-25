@@ -171,11 +171,7 @@ fn map_display_lines_to_logical_lines(
     Some(maps)
 }
 
-fn user_prompt_number_style(color: Color) -> Style {
-    Style::default().fg(color).bg(user_bg())
-}
-
-fn user_prompt_accent_style() -> Style {
+fn user_border_style() -> Style {
     Style::default().fg(user_color()).bg(user_bg())
 }
 
@@ -361,13 +357,11 @@ fn push_user_prompt_lines(
     line_raw_overrides: &mut Vec<Option<WrappedLineMap>>,
     line_copy_offsets: &mut Vec<usize>,
     user_line_indices: &mut Vec<usize>,
-    prompt_num: usize,
-    num_color: Color,
     content: &str,
     align: ratatui::layout::Alignment,
 ) {
-    let prefix_width = unicode_width::UnicodeWidthStr::width(prompt_num.to_string().as_str())
-        + unicode_width::UnicodeWidthStr::width("› ");
+    let border_prefix = "┃ ";
+    let prefix_width = unicode_width::UnicodeWidthStr::width(border_prefix);
     let normalized = content.replace("\r\n", "\n").replace('\r', "\n");
     for (line_idx, content_line) in normalized.split('\n').enumerate() {
         let raw_line = raw_plain_lines.len();
@@ -379,21 +373,8 @@ fn push_user_prompt_lines(
             user_line_indices.push(rendered_line_idx);
         }
 
-        let prefix_spans = if is_first_line {
-            vec![
-                Span::styled(
-                    format!("{}", prompt_num),
-                    user_prompt_number_style(num_color),
-                ),
-                Span::styled("› ", user_prompt_accent_style()),
-            ]
-        } else {
-            vec![Span::styled(
-                " ".repeat(prefix_width),
-                user_prompt_accent_style(),
-            )]
-        };
-        let mut spans = prefix_spans;
+        let border_span = Span::styled(border_prefix, user_border_style());
+        let mut spans = vec![border_span];
         spans.push(Span::styled(
             content_line.to_string(),
             user_prompt_text_style(),
@@ -1292,11 +1273,6 @@ struct BodyRenderCtx<'a> {
     app: &'a dyn TuiState,
     width: u16,
     centered: bool,
-    /// Number rendered next to the first user prompt = global prompt count +
-    /// number of prompts hidden by compaction.
-    prompt_number_offset: usize,
-    total_prompts: usize,
-    pending_count: usize,
     anchored_images: Arc<super::inline_image_ui::AnchoredInlineImages>,
     inline_images_visible: bool,
     messages: &'a [DisplayMessage],
@@ -1392,10 +1368,11 @@ fn render_message_into(
     }
     let align = default_message_alignment(role, centered);
 
+    // Tighter spacing: only add blank line before user messages (not assistant).
+    // User messages have the ┃ border so they're visually distinct already.
+    // Tool/meta/swarm messages never get blank lines between them.
     if (acc.body_has_content || !acc.lines.is_empty())
-        && role != "tool"
-        && role != "meta"
-        && role != "swarm"
+        && role == "user"
     {
         acc.push_blank();
     }
@@ -1404,17 +1381,12 @@ fn render_message_into(
         "user" => {
             acc.prompt_num += 1;
             acc.user_prompt_texts.push(msg.content.clone());
-            let distance = ctx.total_prompts + ctx.pending_count + 1 - acc.prompt_num;
-            let num_color = rainbow_prompt_color(distance);
-            let displayed_prompt_num = acc.prompt_num + ctx.prompt_number_offset;
             push_user_prompt_lines(
                 &mut acc.lines,
                 &mut acc.raw_plain_lines,
                 &mut acc.line_raw_overrides,
                 &mut acc.line_copy_offsets,
                 &mut acc.user_line_indices,
-                displayed_prompt_num,
-                num_color,
                 &msg.content,
                 align,
             );
@@ -1715,24 +1687,42 @@ fn render_message_into(
             let raw_line = acc.raw_plain_lines.len();
             acc.raw_plain_lines.push(msg.content.clone());
             let raw_width = unicode_width::UnicodeWidthStr::width(msg.content.as_str());
+            // OpenCode-style structured error block with left border.
+            let border_style = Style::default().fg(jcode_tui_style::theme::error_color());
+            let text_style = Style::default().fg(dim_color());
+            let max_box = (width.saturating_sub(4) as usize).clamp(28, 80);
+            let inner_width = max_box.saturating_sub(4);
+            let mut box_content: Vec<Line<'static>> = Vec::new();
+            let content_str = msg.content.as_str();
+            let text_display_width = unicode_width::UnicodeWidthStr::width(content_str);
+            if text_display_width <= inner_width {
+                box_content.push(Line::from(Span::styled(
+                    content_str.to_string(),
+                    text_style,
+                )));
+            } else {
+                for chunk in split_by_display_width(content_str, inner_width) {
+                    box_content.push(Line::from(Span::styled(chunk, text_style)));
+                }
+            }
+            let box_lines = render_rounded_box("error", box_content, max_box, border_style);
             let prefix_width =
-                unicode_width::UnicodeWidthStr::width(if centered { "✗ " } else { "  ✗ " });
-            acc.lines.push(
-                Line::from(vec![
-                    Span::styled(
-                        if centered { "✗ " } else { "  ✗ " },
-                        Style::default().fg(Color::Red),
-                    ),
-                    Span::styled(msg.content.clone(), Style::default().fg(Color::Red)),
-                ])
-                .alignment(align),
-            );
-            acc.line_raw_overrides.push(Some(WrappedLineMap {
-                raw_line,
-                start_col: 0,
-                end_col: raw_width,
-            }));
-            acc.line_copy_offsets.push(prefix_width);
+                unicode_width::UnicodeWidthStr::width(if centered { "  " } else { "    " });
+            for line in box_lines {
+                if !centered {
+                    let mut padded_spans = vec![Span::raw("  ")];
+                    padded_spans.extend(line.spans);
+                    acc.lines.push(Line::from(padded_spans).alignment(align));
+                } else {
+                    acc.lines.push(line.alignment(align));
+                }
+                acc.line_raw_overrides.push(Some(WrappedLineMap {
+                    raw_line,
+                    start_col: 0,
+                    end_col: raw_width,
+                }));
+                acc.line_copy_offsets.push(prefix_width);
+            }
         }
         _ => {}
     }
@@ -1788,18 +1778,15 @@ pub(super) fn prepare_body_incremental(
             .count()
     };
 
-    let ctx = BodyRenderCtx {
-        app,
-        width,
-        centered,
-        prompt_number_offset: app.compacted_hidden_user_prompts(),
-        total_prompts: app.display_user_message_count(),
-        pending_count: input_ui::pending_prompt_count(app),
-        anchored_images,
-        inline_images_visible: app.inline_images_visible(),
-        messages,
-        swarm_members: app.swarm_members_for_transcript(),
-    };
+        let ctx = BodyRenderCtx {
+            app,
+            width,
+            centered,
+            anchored_images,
+            inline_images_visible: app.inline_images_visible(),
+            messages,
+            swarm_members: app.swarm_members_for_transcript(),
+        };
 
     let mut acc = BodyAcc {
         prompt_num: prev_prompt_count,
@@ -2118,9 +2105,6 @@ pub(super) fn prepare_body_prepended(
         app,
         width,
         centered,
-        prompt_number_offset: app.compacted_hidden_user_prompts(),
-        total_prompts: app.display_user_message_count(),
-        pending_count: input_ui::pending_prompt_count(app),
         anchored_images: super::inline_image_ui::resolve_anchored_items_cached(app),
         inline_images_visible: app.inline_images_visible(),
         messages,
@@ -2340,6 +2324,12 @@ fn prepare_streaming_cached(
     if prefix_blank {
         lines.push(Line::from(""));
     }
+    // OpenCode-style: show "Kraivcode" header while streaming.
+    lines.push(Line::from(vec![Span::styled(
+        "   Kraivcode",
+        Style::default().fg(header_name_color()),
+    )]));
+    lines.push(Line::from(""));
     for line in md_lines {
         lines.push(align_if_unset(line, align));
     }
@@ -2366,9 +2356,6 @@ pub(super) fn prepare_body(
         app,
         width,
         centered,
-        prompt_number_offset: app.compacted_hidden_user_prompts(),
-        total_prompts: app.display_user_message_count(),
-        pending_count: input_ui::pending_prompt_count(app),
         // Images anchored to transcript messages render inline right after the
         // message that produced them (tool result or user prompt).
         anchored_images: super::inline_image_ui::resolve_anchored_items_cached(app),
