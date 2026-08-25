@@ -143,31 +143,31 @@ impl Role {
             .find(|role| role.key() == normalized)
     }
 
-    /// Built-in default RGB, matching jcode's historical hard-coded palette.
+    /// Built-in default RGB: Kraivcode yellow-and-black identity.
     pub const fn default_rgb(self) -> (u8, u8, u8) {
         match self {
-            Role::User => (138, 180, 248),
-            Role::Ai => (129, 199, 132),
-            Role::Tool => (120, 120, 120),
-            Role::FileLink => (180, 200, 255),
-            Role::Dim => (80, 80, 80),
-            Role::Accent => (186, 139, 255),
+            Role::User => (250, 182, 100),
+            Role::Ai => (238, 238, 238),
+            Role::Tool => (120, 120, 100),
+            Role::FileLink => (200, 200, 160),
+            Role::Dim => (100, 100, 80),
+            Role::Accent => (157, 124, 216),
             Role::System => (255, 170, 220),
             Role::Queued => (255, 193, 7),
             Role::Asap => (110, 210, 255),
-            Role::Pending => (140, 140, 140),
-            Role::UserText => (245, 245, 255),
-            Role::UserBg => (35, 40, 50),
-            Role::AiText => (220, 220, 215),
-            Role::HeaderIcon => (120, 210, 230),
-            Role::HeaderName => (190, 210, 235),
+            Role::Pending => (140, 140, 120),
+            Role::UserText => (238, 238, 238),
+            Role::UserBg => (10, 10, 10),
+            Role::AiText => (210, 210, 200),
+            Role::HeaderIcon => (250, 182, 100),
+            Role::HeaderName => (250, 182, 100),
             Role::HeaderSession => (255, 255, 255),
-            Role::Success => (100, 200, 100),
-            Role::Warning => (255, 200, 100),
-            Role::Error => (255, 100, 100),
+            Role::Success => (127, 216, 143),
+            Role::Warning => (245, 167, 66),
+            Role::Error => (224, 108, 117),
             Role::Info => (140, 180, 255),
-            Role::Border => (100, 100, 110),
-            Role::SelectionBg => (60, 60, 80),
+            Role::Border => (80, 80, 60),
+            Role::SelectionBg => (40, 40, 30),
         }
     }
 
