@@ -1,3 +1,4 @@
+use super::AgentMode;
 use super::DisplayMessageRoleExt;
 use super::keybind::{
     CenteredToggleKeys, ModelSwitchKeys, OptionalBinding, ScrollKeys, WorkspaceNavigationKeys,
@@ -1282,6 +1283,12 @@ pub struct App {
     swarm_panel_focused: bool,
     // Whether the focused swarm panel owns the main transcript viewport.
     swarm_panel_full_page: bool,
+    // Current agent mode for status bar display.
+    agent_mode: AgentMode,
+    // Whether a swarm plan graph is active.
+    plan_active: bool,
+    // Plan engine mode ("deep" or "light") when plan_active is true.
+    plan_mode: Option<String>,
     // Diff display mode (toggle with Alt+G)
     diff_mode: crate::config::DiffDisplayMode,
     // Center all content (from config)
