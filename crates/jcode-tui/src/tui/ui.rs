@@ -43,6 +43,8 @@ pub(crate) use animations::{
 };
 #[path = "ui_box.rs"]
 mod box_utils;
+#[path = "ui_home.rs"]
+mod home;
 #[path = "ui_changelog.rs"]
 mod changelog;
 #[path = "ui_debug_capture.rs"]
@@ -130,7 +132,7 @@ use memory_estimates::{estimate_prepared_chat_frame_bytes, estimate_prepared_mes
 use memory_ui::{
     MemoryTileItem, choose_memory_tile_span, parse_memory_display_entries, plan_memory_tile,
 };
-use memory_ui::{group_into_tiles, render_memory_tiles, split_by_display_width};
+pub(crate) use memory_ui::{group_into_tiles, render_memory_tiles, split_by_display_width};
 use messages::get_cached_message_lines;
 #[cfg_attr(test, allow(unused_imports))]
 pub(crate) use messages::{
@@ -556,9 +558,7 @@ use layout_support::{
 };
 #[cfg(test)]
 pub(crate) use status_support::calculate_input_lines;
-use status_support::{
-    format_status_for_debug, is_running_stable_release, semver, shorten_model_name,
-};
+use status_support::format_status_for_debug;
 use theme_support::{
     accent_color, activity_indicator, activity_indicator_frame_index, ai_color, ai_text,
     animated_tool_color, asap_color, blend_color, dim_color, file_link_color, header_icon_color,
@@ -3018,7 +3018,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let hint_line_height = input_ui::input_hint_line_height(app);
     let inline_block_height: u16 = inline_ui_height(app);
     let inline_ui_gap_height: u16 = if inline_block_height > 0 { 1 } else { 0 };
-    let input_height = base_input_height + hint_line_height;
+    // +2 for the rounded border (top + bottom row) drawn by draw_input's .block().
+    let input_height = base_input_height + hint_line_height + 2;
 
     if let Some(ref mut capture) = debug_capture {
         capture.render_order.push("prepare_messages".to_string());
@@ -3052,6 +3053,11 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     };
 
     let onboarding_welcome = app.onboarding_welcome_active();
+    let empty_session_home =
+    !onboarding_welcome
+        && !swarm_page_active
+        && app.display_messages().is_empty()
+        && app.display_user_message_count() == 0;
 
     // The guided onboarding phases (login import, OpenAI prompt, continue prompt)
     // are entirely key-driven and own the whole chat column: they render their own
@@ -3076,12 +3082,14 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         return;
     }
 
-    let show_donut = !onboarding_welcome && super::idle_donut_active(app);
+    let show_donut =
+    !onboarding_welcome
+        && !empty_session_home
+        && super::idle_donut_active(app);
     let donut_height: u16 = idle_donut_reserved_height(show_donut, input_height);
     let notification_height: u16 = if app.has_notification() { 1 } else { 0 };
-    // Elastic overscroll status line revealed when the user scrolls past the
-    // bottom of the transcript. Rendered directly below the input line.
-    let overscroll_height: u16 = if app.chat_overscroll_active() { 1 } else { 0 };
+    // Elastic overscroll status line removed from layout; state tracking preserved.
+    let overscroll_height: u16 = 0;
     let fixed_height = 1
         + queued_height
         + swarm_strip_height
@@ -3089,8 +3097,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         + inline_block_height
         + inline_ui_gap_height
         + input_height
-        + overscroll_height
-        + donut_height; // status + queued + swarm strip + notification + inline UI + gap + input + overscroll + donut
+        + donut_height; // status + queued + swarm strip + notification + inline UI + gap + input + donut
     let available_height = chat_area.height;
     // Overflow decisions (native scrollbar, and thus the wrap width) must not
     // depend on the transient overscroll row. Otherwise revealing the line at
@@ -3103,11 +3110,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     //
     // When the line is pinned permanently visible by config it is part of the
     // stable layout, not a transient reveal, so it does count here.
-    let stable_fixed_height = if app.chat_overscroll_pinned() {
-        fixed_height
-    } else {
-        fixed_height - overscroll_height
-    };
+    let stable_fixed_height = fixed_height;
     let overflows = |prepared: &PreparedChatFrame| {
         let started = Instant::now();
         let result =
@@ -3195,43 +3198,53 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let use_packed = terminal_clear_collapsed
         || (!swarm_page_active && content_height + fixed_height <= available_height);
 
-    // Layout: messages (includes header), queued, status, notification, inline UI, gap, input, donut
+    // Layout: messages, queued, swarm, notification, inline, gap, input, status, donut
     // All vertical chunks are within the chat_area (left column).
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(if use_packed {
             vec![
-                Constraint::Length(if terminal_clear_collapsed {
+                if empty_session_home {
+                    Constraint::Fill(1)
+                } else if terminal_clear_collapsed {
+                    Constraint::Length(0)
+                } else {
+                    Constraint::Length(content_height.max(1))
+                }, // 0 Messages (fill when empty home, exact height otherwise, 0 when terminal-cleared)
+                Constraint::Length(queued_height), // 1 Queued messages
+                Constraint::Length(swarm_strip_height), // 2 Swarm strip
+                Constraint::Length(notification_height), // 3 Notification line
+                Constraint::Length(inline_block_height), // 4 Inline UI
+                Constraint::Length(inline_ui_gap_height), // 5 Inline UI/input spacing
+                Constraint::Length(if empty_session_home {
                     0
                 } else {
-                    content_height.max(1)
-                }), // 0 Messages (exact height; 0 when terminal-cleared)
-                Constraint::Length(queued_height), // 1 Queued messages (above status)
-                Constraint::Length(swarm_strip_height), // 2 Swarm strip (above status)
-                Constraint::Length(1),             // 3 Status line
-                Constraint::Length(notification_height), // 4 Notification line
-                Constraint::Length(inline_block_height), // 5 Inline UI
-                Constraint::Length(inline_ui_gap_height), // 6 Inline UI/input spacing
-                Constraint::Length(input_height),  // 7 Input
-                Constraint::Length(overscroll_height), // 8 Overscroll status line
+                    input_height
+                }),  // 6 Input
+                Constraint::Length(1),             // 7 Status line (always visible, below input)
+                Constraint::Length(0),             // 8 Overscroll (removed from layout, state preserved)
                 Constraint::Length(donut_height),  // 9 Donut animation
             ]
         } else {
             vec![
                 Constraint::Min(3),                       // 0 Messages (scrollable)
-                Constraint::Length(queued_height),        // 1 Queued messages (above status)
-                Constraint::Length(swarm_strip_height),   // 2 Swarm strip (above status)
-                Constraint::Length(1),                    // 3 Status line
-                Constraint::Length(notification_height),  // 4 Notification line
-                Constraint::Length(inline_block_height),  // 5 Inline UI
-                Constraint::Length(inline_ui_gap_height), // 6 Inline UI/input spacing
-                Constraint::Length(input_height),         // 7 Input
-                Constraint::Length(overscroll_height),    // 8 Overscroll status line
+                Constraint::Length(queued_height),        // 1 Queued messages
+                Constraint::Length(swarm_strip_height),   // 2 Swarm strip
+                Constraint::Length(notification_height),  // 3 Notification line
+                Constraint::Length(inline_block_height),  // 4 Inline UI
+                Constraint::Length(inline_ui_gap_height), // 5 Inline UI/input spacing
+                Constraint::Length(if empty_session_home {
+                    0
+                } else {
+                    input_height
+                }),        // 6 Input
+                Constraint::Length(1),                    // 7 Status line (always visible, below input)
+                Constraint::Length(0),                    // 8 Overscroll (removed from layout)
                 Constraint::Length(donut_height),         // 9 Donut animation
             ]
         })
         .split(chat_area);
-    record_status_area(chunks[3]);
+    record_status_area(chunks[7]);
 
     // Draw the inline swarm strip directly above the status line if present.
     if swarm_strip_height > 0 {
@@ -3247,8 +3260,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         if queued_height > 0 {
             capture.layout.queued_area = Some(chunks[1].into());
         }
-        capture.layout.status_area = Some(chunks[3].into());
-        capture.layout.input_area = Some(chunks[7].into());
+        capture.layout.status_area = Some(chunks[7].into());
+        capture.layout.input_area = Some(chunks[6].into());
         capture.layout.input_lines_raw = app.input().lines().count().max(1);
         capture.layout.input_lines_wrapped = base_input_height as usize;
 
@@ -3325,14 +3338,42 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         capture.layout.messages_area = Some(messages_area.into());
         capture.layout.diagram_area = diagram_area.map(|r| r.into());
     }
-    record_layout_snapshot(messages_area, diagram_area, diff_pane_area, Some(chunks[7]));
+    record_layout_snapshot(messages_area, diagram_area, diff_pane_area, Some(chunks[6]));
+
+    let mut home_input_area: Option<Rect> = None;
 
     let margins = if onboarding_welcome {
         onboarding::draw_onboarding_welcome(frame, app, messages_area);
+
         info_widget::Margins {
             right_widths: Vec::new(),
             left_widths: Vec::new(),
             centered: app.centered_mode(),
+            ..Default::default()
+        }
+    } else if empty_session_home {
+        let home_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(1)])
+            .split(messages_area);
+
+        let (persistent, _secondary) = header::build_header_sections(app, home_chunks[0].width);
+        clear_area(frame, home_chunks[0]);
+        if let Some(line) = persistent.into_iter().next() {
+            frame.render_widget(Paragraph::new(line), home_chunks[0]);
+        }
+
+        home_input_area = Some(home::draw_home(
+            frame,
+            app,
+            home_chunks[1],
+            input_height,
+        ));
+
+        info_widget::Margins {
+            right_widths: Vec::new(),
+            left_widths: Vec::new(),
+            centered: true,
             ..Default::default()
         }
     } else if swarm_page_active {
@@ -3367,10 +3408,24 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             ..Default::default()
         }
     } else {
+        // Active session: render a compact one-line persistent header above
+        // the transcript so the user always sees the project identity.
+        clear_area(frame, messages_area);
+        let (active_header, _) = header::build_header_sections(app, messages_area.width);
+        let active_chunks = Layout::vertical([
+            Constraint::Length(1),  // header row
+            Constraint::Min(1),    // messages
+        ])
+        .split(messages_area);
+        clear_area(frame, active_chunks[0]);
+        if let Some(line) = active_header.into_iter().next() {
+            frame.render_widget(Paragraph::new(line), active_chunks[0]);
+        }
+
         draw_messages(
             frame,
             app,
-            messages_area,
+            active_chunks[1],
             prepared.clone(),
             chat_scrollbar_visible,
         )
@@ -3460,29 +3515,30 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     if let Some(ref mut capture) = debug_capture {
         capture.render_order.push("draw_status".to_string());
     }
-    input_ui::draw_status(frame, app, chunks[3], pending_count);
+    input_ui::draw_status(frame, app, chunks[7], pending_count, empty_session_home);
     if notification_height > 0 {
-        input_ui::draw_notification(frame, app, chunks[4]);
+        input_ui::draw_notification(frame, app, chunks[3]);
     }
     if let Some(ref mut capture) = debug_capture {
         capture.render_order.push("draw_input".to_string());
     }
     // Draw inline UI if active
     if inline_block_height > 0 {
-        draw_inline_ui(frame, app, chunks[5]);
+        draw_inline_ui(frame, app, chunks[4]);
     }
 
-    let input_cursor = input_ui::draw_input(
+    let active_input_area = match home_input_area {
+        Some(area) => area,
+        None => chunks[6],
+    };
+
+    let _input_cursor = input_ui::draw_input(
         frame,
         app,
-        chunks[7],
+        active_input_area,
         user_count + pending_count + 1,
         &mut debug_capture,
     );
-
-    if overscroll_height > 0 {
-        input_ui::draw_overscroll_status(frame, app, chunks[8]);
-    }
 
     if donut_height > 0 {
         animations::draw_idle_animation(frame, app, chunks[9]);
@@ -3493,7 +3549,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let widget_data_start = Instant::now();
     let widget_data = app.info_widget_data();
     let widget_data_elapsed = widget_data_start.elapsed();
-    let mut widget_render_ms: Option<f32> = None;
+    let widget_render_ms: Option<f32> = None;
     let mut placements: Vec<info_widget::WidgetPlacement> = Vec::new();
     let widget_bounds = messages_area;
     if app.info_widget_overlays_enabled()
@@ -3551,10 +3607,11 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 }
             }
         }
-
-        let widget_start = Instant::now();
-        info_widget::render_all(frame, &placements, &widget_data);
-        widget_render_ms = Some(widget_start.elapsed().as_secs_f32() * 1000.0);
+        // Kraivcode UI: info widgets are currently hidden from the main screen.
+        // Their data remains available for the future status bar / context overlay.
+        // let widget_start = Instant::now();
+        // info_widget::render_all(frame, &placements, &widget_data);
+        // widget_render_ms = Some(widget_start.elapsed().as_secs_f32() * 1000.0);
 
         // Optional visual overlay for placements
     } else {
@@ -3579,23 +3636,32 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Session facts use actual final-frame cells for collision detection. They
     // prefer the composer chrome and may climb into a few transcript-tail rows
     // only when the right suffix is genuinely unused.
-    input_ui::draw_right_fact_stack(
-        frame,
-        app,
-        messages_area,
-        chunks[7],
-        chat_scrollbar_visible,
-        input_cursor,
-    );
+    // input_ui::draw_right_fact_stack(
+    //     frame,
+    //     app,
+    //     messages_area,
+    //     chunks[7],
+    //     chat_scrollbar_visible,
+    //     input_cursor,
+    // );
 
     // Command-suggestion popover: a late overlay pass so the palette floats
     // over existing rows (blank space, pinned footer, or the transcript tail)
     // instead of reserving layout height and shoving everything around.
-    input_ui::draw_command_suggestions_overlay(frame, app, chunks[7]);
+
+    input_ui::draw_command_suggestions_overlay(
+        frame,
+        app,
+        active_input_area,
+    );
 
     // Ctrl+R reverse prompt-history search overlay (drawn after the command
     // palette so it wins when both could be visible).
-    input_ui::draw_prompt_history_search_overlay(frame, app, chunks[7]);
+    input_ui::draw_prompt_history_search_overlay(
+        frame,
+        app,
+        active_input_area,
+    );
 
     // Observe the rendered messages area for the anchor-stability (smoothness)
     // report. Runs on the final buffer so it sees exactly what the user sees.

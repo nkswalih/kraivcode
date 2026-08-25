@@ -1,7 +1,7 @@
 use super::*;
 use crate::tui::session_picker::{self, OverlayAction, PickerResult, ResumeTarget, SessionPicker};
 use crate::tui::{
-    AccountPickerAction, InlineInteractiveState, PickerAction, PickerEntry, PickerKind,
+    AccountPickerAction, AgentMode, InlineInteractiveState, PickerAction, PickerEntry, PickerKind,
     PickerOption,
 };
 use serde::{Deserialize, Serialize};
@@ -3448,6 +3448,7 @@ impl App {
                         target,
                         clear_override,
                     } => {
+                        self.agent_mode = AgentMode::from(target);
                         self.inline_interactive_state = None;
                         let result = if clear_override {
                             save_agent_model_override(target, None)
