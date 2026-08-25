@@ -333,6 +333,15 @@ impl crate::tui::TuiState for TestState {
     fn swarm_panel_full_page(&self) -> bool {
         self.swarm_panel_full_page
     }
+    fn agent_mode(&self) -> crate::tui::AgentMode {
+        crate::tui::AgentMode::default()
+    }
+    fn plan_active(&self) -> bool {
+        false
+    }
+    fn plan_mode(&self) -> Option<&str> {
+        None
+    }
     fn remote_startup_phase_active(&self) -> bool {
         self.remote_startup_phase_active
     }
