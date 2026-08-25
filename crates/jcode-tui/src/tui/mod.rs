@@ -575,6 +575,20 @@ pub trait TuiState {
         false
     }
 
+    // ---- Status bar agent/plan mode ----
+    /// Current agent mode for the status bar label (Ready/Swarm/Review/etc).
+    fn agent_mode(&self) -> AgentMode {
+        AgentMode::default()
+    }
+    /// Whether a swarm plan graph is active.
+    fn plan_active(&self) -> bool {
+        false
+    }
+    /// Plan engine mode ("deep" or "light") when a plan is active.
+    fn plan_mode(&self) -> Option<&str> {
+        None
+    }
+
     // ---- Workspace ----
     /// Whether workspace mode is enabled for this client.
     fn workspace_mode_enabled(&self) -> bool {
@@ -1286,6 +1300,42 @@ pub enum AgentModelTarget {
     Judge,
     Memory,
     Ambient,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AgentMode {
+    #[default]
+    Ready,
+    Swarm,
+    Review,
+    Judge,
+    Memory,
+    Ambient,
+}
+
+impl AgentMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Ready => "Ready",
+            Self::Swarm => "Swarm",
+            Self::Review => "Code Review",
+            Self::Judge => "Judge",
+            Self::Memory => "Memory",
+            Self::Ambient => "Ambient",
+        }
+    }
+}
+
+impl From<AgentModelTarget> for AgentMode {
+    fn from(target: AgentModelTarget) -> Self {
+        match target {
+            AgentModelTarget::Swarm => Self::Swarm,
+            AgentModelTarget::Review => Self::Review,
+            AgentModelTarget::Judge => Self::Judge,
+            AgentModelTarget::Memory => Self::Memory,
+            AgentModelTarget::Ambient => Self::Ambient,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
