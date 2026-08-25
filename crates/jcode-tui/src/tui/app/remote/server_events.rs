@@ -2174,6 +2174,8 @@ pub(in crate::tui::app) fn handle_server_event(
                 app.swarm_plan_swarm_id = Some(snapshot.swarm_id.clone());
                 app.swarm_plan_version = Some(snapshot.version);
                 app.swarm_plan_items = snapshot.items.clone();
+                app.plan_active = !snapshot.items.is_empty();
+                app.plan_mode = snapshot.summary.as_ref().map(|s| s.mode.clone());
                 persist_swarm_plan_snapshot(
                     app,
                     snapshot.swarm_id,
