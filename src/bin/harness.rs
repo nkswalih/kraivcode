@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use jcode::id::new_id;
-use jcode::message::{Message, ToolDefinition};
-use jcode::provider::{EventStream, Provider};
-use jcode::tool::{Registry, ToolContext, ToolExecutionMode};
+use kraivcode::id::new_id;
+use kraivcode::message::{Message, ToolDefinition};
+use kraivcode::provider::{EventStream, Provider};
+use kraivcode::tool::{Registry, ToolContext, ToolExecutionMode};
 use serde_json::json;
 use std::path::PathBuf;
 use std::sync::Arc;
