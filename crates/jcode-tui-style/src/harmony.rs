@@ -992,6 +992,25 @@ pub(crate) mod calibration {
         ])
     }
 
+    /// Kraivcode's yellow-and-black identity.
+    pub(super) fn kraivcode_dark() -> Palette {
+        build(&[
+            (Role::User, "#fab264"),
+            (Role::Ai, "#eeeeee"),
+            (Role::Dim, "#646450"),
+            (Role::Accent, "#9d7cd8"),
+            (Role::UserText, "#eeeeee"),
+            (Role::UserBg, "#0a0a0a"),
+            (Role::HeaderName, "#fab264"),
+            (Role::HeaderIcon, "#fab264"),
+            (Role::Success, "#7fd88f"),
+            (Role::Warning, "#f5a742"),
+            (Role::Error, "#e06c75"),
+            (Role::Border, "#50503c"),
+            (Role::SelectionBg, "#28281e"),
+        ])
+    }
+
     /// Every role a barely-different shade of mud: unreadable and indistinct.
     pub(super) fn all_mud() -> Palette {
         build(&[
