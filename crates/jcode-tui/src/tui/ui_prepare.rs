@@ -363,15 +363,12 @@ fn push_user_prompt_lines(
     let border_prefix = "┃ ";
     let prefix_width = unicode_width::UnicodeWidthStr::width(border_prefix);
     let normalized = content.replace("\r\n", "\n").replace('\r', "\n");
-    for (line_idx, content_line) in normalized.split('\n').enumerate() {
+    for (_line_idx, content_line) in normalized.split('\n').enumerate() {
         let raw_line = raw_plain_lines.len();
         raw_plain_lines.push(content_line.to_string());
         let prompt_width = unicode_width::UnicodeWidthStr::width(content_line);
         let rendered_line_idx = lines.len();
-        let is_first_line = line_idx == 0;
-        if is_first_line {
-            user_line_indices.push(rendered_line_idx);
-        }
+        user_line_indices.push(rendered_line_idx);
 
         let border_span = Span::styled(border_prefix, user_border_style());
         let mut spans = vec![border_span];
@@ -466,9 +463,12 @@ fn push_segmented_user_prompt_lines(
         }
     }
 
-    // One prompt registration per submitted message regardless of how many
-    // paste cards it contains.
-    acc.user_line_indices.push(first_line_index);
+    // Register every line of the user message (typed + pasted) so the
+    // viewport fill covers the full block width, not just the first line.
+    let end_index = acc.lines.len();
+    for i in first_line_index..end_index {
+        acc.user_line_indices.push(i);
+    }
 }
 
 fn empty_prepared_messages() -> PreparedMessages {
@@ -1428,10 +1428,14 @@ fn render_message_into(
     // Tighter spacing: only add blank line before user messages (not assistant).
     // User messages have the ┃ border so they're visually distinct already.
     // Tool/meta/swarm messages never get blank lines between them.
+    // The blank line is registered as a user line so the viewport fill covers
+    // it with the user_bg color, creating a solid top-padding block.
     if (acc.body_has_content || !acc.lines.is_empty())
         && role == "user"
     {
+        let padding_idx = acc.lines.len();
         acc.push_blank();
+        acc.user_line_indices.push(padding_idx);
     }
 
     match role {
@@ -1464,6 +1468,14 @@ fn render_message_into(
                         acc.push_auto(line);
                     }
                 }
+            }
+            // Bottom padding blank line: registered as a user line so the
+            // viewport fill covers it with user_bg, creating a solid
+            // bottom-padding block between this user message and the next.
+            {
+                let padding_idx = acc.lines.len();
+                acc.push_blank();
+                acc.user_line_indices.push(padding_idx);
             }
         }
         "assistant" => {
