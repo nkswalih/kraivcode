@@ -1304,7 +1304,14 @@ impl App {
             KeyCode::Char('k') if modifiers.contains(KeyModifiers::CONTROL) => {
                 self.move_command_suggestion_selection(-1)
             }
-            KeyCode::Enter if modifiers.is_empty() => self.accept_selected_command_suggestion(),
+            KeyCode::Enter if modifiers.is_empty() => {
+                // Injected right-click paste Enter storms must never execute
+                // a slash command while the palette is open.
+                if crate::tui::app::input::paste_burst_enter_is_synthetic() {
+                    return false;
+                }
+                self.accept_selected_command_suggestion()
+            }
             _ => false,
         }
     }

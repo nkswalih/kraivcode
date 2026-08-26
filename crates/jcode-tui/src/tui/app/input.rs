@@ -3274,6 +3274,12 @@ impl App {
         }
 
         if let Some(text) = text_input.or_else(|| text_input_for_key(code, modifiers)) {
+            // While a slash-command palette / picker / detail popup is open,
+            // drop injected right-click paste floods so nothing leaks into
+            // the composer draft behind the modal.
+            if self.paste_input_suppressed() && paste_burst_enter_is_synthetic() {
+                return Ok(());
+            }
             if handle_raw_paste_newline_text(self, &text) {
                 return Ok(());
             }
