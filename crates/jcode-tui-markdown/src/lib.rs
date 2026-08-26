@@ -318,6 +318,12 @@ fn repeated_gutter_prefix(line: &Line<'static>) -> Option<(Vec<Span<'static>>, u
     }
 
     if gutter_count > 0 {
+        // When the only content IS the gutter (blank lines like "┃ "), don't
+        // return a prefix. The gutter is already in the token's word; adding
+        // it again via seed_repeated_prefix would produce "┃┃ ".
+        if rest.is_empty() {
+            return None;
+        }
         return Some((
             leading_spans_for_display_width(line, base_prefix_width),
             base_prefix_width,
