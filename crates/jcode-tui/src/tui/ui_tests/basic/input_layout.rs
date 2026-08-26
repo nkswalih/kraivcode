@@ -162,6 +162,7 @@ fn test_wrapped_input_line_count_respects_two_digit_prompt_width() {
             duration_secs: None,
             title: None,
             tool_data: None,
+            pasted_segments: None,
         });
     }
 
