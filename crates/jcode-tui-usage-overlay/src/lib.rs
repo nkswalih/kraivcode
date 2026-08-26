@@ -34,12 +34,12 @@ impl UsageOverlayStatus {
 
     pub fn color(self) -> Color {
         match self {
-            Self::Loading => Color::Rgb(129, 184, 255),
-            Self::Good => Color::Rgb(111, 214, 181),
+            Self::Loading => Color::Rgb(255, 200, 50),
+            Self::Good => Color::Rgb(100, 220, 130),
             Self::Warning => Color::Rgb(255, 196, 112),
             Self::Critical => Color::Rgb(255, 146, 110),
             Self::Error => Color::Rgb(232, 134, 134),
-            Self::Info => Color::Rgb(196, 170, 255),
+            Self::Info => Color::Rgb(255, 220, 100),
         }
     }
 
@@ -57,12 +57,19 @@ impl UsageOverlayStatus {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum DetailLine {
+    Text(String),
+    Bar(Vec<Span<'static>>),
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UsageOverlayItem {
     pub id: String,
     pub title: String,
     pub subtitle: String,
     pub status: UsageOverlayStatus,
-    pub detail_lines: Vec<String>,
+    pub detail_lines: Vec<DetailLine>,
 }
 
 impl UsageOverlayItem {
@@ -71,7 +78,7 @@ impl UsageOverlayItem {
         title: impl Into<String>,
         subtitle: impl Into<String>,
         status: UsageOverlayStatus,
-        detail_lines: Vec<String>,
+        detail_lines: Vec<DetailLine>,
     ) -> Self {
         Self {
             id: id.into(),
@@ -98,13 +105,22 @@ pub fn item_matches_filter(item: &UsageOverlayItem, filter: &str) -> bool {
         return true;
     }
 
+    let details: Vec<String> = item
+        .detail_lines
+        .iter()
+        .map(|line| match line {
+            DetailLine::Text(s) => s.clone(),
+            DetailLine::Bar(spans) => spans.iter().map(|s| s.content.as_ref()).collect(),
+        })
+        .collect();
+
     let haystack = format!(
         "{} {} {} {} {}",
         item.id,
         item.title,
         item.subtitle,
         item.status.label(),
-        item.detail_lines.join(" ")
+        details.join(" ")
     )
     .to_lowercase();
 
@@ -113,13 +129,13 @@ pub fn item_matches_filter(item: &UsageOverlayItem, filter: &str) -> bool {
         .all(|needle| haystack.contains(&needle.to_lowercase()))
 }
 
-const PANEL_BG: Color = Color::Rgb(24, 28, 40);
-const PANEL_BORDER: Color = Color::Rgb(90, 95, 110);
-const PANEL_BORDER_ACTIVE: Color = Color::Rgb(120, 140, 190);
-const SECTION_BORDER: Color = Color::Rgb(70, 78, 94);
-const SELECTED_BG: Color = Color::Rgb(38, 42, 56);
-const MUTED: Color = Color::Rgb(140, 146, 163);
-const MUTED_DARK: Color = Color::Rgb(100, 106, 122);
+const PANEL_BG: Color = Color::Rgb(18, 18, 14);
+const PANEL_BORDER: Color = Color::Rgb(80, 75, 40);
+const PANEL_BORDER_ACTIVE: Color = Color::Rgb(160, 140, 50);
+const SECTION_BORDER: Color = Color::Rgb(80, 75, 40);
+const SELECTED_BG: Color = Color::Rgb(38, 35, 20);
+const MUTED: Color = Color::Rgb(140, 130, 80);
+const MUTED_DARK: Color = Color::Rgb(100, 95, 55);
 const OVERLAY_PERCENT_X: u16 = 88;
 const OVERLAY_PERCENT_Y: u16 = 74;
 
@@ -148,10 +164,9 @@ impl UsageOverlay {
                 "Fetching limits from connected providers",
                 UsageOverlayStatus::Loading,
                 vec![
-                    "Fetching usage limits from all connected providers...".to_string(),
-                    "".to_string(),
-                    "This view will update automatically when the usage report returns."
-                        .to_string(),
+                    DetailLine::Text("Fetching usage limits from all connected providers...".to_string()),
+                    DetailLine::Text("".to_string()),
+                    DetailLine::Text("This view will update automatically when the usage report returns.".to_string()),
                 ],
             )],
             UsageOverlaySummary::default(),
@@ -191,13 +206,13 @@ impl UsageOverlay {
                 subtitle,
                 UsageOverlayStatus::Loading,
                 vec![
-                    "## Live refresh".to_string(),
-                    if from_cache {
+                    DetailLine::Text("## Live refresh".to_string()),
+                    DetailLine::Text(if from_cache {
                         "• Cached results are visible immediately.".to_string()
                     } else {
                         "• Waiting for provider responses.".to_string()
-                    },
-                    if total > 0 {
+                    }),
+                    DetailLine::Text(if total > 0 {
                         format!(
                             "• Completed {}/{} provider checks.",
                             completed.min(total),
@@ -205,8 +220,8 @@ impl UsageOverlay {
                         )
                     } else {
                         "• Discovering connected providers.".to_string()
-                    },
-                    "• This panel updates as each provider returns.".to_string(),
+                    }),
+                    DetailLine::Text("• This panel updates as each provider returns.".to_string()),
                 ],
             ));
         } else if items.is_empty() {
@@ -216,10 +231,10 @@ impl UsageOverlay {
                 "Connect Claude or OpenAI OAuth to show usage limits",
                 UsageOverlayStatus::Info,
                 vec![
-                    "## No usage sources found".to_string(),
-                    "• No providers with OAuth credentials were found.".to_string(),
-                    "• Use `/login claude` or `/login openai` to connect a provider.".to_string(),
-                    "• Then run `/usage` again.".to_string(),
+                    DetailLine::Text("## No usage sources found".to_string()),
+                    DetailLine::Text("• No providers with OAuth credentials were found.".to_string()),
+                    DetailLine::Text("• Use `/login claude` or `/login openai` to connect a provider.".to_string()),
+                    DetailLine::Text("• Then run `/usage` again.".to_string()),
                 ],
             ));
         }
@@ -304,7 +319,18 @@ impl UsageOverlay {
 
     pub fn selected_item_detail_text(&self) -> String {
         self.selected_item()
-            .map(|item| item.detail_lines.join("\n"))
+            .map(|item| {
+                item.detail_lines
+                    .iter()
+                    .map(|line| match line {
+                        DetailLine::Text(s) => s.clone(),
+                        DetailLine::Bar(spans) => {
+                            spans.iter().map(|s| s.content.as_ref()).collect()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
             .unwrap_or_default()
     }
 
@@ -441,7 +467,7 @@ impl UsageOverlay {
         let block = Block::default()
             .title(Span::styled(
                 " Usage overview ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(Color::Rgb(255, 200, 50)).bold(),
             ))
             .borders(Borders::ALL)
             .style(Style::default().bg(PANEL_BG))
@@ -513,7 +539,7 @@ impl UsageOverlay {
         let block = Block::default()
             .title(Span::styled(
                 title,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(Color::Rgb(255, 200, 50)).bold(),
             ))
             .borders(Borders::ALL)
             .style(Style::default().bg(PANEL_BG))
@@ -598,7 +624,7 @@ impl UsageOverlay {
         let block = Block::default()
             .title(Span::styled(
                 title,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(Color::Rgb(255, 200, 50)).bold(),
             ))
             .borders(Borders::ALL)
             .style(Style::default().bg(PANEL_BG))
@@ -611,20 +637,25 @@ impl UsageOverlay {
                 .detail_lines
                 .iter()
                 .map(|line| {
-                    if line.is_empty() {
-                        Line::from("")
-                    } else if let Some(rest) = line.strip_prefix("## ") {
-                        Line::from(Span::styled(
-                            format!("  {}", rest),
-                            Style::default().fg(Color::White).bold(),
-                        ))
-                    } else if let Some(rest) = line.strip_prefix("• ") {
-                        Line::from(vec![
-                            Span::styled("  • ", Style::default().fg(MUTED_DARK)),
-                            Span::styled(rest.to_string(), Style::default().fg(MUTED)),
-                        ])
-                    } else {
-                        Line::from(Span::styled(line.clone(), Style::default().fg(MUTED)))
+                    match line {
+                        DetailLine::Bar(spans) => Line::from(spans.clone()),
+                        DetailLine::Text(text) => {
+                            if text.is_empty() {
+                                Line::from("")
+                            } else if let Some(rest) = text.strip_prefix("## ") {
+                                Line::from(Span::styled(
+                                    format!("  {}", rest),
+                                    Style::default().fg(Color::Rgb(255, 200, 50)).bold(),
+                                ))
+                            } else if let Some(rest) = text.strip_prefix("• ") {
+                                Line::from(vec![
+                                    Span::styled("  • ", Style::default().fg(MUTED_DARK)),
+                                    Span::styled(rest.to_string(), Style::default().fg(MUTED)),
+                                ])
+                            } else {
+                                Line::from(Span::styled(text.clone(), Style::default().fg(MUTED)))
+                            }
+                        }
                     }
                 })
                 .collect(),
@@ -645,7 +676,12 @@ fn estimate_item_bytes(item: &UsageOverlayItem) -> usize {
         + item
             .detail_lines
             .iter()
-            .map(|value| value.capacity())
+            .map(|line| match line {
+                DetailLine::Text(s) => s.capacity(),
+                DetailLine::Bar(spans) => {
+                    spans.iter().map(|s| s.content.len()).sum::<usize>()
+                }
+            })
             .sum::<usize>()
 }
 
@@ -770,42 +806,67 @@ pub fn format_reset_time(timestamp: &str) -> String {
     }
 }
 
-pub fn format_usage_bar(percent: f32, width: usize) -> String {
+pub fn format_usage_bar(percent: f32, width: usize) -> Vec<Span<'static>> {
     let filled = ((percent / 100.0) * width as f32).round() as usize;
     let filled = filled.min(width);
     let empty = width.saturating_sub(filled);
-    let bar: String = "█".repeat(filled) + &"░".repeat(empty);
-    format!("{} {:.0}%", bar, percent)
+    let pct = percent.round() as u16;
+
+    // Match the status bar context pill style: ▰ filled yellow / ▱ empty dim gray.
+    let fill_color = Color::Rgb(255, 200, 50);
+    let track_color = Color::Rgb(50, 50, 60);
+
+    let mut spans = Vec::with_capacity(3);
+    spans.push(Span::styled(
+        "▰".repeat(filled),
+        Style::default().fg(fill_color),
+    ));
+    spans.push(Span::styled(
+        "▱".repeat(empty),
+        Style::default().fg(track_color),
+    ));
+    spans.push(Span::styled(
+        format!(" {}%", pct),
+        Style::default().fg(fill_color).bold(),
+    ));
+    spans
 }
 
-fn provider_detail_lines(report: &jcode_usage_types::ProviderUsage) -> Vec<String> {
+fn provider_detail_lines(report: &jcode_usage_types::ProviderUsage) -> Vec<DetailLine> {
     let mut lines = Vec::new();
-    lines.push("## Status".to_string());
+    lines.push(DetailLine::Text("## Status".to_string()));
     if let Some(error) = &report.error {
-        lines.push(format!("• Error: {}", error));
-        lines.push("".to_string());
-        lines.push("## Next steps".to_string());
-        lines.push(
+        lines.push(DetailLine::Text(format!("• Error: {}", error)));
+        lines.push(DetailLine::Text("".to_string()));
+        lines.push(DetailLine::Text("## Next steps".to_string()));
+        lines.push(DetailLine::Text(
             "• Re-run `/usage` to retry after credentials or network issues are fixed.".to_string(),
-        );
+        ));
         if report.provider_name.to_lowercase().contains("openai") {
-            lines.push("• Use `/login openai` if the token needs refreshing.".to_string());
+            lines.push(DetailLine::Text(
+                "• Use `/login openai` if the token needs refreshing.".to_string(),
+            ));
         } else if report.provider_name.to_lowercase().contains("anthropic")
             || report.provider_name.to_lowercase().contains("claude")
         {
-            lines.push("• Use `/login claude` if the token needs refreshing.".to_string());
+            lines.push(DetailLine::Text(
+                "• Use `/login claude` if the token needs refreshing.".to_string(),
+            ));
         }
         return lines;
     }
 
-    lines.push(format!("• {}", provider_status(report).label()));
+    lines.push(DetailLine::Text(format!(
+        "• {}",
+        provider_status(report).label()
+    )));
     if report.hard_limit_reached {
-        lines.push("• Hard limit reached.".to_string());
+        lines.push(DetailLine::Text("• Hard limit reached.".to_string()));
     }
 
     if !report.limits.is_empty() {
-        lines.push("".to_string());
-        lines.push("## Limits".to_string());
+        lines.push(DetailLine::Text("".to_string()));
+        lines.push(DetailLine::Text("## Limits".to_string()));
         for limit in &report.limits {
             let reset = limit
                 .resets_at
@@ -813,25 +874,33 @@ fn provider_detail_lines(report: &jcode_usage_types::ProviderUsage) -> Vec<Strin
                 .map(format_reset_time)
                 .map(|value| format!(" · resets in {}", value))
                 .unwrap_or_default();
-            lines.push(format!(
-                "• {}  {}{}",
-                limit.name,
-                format_usage_bar(limit.usage_percent, 18),
-                reset
-            ));
+            let mut bar_spans = format_usage_bar(limit.usage_percent, 18);
+            bar_spans.insert(
+                0,
+                Span::styled(
+                    format!("• {}  ", limit.name),
+                    Style::default().fg(MUTED),
+                ),
+            );
+            if !reset.is_empty() {
+                bar_spans.push(Span::styled(reset, Style::default().fg(MUTED)));
+            }
+            lines.push(DetailLine::Bar(bar_spans));
         }
     }
 
     if !report.extra_info.is_empty() {
-        lines.push("".to_string());
-        lines.push("## Details".to_string());
+        lines.push(DetailLine::Text("".to_string()));
+        lines.push(DetailLine::Text("## Details".to_string()));
         for (key, value) in &report.extra_info {
-            lines.push(format!("• {}: {}", key, value));
+            lines.push(DetailLine::Text(format!("• {}: {}", key, value)));
         }
     }
 
     if report.limits.is_empty() && report.extra_info.is_empty() {
-        lines.push("• No usage data available from this provider.".to_string());
+        lines.push(DetailLine::Text(
+            "• No usage data available from this provider.".to_string(),
+        ));
     }
 
     lines
@@ -889,7 +958,7 @@ mod tests {
             "Claude usage",
             "85% used",
             UsageOverlayStatus::Warning,
-            vec!["resets tomorrow".to_string()],
+            vec![DetailLine::Text("resets tomorrow".to_string())],
         );
         assert!(item_matches_filter(&item, "watch tomorrow"));
         assert!(item_matches_filter(&item, "claude 85"));

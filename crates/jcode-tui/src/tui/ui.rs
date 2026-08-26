@@ -3251,7 +3251,10 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let use_packed = terminal_clear_collapsed
         || (!swarm_page_active && content_height + fixed_height <= available_height);
 
-    // Layout: messages, queued, swarm, notification, inline, gap, input, status, donut
+    // Live activity line height: 0 when idle, 1 when processing/building/rate-limited.
+    let activity_height: u16 = if input_ui::activity_line_visible(app) { 1 } else { 0 };
+
+    // Layout: messages, queued, swarm, notification, inline, gap, activity, input, status, donut
     // All vertical chunks are within the chat_area (left column).
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -3269,14 +3272,15 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 Constraint::Length(notification_height), // 3 Notification line
                 Constraint::Length(inline_block_height), // 4 Inline UI
                 Constraint::Length(inline_ui_gap_height), // 5 Inline UI/input spacing
+                Constraint::Length(activity_height),     // 6 Activity line (above composer)
                 Constraint::Length(if empty_session_home {
                     0
                 } else {
                     input_height
-                }),  // 6 Input
-                Constraint::Length(1),             // 7 Status line (always visible, below input)
-                Constraint::Length(0),             // 8 Overscroll (removed from layout, state preserved)
-                Constraint::Length(donut_height),  // 9 Donut animation
+                }),  // 7 Input
+                Constraint::Length(1),             // 8 Status line (always visible, below input)
+                Constraint::Length(0),             // 9 Overscroll (removed from layout, state preserved)
+                Constraint::Length(donut_height),  // 10 Donut animation
             ]
         } else {
             vec![
@@ -3286,18 +3290,19 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 Constraint::Length(notification_height),  // 3 Notification line
                 Constraint::Length(inline_block_height),  // 4 Inline UI
                 Constraint::Length(inline_ui_gap_height), // 5 Inline UI/input spacing
+                Constraint::Length(activity_height),      // 6 Activity line (above composer)
                 Constraint::Length(if empty_session_home {
                     0
                 } else {
                     input_height
-                }),        // 6 Input
-                Constraint::Length(1),                    // 7 Status line (always visible, below input)
-                Constraint::Length(0),                    // 8 Overscroll (removed from layout)
-                Constraint::Length(donut_height),         // 9 Donut animation
+                }),        // 7 Input
+                Constraint::Length(1),                    // 8 Status line (always visible, below input)
+                Constraint::Length(0),                    // 9 Overscroll (removed from layout)
+                Constraint::Length(donut_height),         // 10 Donut animation
             ]
         })
         .split(chat_area);
-    record_status_area(chunks[7]);
+    record_status_area(chunks[8]);
 
     // Draw the inline swarm strip directly above the status line if present.
     if swarm_strip_height > 0 {
@@ -3313,8 +3318,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         if queued_height > 0 {
             capture.layout.queued_area = Some(chunks[1].into());
         }
-        capture.layout.status_area = Some(chunks[7].into());
-        capture.layout.input_area = Some(chunks[6].into());
+        capture.layout.status_area = Some(chunks[8].into());
+        capture.layout.input_area = Some(chunks[7].into());
         capture.layout.input_lines_raw = app.input().lines().count().max(1);
         capture.layout.input_lines_wrapped = base_input_height as usize;
 
@@ -3391,7 +3396,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         capture.layout.messages_area = Some(messages_area.into());
         capture.layout.diagram_area = diagram_area.map(|r| r.into());
     }
-    record_layout_snapshot(messages_area, diagram_area, diff_pane_area, Some(chunks[6]));
+    record_layout_snapshot(messages_area, diagram_area, diff_pane_area, Some(chunks[7]));
 
     let mut home_input_area: Option<Rect> = None;
 
@@ -3556,9 +3561,16 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         input_ui::draw_queued(frame, app, chunks[1], user_count + 1);
     }
     if let Some(ref mut capture) = debug_capture {
+        capture.render_order.push("draw_activity_line".to_string());
+    }
+    if activity_height > 0 {
+        clear_area(frame, chunks[6]);
+        input_ui::draw_activity_line(frame, app, chunks[6], pending_count);
+    }
+    if let Some(ref mut capture) = debug_capture {
         capture.render_order.push("draw_status".to_string());
     }
-    input_ui::draw_status(frame, app, chunks[7], pending_count, empty_session_home);
+    input_ui::draw_status(frame, app, chunks[8], pending_count, empty_session_home);
     if notification_height > 0 {
         input_ui::draw_notification(frame, app, chunks[3]);
     }
@@ -3572,7 +3584,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
 
     let active_input_area = match home_input_area {
         Some(area) => area,
-        None => chunks[6],
+        None => chunks[7],
     };
 
     let _input_cursor = input_ui::draw_input(
@@ -3584,7 +3596,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     );
 
     if donut_height > 0 {
-        animations::draw_idle_animation(frame, app, chunks[9]);
+        animations::draw_idle_animation(frame, app, chunks[10]);
     }
     let chrome_elapsed = chrome_start.elapsed();
 
