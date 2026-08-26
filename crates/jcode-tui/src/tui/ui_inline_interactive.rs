@@ -489,7 +489,7 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 truncate_display(hint, area.width.saturating_sub(1) as usize),
-                Style::default().fg(rgb(120, 120, 150)).italic(),
+                Style::default().fg(rgb(120, 110, 60)).italic(),
             ))),
             hint_area,
         );
@@ -504,8 +504,8 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(rgb(85, 85, 110)))
-        .style(Style::default().bg(rgb(18, 18, 26)));
+        .border_style(Style::default().fg(rgb(80, 75, 40)))
+        .style(Style::default().bg(rgb(18, 18, 14)));
     frame.render_widget(block.clone(), render_area);
 
     let inner = block.inner(render_area);
@@ -603,17 +603,17 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
     if is_preview {
         header_spans.push(Span::styled(
             picker.preview_submit_hint(),
-            Style::default().fg(rgb(60, 60, 80)).italic(),
+            Style::default().fg(rgb(45, 42, 20)).italic(),
         ));
     } else {
         header_spans.push(Span::styled(
             picker.active_submit_hint(),
-            Style::default().fg(rgb(60, 60, 80)),
+            Style::default().fg(rgb(45, 42, 20)),
         ));
         if picker.shows_default_shortcut_hint() {
             header_spans.push(Span::styled(
                 "  Ctrl-O=set default",
-                Style::default().fg(rgb(60, 60, 80)).italic(),
+                Style::default().fg(rgb(45, 42, 20)).italic(),
             ));
         }
     }
@@ -717,19 +717,19 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
             }) => Some(rgb(240, 200, 120)),
             crate::tui::PickerAction::Account(crate::tui::AccountPickerAction::OpenCenter {
                 ..
-            }) => Some(rgb(150, 190, 255)),
+            }) => Some(rgb(200, 180, 100)),
             _ => None,
         };
         let primary_style = if unavailable {
             Style::default().fg(rgb(80, 80, 80))
         } else if is_row_selected && col == 0 {
-            Style::default().fg(Color::White).bg(rgb(60, 60, 80)).bold()
+            Style::default().fg(Color::White).bg(rgb(45, 42, 20)).bold()
         } else if let Some(color) = account_action_color {
             Style::default().fg(color).bold()
         } else if entry.is_current {
             Style::default().fg(accent_color())
         } else if entry.is_favorite {
-            Style::default().fg(rgb(255, 160, 210)).bold()
+            Style::default().fg(rgb(255, 180, 60)).bold()
         } else if entry.recommended {
             Style::default().fg(rgb(255, 220, 120))
         } else if entry.old {
@@ -785,7 +785,7 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
             let state_style = if unavailable {
                 Style::default().fg(rgb(80, 80, 80))
             } else if is_row_selected {
-                Style::default().fg(Color::White).bg(rgb(60, 60, 80)).bold()
+                Style::default().fg(Color::White).bg(rgb(45, 42, 20)).bold()
             } else if entry.is_current {
                 Style::default().fg(accent_color()).bold()
             } else if let Some(color) = account_action_color {
@@ -875,9 +875,9 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
         let provider_style = if unavailable {
             Style::default().fg(rgb(80, 80, 80))
         } else if is_row_selected && col == 1 {
-            Style::default().fg(Color::White).bg(rgb(60, 60, 80)).bold()
+            Style::default().fg(Color::White).bg(rgb(45, 42, 20)).bold()
         } else {
-            Style::default().fg(rgb(140, 180, 255))
+            Style::default().fg(rgb(200, 180, 100))
         };
 
         let via_raw = route
@@ -888,9 +888,9 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
         let via_style = if unavailable {
             Style::default().fg(rgb(80, 80, 80))
         } else if is_row_selected && col == 2 {
-            Style::default().fg(Color::White).bg(rgb(60, 60, 80)).bold()
+            Style::default().fg(Color::White).bg(rgb(45, 42, 20)).bold()
         } else if is_usage_picker {
-            Style::default().fg(rgb(196, 170, 255))
+            Style::default().fg(rgb(255, 220, 100))
         } else {
             Style::default().fg(rgb(220, 190, 120))
         };

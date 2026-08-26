@@ -6,13 +6,13 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
-const PANEL_BG: Color = Color::Rgb(24, 28, 40);
-const PANEL_BORDER: Color = Color::Rgb(90, 95, 110);
-const PANEL_BORDER_ACTIVE: Color = Color::Rgb(120, 140, 190);
+const PANEL_BG: Color = Color::Rgb(18, 18, 14);
+const PANEL_BORDER: Color = Color::Rgb(80, 75, 40);
+const PANEL_BORDER_ACTIVE: Color = Color::Rgb(160, 140, 50);
 const SECTION_BORDER: Color = Color::Rgb(70, 78, 94);
-const SELECTED_BG: Color = Color::Rgb(38, 42, 56);
-const MUTED: Color = Color::Rgb(140, 146, 163);
-const MUTED_DARK: Color = Color::Rgb(100, 106, 122);
+const SELECTED_BG: Color = Color::Rgb(38, 35, 20);
+const MUTED: Color = Color::Rgb(140, 130, 80);
+const MUTED_DARK: Color = Color::Rgb(100, 95, 55);
 const OVERLAY_PERCENT_X: u16 = 88;
 const OVERLAY_PERCENT_Y: u16 = 74;
 
@@ -393,7 +393,7 @@ impl LoginPicker {
                 metric_span(
                     "recommended",
                     self.summary.recommended_count,
-                    Color::Rgb(196, 170, 255),
+                    Color::Rgb(255, 220, 100),
                 ),
             ]),
         ];
@@ -518,7 +518,7 @@ impl LoginPicker {
                 if item.provider.recommended {
                     Span::styled(
                         "  recommended",
-                        Style::default().fg(Color::Rgb(196, 170, 255)),
+                        Style::default().fg(Color::Rgb(255, 220, 100)),
                     )
                 } else {
                     Span::raw("")
@@ -622,7 +622,7 @@ fn provider_style(provider_id: &str) -> Style {
         "claude" => Color::Rgb(229, 187, 111),
         "openai" => Color::Rgb(111, 214, 181),
         "gemini" | "google" => Color::Rgb(129, 184, 255),
-        "copilot" => Color::Rgb(182, 154, 255),
+        "copilot" => Color::Rgb(255, 200, 80),
         "cursor" => Color::Rgb(131, 215, 255),
         "openrouter"
         | "openai-compatible"
@@ -642,7 +642,7 @@ fn provider_style(provider_id: &str) -> Style {
 fn auth_kind_color(kind: &str) -> Color {
     match kind {
         "OAuth" => Color::Rgb(129, 184, 255),
-        "API key" => Color::Rgb(182, 154, 255),
+        "API key" => Color::Rgb(255, 200, 80),
         "device code" => Color::Rgb(111, 214, 181),
         "CLI" => Color::Rgb(131, 215, 255),
         "API key / CLI" => Color::Rgb(229, 187, 111),

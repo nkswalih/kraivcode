@@ -291,11 +291,21 @@ fn repeated_gutter_prefix(line: &Line<'static>) -> Option<(Vec<Span<'static>>, u
 
     let mut rest = &plain[prefix_bytes..];
     let mut gutter_count = 0usize;
-    while let Some(next) = rest.strip_prefix("│ ") {
+    let mut gutter_char_width = 0usize;
+    // Recognize both │ (light pipe, blockquotes) and ┃ (heavy pipe, user borders)
+    while let Some(next) = rest.strip_prefix("┃ ") {
         gutter_count += 1;
+        gutter_char_width = UnicodeWidthStr::width("┃ ");
         rest = next;
     }
-    let gutter_width = gutter_count * UnicodeWidthStr::width("│ ");
+    if gutter_count == 0 {
+        while let Some(next) = rest.strip_prefix("│ ") {
+            gutter_count += 1;
+            gutter_char_width = UnicodeWidthStr::width("│ ");
+            rest = next;
+        }
+    }
+    let gutter_width = gutter_count * gutter_char_width;
     let base_prefix_width = leading_width + gutter_width;
 
     if let Some(marker_width) = rendered_list_marker_width(rest) {

@@ -735,13 +735,16 @@ pub(super) fn draw_debug_overlay(
     render_overlay_box(frame, chunks[3], "notification", Color::Magenta);
     render_overlay_box(frame, chunks[4], "inline", Color::Green);
     if chunks.len() > 6 && chunks[6].height > 0 {
-        render_overlay_box(frame, chunks[6], "input", Color::Blue);
+        render_overlay_box(frame, chunks[6], "activity", Color::Cyan);
     }
     if chunks.len() > 7 && chunks[7].height > 0 {
-        render_overlay_box(frame, chunks[7], "status", Color::Yellow);
+        render_overlay_box(frame, chunks[7], "input", Color::Blue);
     }
-    if chunks.len() > 9 && chunks[9].height > 0 {
-        render_overlay_box(frame, chunks[9], "donut", Color::Blue);
+    if chunks.len() > 8 && chunks[8].height > 0 {
+        render_overlay_box(frame, chunks[8], "status", Color::Yellow);
+    }
+    if chunks.len() > 10 && chunks[10].height > 0 {
+        render_overlay_box(frame, chunks[10], "donut", Color::Blue);
     }
 
     for placement in placements {

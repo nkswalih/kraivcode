@@ -112,9 +112,9 @@ pub(super) fn action_icon(item: &AccountPickerItem) -> (&'static str, Color) {
                 Color::Rgb(160, 168, 188)
             },
         ),
-        ActionSection::Add => ("+", Color::Rgb(140, 176, 255)),
+        ActionSection::Add => ("+", Color::Rgb(255, 180, 60)),
         ActionSection::Login => ("R", Color::Rgb(229, 187, 111)),
-        ActionSection::Overview => ("S", Color::Rgb(140, 176, 255)),
+        ActionSection::Overview => ("S", Color::Rgb(255, 180, 60)),
         ActionSection::Setting => (".", Color::Rgb(189, 200, 255)),
         ActionSection::Remove => ("x", Color::Rgb(255, 140, 140)),
         ActionSection::Other => ("-", Color::Rgb(180, 190, 220)),
@@ -139,7 +139,7 @@ pub(super) fn action_kind_badge(command: &AccountPickerCommand) -> (&'static str
         "login" => ("login", Color::Rgb(111, 214, 181)),
         "setting" => ("setting", Color::Rgb(229, 187, 111)),
         "danger" => ("remove", Color::Rgb(255, 140, 140)),
-        "account" => ("account", Color::Rgb(182, 154, 255)),
+        "account" => ("account", Color::Rgb(255, 200, 80)),
         _ => ("action", Color::Rgb(180, 190, 220)),
     }
 }
@@ -238,9 +238,9 @@ pub(super) fn provider_style(provider_id: &str) -> Style {
         "claude" => Color::Rgb(229, 187, 111),
         "openai" => Color::Rgb(111, 214, 181),
         "gemini" | "google" => Color::Rgb(129, 184, 255),
-        "copilot" => Color::Rgb(182, 154, 255),
+        "copilot" => Color::Rgb(255, 200, 80),
         "cursor" => Color::Rgb(131, 215, 255),
-        "account-flow" => Color::Rgb(196, 170, 255),
+        "account-flow" => Color::Rgb(255, 220, 100),
         "openrouter"
         | "openai-compatible"
         | "opencode"

@@ -180,9 +180,9 @@ impl SessionPicker {
         spinner_frame: usize,
     ) -> Vec<Line<'static>> {
         let dim: Color = rgb(100, 100, 100);
-        let dimmer: Color = rgb(70, 70, 70);
+        let dimmer: Color = rgb(60, 55, 30);
         let user_clr: Color = rgb(138, 180, 248);
-        let accent: Color = rgb(186, 139, 255);
+        let accent: Color = rgb(255, 200, 50);
         let batch_restore: Color = rgb(255, 140, 140);
 
         let created_ago = format_time_ago(session.created_at);
@@ -623,7 +623,7 @@ impl SessionPicker {
         if !self.search_query.is_empty() {
             title_parts.push(Span::styled(
                 format!("  🔍 \"{}\"", self.search_query),
-                Style::default().fg(rgb(186, 139, 255)),
+                Style::default().fg(rgb(255, 200, 50)),
             ));
         }
 
@@ -654,8 +654,8 @@ impl SessionPicker {
             help = format!(" T take over live Claude ·{}", help);
         }
 
-        let border_dim: Color = rgb(70, 70, 70);
-        let border_focus: Color = rgb(130, 130, 160);
+        let border_dim: Color = rgb(60, 55, 30);
+        let border_focus: Color = rgb(130, 120, 60);
         let border_color = if self.focus == PaneFocus::Sessions {
             border_focus
         } else {
@@ -691,7 +691,7 @@ impl SessionPicker {
                 Style::default().fg(rgb(150, 150, 160))
             } else {
                 Style::default()
-                    .bg(rgb(40, 44, 52))
+                    .bg(rgb(38, 35, 20))
                     .add_modifier(Modifier::BOLD)
             });
 
