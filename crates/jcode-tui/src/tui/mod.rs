@@ -724,6 +724,10 @@ pub trait TuiState {
     fn model_detail_popup(&self) -> Option<ModelDetailPopup> {
         None
     }
+    /// In-chat permission panel state, when a gated tool awaits a decision.
+    fn permission_panel(&self) -> Option<PermissionPanelState> {
+        None
+    }
     /// Whether the first-run onboarding empty state is being previewed in this session.
     // ---- Onboarding ----
     fn onboarding_preview_mode(&self) -> bool {
@@ -1306,10 +1310,14 @@ pub enum AgentModelTarget {
     Ambient,
 }
 
+/// Interactive agent personas. `Build` is the default coding persona;
+/// `Plan` is read-only and produces structured implementation plans. The
+/// remaining variants mirror the existing AgentModelTarget surfaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AgentMode {
     #[default]
-    Ready,
+    Build,
+    Plan,
     Swarm,
     Review,
     Judge,
@@ -1318,15 +1326,55 @@ pub enum AgentMode {
 }
 
 impl AgentMode {
+    pub const ALL: [AgentMode; 7] = [
+        Self::Build,
+        Self::Plan,
+        Self::Swarm,
+        Self::Review,
+        Self::Judge,
+        Self::Memory,
+        Self::Ambient,
+    ];
+
     pub fn label(self) -> &'static str {
         match self {
-            Self::Ready => "Ready",
+            Self::Build => "Build",
+            Self::Plan => "Plan",
             Self::Swarm => "Swarm",
             Self::Review => "Code Review",
             Self::Judge => "Judge",
             Self::Memory => "Memory",
             Self::Ambient => "Ambient",
         }
+    }
+
+    /// Lowercase config/persistence key.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Build => "build",
+            Self::Plan => "plan",
+            Self::Swarm => "swarm",
+            Self::Review => "review",
+            Self::Judge => "judge",
+            Self::Memory => "memory",
+            Self::Ambient => "ambient",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|mode| mode.key() == key)
+    }
+
+    pub fn next(self) -> Self {
+        let index = Self::ALL.iter().position(|m| *m == self).unwrap_or(0);
+        let next_index = (index + 1) % Self::ALL.len();
+        Self::ALL[next_index]
+    }
+
+    pub fn previous(self) -> Self {
+        let index = Self::ALL.iter().position(|m| *m == self).unwrap_or(0);
+        let prev_index = (index + Self::ALL.len() - 1) % Self::ALL.len();
+        Self::ALL[prev_index]
     }
 }
 
@@ -1657,6 +1705,47 @@ impl PickerEntry {
 pub enum ModelDetailButton {
     SetDefault,
     SelectSession,
+}
+
+/// The three decisions offered by the in-chat permission panel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PermissionPanelDecision {
+    Allow,
+    AlwaysAllow,
+    Deny,
+}
+
+impl PermissionPanelDecision {
+    pub const PILLS: [Self; 3] = [
+        Self::Allow,
+        Self::AlwaysAllow,
+        Self::Deny,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Allow => "Allow",
+            Self::AlwaysAllow => "Always allow",
+            Self::Deny => "Deny",
+        }
+    }
+}
+
+/// What the gated tool wants to do, shown verbatim in the panel.
+#[derive(Debug, Clone)]
+pub struct PermissionPanelRequest {
+    pub tool_name: String,
+    pub path: String,
+    pub reason: String,
+}
+
+/// State of the floating permission card anchored above the composer.
+#[derive(Debug, Clone)]
+pub struct PermissionPanelState {
+    pub request: PermissionPanelRequest,
+    /// Index into `PermissionPanelDecision::PILLS`.
+    pub selected: usize,
+    pub opened_at: std::time::Instant,
 }
 
 impl ModelDetailButton {

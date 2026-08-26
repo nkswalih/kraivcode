@@ -1280,6 +1280,27 @@ impl App {
         )
     }
 
+    /// True when Tab / Shift+Tab should cycle the agent persona: no modal
+    /// (picker, popup, palette) and no active copy-selection drag owns the
+    /// keystroke.
+    pub(super) fn agent_tab_switch_applies(&self) -> bool {
+        self.model_detail_popup.is_none()
+            && self.inline_interactive_state.is_none()
+            && self.command_suggestions().is_empty()
+            && !self.copy_selection_dragging
+    }
+
+    /// Cycle the active agent persona (Tab switcher) and persist it.
+    pub(super) fn cycle_agent_persona(&mut self, backward: bool) {
+        self.agent_mode = if backward {
+            self.agent_mode.previous()
+        } else {
+            self.agent_mode.next()
+        };
+        super::agent_persona::persist_persona(self.agent_mode);
+        self.set_status_notice(format!("Agent: {}", self.agent_mode.label()));
+    }
+
     pub(super) fn handle_command_suggestion_key(
         &mut self,
         code: KeyCode,

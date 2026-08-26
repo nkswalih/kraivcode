@@ -2706,6 +2706,12 @@ pub(super) fn handle_modal_key(
     code: KeyCode,
     modifiers: KeyModifiers,
 ) -> Result<bool> {
+    // The in-chat permission panel gates a blocked tool call and claims all
+    // keys while open — above even the model detail popup.
+    if app.permission_panel.is_some() {
+        return Ok(app.handle_permission_panel_key(code));
+    }
+
     // The floating right-click model-detail popup sits above every other
     // modal and claims all keys while open.
     if app.model_detail_popup.is_some() {
@@ -3120,6 +3126,23 @@ impl App {
         // timing/kind sample. Both must land before dispatch decisions that
         // consult the classification predicates.
         if paste_burst::observe_key(code, modifiers, text_input.as_deref()) {
+            return Ok(());
+        }
+
+        // Tab / Shift+Tab: agent persona switcher (Build → Plan → …). Must
+        // precede autocomplete/picker Tab arms; modal owners are excluded by
+        // the applies-check so their own Tab handling still wins.
+        if matches!(code, KeyCode::Tab | KeyCode::BackTab)
+            && self.agent_tab_switch_applies()
+            && !modifiers.intersects(
+                KeyModifiers::CONTROL
+                    | KeyModifiers::ALT
+                    | KeyModifiers::SUPER
+                    | KeyModifiers::HYPER
+                    | KeyModifiers::META,
+            )
+        {
+            self.cycle_agent_persona(code == KeyCode::BackTab);
             return Ok(());
         }
 
@@ -4075,7 +4098,11 @@ impl App {
             ));
         }
         if images.is_empty() {
-            self.current_turn_system_reminder = mission_turn_reminder(&self.session.id);
+            self.current_turn_system_reminder =
+                super::agent_persona::merge_turn_reminder(
+                    mission_turn_reminder(&self.session.id),
+                    self.agent_mode,
+                );
             self.add_provider_message(Message::user(&input));
             self.session.add_message(
                 Role::User,
@@ -4085,7 +4112,11 @@ impl App {
                 }],
             );
         } else {
-            self.current_turn_system_reminder = mission_turn_reminder(&self.session.id);
+            self.current_turn_system_reminder =
+                super::agent_persona::merge_turn_reminder(
+                    mission_turn_reminder(&self.session.id),
+                    self.agent_mode,
+                );
             self.add_provider_message(Message::user_with_images(&input, images.clone()));
             let mut blocks: Vec<ContentBlock> = images
                 .into_iter()
@@ -4166,8 +4197,10 @@ impl App {
                 }
             }
 
-            self.current_turn_system_reminder =
+            let base_reminder =
                 merge_turn_reminders(reminder, mission_turn_reminder(&self.session.id));
+            self.current_turn_system_reminder =
+                super::agent_persona::merge_turn_reminder(base_reminder, self.agent_mode);
 
             if has_combined {
                 self.add_provider_message(Message::user(&combined));

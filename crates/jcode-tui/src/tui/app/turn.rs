@@ -1291,10 +1291,72 @@ impl App {
                 let registry = self.registry.clone();
                 let tool_name = tc.name.clone();
                 let tool_input = tc.input.clone();
+
+                // Persona tool gate (Plan persona = read-only; secret reads
+                // require explicit approval via the in-chat permission panel).
+                // Every arm yields a boxed future with the same output type as
+                // registry.execute, so the poll loop below is unchanged.
+                use futures::FutureExt;
+                let mut tool_future = match super::agent_persona::gate_plan_tool(
+                    &tool_name,
+                    &tool_input,
+                ) {
+                    super::agent_persona::ToolGateDecision::Allow => std::pin::pin!(
+                        registry
+                            .execute(&tool_name, tool_input.clone(), ctx)
+                            .boxed()
+                    ),
+                    super::agent_persona::ToolGateDecision::Deny(message) => std::pin::pin!(
+                        async move { Err(anyhow::anyhow!(message)) }.boxed()
+                    ),
+                    super::agent_persona::ToolGateDecision::NeedsPermission { reason } => {
+                        let path = ["file_path", "path", "absolute_path"]
+                            .iter()
+                            .find_map(|key| {
+                                tool_input.get(*key).and_then(|value| value.as_str())
+                            })
+                            .unwrap_or_default()
+                            .to_string();
+                        let (sender, receiver) =
+                            tokio::sync::oneshot::channel::<
+                                crate::tui::PermissionPanelDecision,
+                            >();
+                        self.open_permission_panel(
+                            crate::tui::PermissionPanelRequest {
+                                tool_name: tool_name.clone(),
+                                path,
+                                reason,
+                            },
+                            sender,
+                        );
+                        let registry = registry.clone();
+                        let tool_name = tool_name.clone();
+                        let tool_input = tool_input.clone();
+                        std::pin::pin!(
+                            async move {
+                                use crate::tui::PermissionPanelDecision;
+                                match receiver.await {
+                                    Ok(PermissionPanelDecision::Deny) => Err(
+                                        anyhow::anyhow!("Permission denied by user."),
+                                    ),
+                                    Ok(_) => {
+                                        registry
+                                            .execute(&tool_name, tool_input, ctx)
+                                            .await
+                                    }
+                                    Err(_) => Err(anyhow::anyhow!(
+                                        "Permission request cancelled."
+                                    )),
+                                }
+                            }
+                            .boxed()
+                        )
+                    }
+                };
+
                 let tool_start = Instant::now();
                 let _tool_work = crate::logging::watchdog::begin_work("turn.tool");
                 crate::logging::watchdog::set_detail(format!("tool={tool_name}"));
-                let mut tool_future = std::pin::pin!(registry.execute(&tool_name, tool_input, ctx));
 
                 // Subscribe to bus for subagent status updates
                 let mut bus_receiver = Bus::global().subscribe();

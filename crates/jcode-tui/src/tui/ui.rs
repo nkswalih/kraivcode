@@ -78,7 +78,8 @@ mod output_style;
 #[path = "ui_overlays.rs"]
 mod overlays;
 pub(crate) use overlays::{
-    clear_model_detail_popup_geometry, model_detail_popup_geometry,
+    clear_model_detail_popup_geometry, clear_permission_panel_geometry,
+    model_detail_popup_geometry, permission_panel_geometry,
 };
 #[path = "ui_pinned.rs"]
 mod pinned_ui;
@@ -2337,6 +2338,14 @@ pub(crate) fn input_pane_line_count() -> Option<usize> {
     copy_pane_line_count(crate::tui::CopySelectionPane::Input)
 }
 
+/// Anchor rect for floating cards that sit directly above the composer
+/// (e.g. the permission panel): the recorded Input-pane content area, when
+/// available this frame.
+pub(crate) fn composer_anchor_rect() -> Option<Rect> {
+    copy_snapshot_for_pane(crate::tui::CopySelectionPane::Input)
+        .map(|snapshot| snapshot.content_area)
+}
+
 /// Byte offsets of an Input-pane selection inside the composer's logical
 /// input string (`App::input`). The snapshot's raw lines are exactly the
 /// `\n`-split composer text, so prefix lengths reconstruct byte offsets
@@ -3661,6 +3670,12 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 placements: Vec::new(),
             });
         }
+    }
+
+    // In-chat permission panel floats above everything (it gates a blocked
+    // tool call), including the model detail popup.
+    if let Some(panel) = app.permission_panel() {
+        overlays::draw_permission_panel(frame, area, &panel);
     }
 
     // Right-click model detail popup floats above everything else.

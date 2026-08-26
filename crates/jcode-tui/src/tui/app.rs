@@ -50,6 +50,7 @@ pub enum AppRuntimeMode {
     TestHarness,
 }
 
+mod agent_persona;
 mod auth;
 mod auth_account_picker_saved_accounts;
 mod catchup;
@@ -1145,6 +1146,12 @@ pub struct App {
     copy_selection_edge_autoscroll: Option<(crate::tui::CopySelectionPane, bool)>,
     /// Right-click detail card for a /model picker entry.
     model_detail_popup: Option<crate::tui::ModelDetailPopup>,
+    /// In-chat permission panel (Plan persona secret/tool approvals) with the
+    /// oneshot sender that resolves the blocked tool call.
+    permission_panel: Option<(
+        crate::tui::PermissionPanelState,
+        tokio::sync::oneshot::Sender<crate::tui::PermissionPanelDecision>,
+    )>,
     // Debug socket broadcast channel (if enabled)
     debug_tx: Option<tokio::sync::broadcast::Sender<super::backend::DebugEvent>>,
     // Remote provider info (set when running in remote mode)
