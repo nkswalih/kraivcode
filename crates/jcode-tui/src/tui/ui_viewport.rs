@@ -965,12 +965,13 @@ pub(super) fn draw_messages(
 
     // Fill user message rows with full-width background before rendering the
     // paragraph. This ensures the dark olive background extends across the
-    // entire row, not just behind the text spans. An extra padding row is
-    // added above and below each user message block for breathing room.
+    // entire row, not just behind the text spans. Padding rows (blank lines
+    // registered as user lines in the prepare step) are already in the range
+    // and get filled automatically.
     {
         let user_bg = super::user_bg();
         let user_bg_style = Style::default().bg(user_bg);
-        let fill_width = render_area.width as usize;
+        let fill_width = content_area.width as usize;
         let prompt_start_idx =
             lower_bound(wrapped_user_prompt_starts, scroll);
         let prompt_end_idx =
@@ -981,9 +982,8 @@ pub(super) fn draw_messages(
                 .get(prompt_i)
                 .copied()
                 .unwrap_or(abs_start + 1);
-            // +1 padding row above and below the user message block.
-            let vis_start = abs_start.saturating_sub(1).max(scroll);
-            let vis_end = (abs_end + 1).min(visible_end);
+            let vis_start = abs_start.max(scroll);
+            let vis_end = abs_end.min(visible_end);
             for abs_line in vis_start..vis_end {
                 let rel = abs_line - scroll;
                 if let Some(line) = visible_lines.get_mut(rel) {
