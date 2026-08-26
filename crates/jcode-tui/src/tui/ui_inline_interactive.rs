@@ -353,6 +353,65 @@ fn fuzzy_match_positions(pattern: &str, text: &str) -> Vec<usize> {
     jcode_fuzzy::fuzzy_match_token_positions(pattern, text)
 }
 
+/// Recorded geometry of the visible `/model` picker rows so mouse events
+/// can map a click position back to a filtered-entry index between frames.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ModelPickerRowsGeometry {
+    pub area: ratatui::layout::Rect,
+    /// Entry-list index of the first visible filtered row.
+    pub first_visible_index: usize,
+    pub row_height: u16,
+}
+
+#[cfg(not(test))]
+static MODEL_PICKER_ROWS_GEOMETRY: std::sync::OnceLock<
+    std::sync::Mutex<Option<ModelPickerRowsGeometry>>,
+> = std::sync::OnceLock::new();
+
+#[cfg(not(test))]
+fn model_picker_rows_geometry_slot()
+-> &'static std::sync::Mutex<Option<ModelPickerRowsGeometry>> {
+    MODEL_PICKER_ROWS_GEOMETRY.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+pub(crate) fn record_model_picker_rows_geometry(
+    area: ratatui::layout::Rect,
+    first_visible_index: usize,
+    row_height: u16,
+) {
+    #[cfg(not(test))]
+    {
+        if let Ok(mut slot) = model_picker_rows_geometry_slot().lock() {
+            *slot = Some(ModelPickerRowsGeometry {
+                area,
+                first_visible_index,
+                row_height,
+            });
+        }
+    }
+    #[cfg(test)]
+    let _ = (area, first_visible_index, row_height);
+}
+
+pub(crate) fn model_picker_rows_geometry() -> Option<ModelPickerRowsGeometry> {
+    #[cfg(not(test))]
+    {
+        let guard = model_picker_rows_geometry_slot().lock().ok()?;
+        guard.clone()
+    }
+    #[cfg(test)]
+    {
+        None
+    }
+}
+
+pub(crate) fn clear_model_picker_rows_geometry() {
+    #[cfg(not(test))]
+    if let Ok(mut slot) = model_picker_rows_geometry_slot().lock() {
+        *slot = None;
+    }
+}
+
 pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, area: Rect) {
     let picker = match app.inline_interactive_state() {
         Some(p) => p,
@@ -587,6 +646,7 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
     }
 
     if picker.filtered.is_empty() {
+        clear_model_picker_rows_geometry();
         lines.push(Line::from(Span::styled(
             "   no matches",
             Style::default().fg(dim_color()).italic(),
@@ -598,6 +658,7 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
     let list_header_lines = 1 + usize::from(selected_route_notice.is_some());
     let list_height = height.saturating_sub(list_header_lines);
     if list_height == 0 {
+        clear_model_picker_rows_geometry();
         frame.render_widget(Paragraph::new(lines), inner);
         return;
     }
@@ -611,6 +672,17 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
         selected - half
     };
     let end = (start + list_height).min(filtered_count);
+
+    record_model_picker_rows_geometry(
+        Rect {
+            x: inner.x,
+            y: inner.y + list_header_lines as u16,
+            width: inner.width,
+            height: (end - start) as u16,
+        },
+        start,
+        1,
+    );
 
     for vi in start..end {
         let model_idx = picker.filtered[vi];

@@ -63,6 +63,7 @@ pub(crate) mod inline_image_ui;
 mod inline_interactive_ui;
 #[path = "ui_inline.rs"]
 mod inline_ui;
+pub(crate) use inline_interactive_ui::model_picker_rows_geometry;
 #[path = "ui_input.rs"]
 pub(crate) mod input_ui;
 #[path = "ui_memory_estimates.rs"]
@@ -76,6 +77,7 @@ mod onboarding;
 mod output_style;
 #[path = "ui_overlays.rs"]
 mod overlays;
+pub(crate) use overlays::model_detail_popup_geometry;
 #[path = "ui_pinned.rs"]
 mod pinned_ui;
 #[path = "ui_prepare.rs"]
@@ -3657,6 +3659,11 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 placements: Vec::new(),
             });
         }
+    }
+
+    // Right-click model detail popup floats above everything else.
+    if let Some(popup) = app.model_detail_popup() {
+        overlays::draw_model_detail_popup(frame, area, &popup);
     }
 
     if visual_debug::overlay_enabled() {

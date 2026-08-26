@@ -720,6 +720,10 @@ pub trait TuiState {
     fn copy_selection_range(&self) -> Option<CopySelectionRange>;
     /// Persistent status for in-app copy selection mode.
     fn copy_selection_status(&self) -> Option<CopySelectionStatus>;
+    /// Right-click detail popup for a /model picker entry, when open.
+    fn model_detail_popup(&self) -> Option<ModelDetailPopup> {
+        None
+    }
     /// Whether the first-run onboarding empty state is being previewed in this session.
     // ---- Onboarding ----
     fn onboarding_preview_mode(&self) -> bool {
@@ -1646,6 +1650,43 @@ impl PickerEntry {
             _ => None,
         }
     }
+}
+
+/// Buttons rendered inside the model-detail popup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelDetailButton {
+    SetDefault,
+    SelectSession,
+}
+
+impl ModelDetailButton {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::SetDefault => "Set as default model",
+            Self::SelectSession => "Select for this session",
+        }
+    }
+}
+
+/// Right-click detail card for a `/model` picker entry: identity, auth and
+/// endpoint facts plus the two action pills. `button_rects`/`card_rect` are
+/// captured during rendering so mouse clicks can hit-test the floating card.
+#[derive(Debug, Clone)]
+pub struct ModelDetailPopup {
+    /// Index into the open Model picker's `entries`.
+    pub entry_index: usize,
+    pub model_name: String,
+    pub model_spec: String,
+    pub provider_label: String,
+    pub login_method: String,
+    pub api_method: String,
+    pub base_url: Option<String>,
+    pub status: String,
+    pub available: bool,
+    pub is_default: bool,
+    pub selected_button: ModelDetailButton,
+    pub button_rects: Vec<(ratatui::layout::Rect, ModelDetailButton)>,
+    pub card_rect: ratatui::layout::Rect,
 }
 
 /// A single available option for a picker entry.

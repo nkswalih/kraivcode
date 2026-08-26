@@ -1088,6 +1088,276 @@ impl App {
         self.open_model_picker_inner(false);
     }
 
+    /// True while the runtime `/model` picker (the one whose entries carry
+    /// Model actions) is open.
+    pub(super) fn runtime_model_picker_is_open(&self) -> bool {
+        self.inline_interactive_state
+            .as_ref()
+            .is_some_and(picker_is_runtime_model_picker)
+    }
+
+    /// Persist the given Model-picker entry as the global default model.
+    ///
+    /// Shared by the Ctrl+O shortcut and the right-click detail popup's
+    /// "Set as default model" pill. Handles provider/effort persistence,
+    /// picker-cache invalidation, and the in-place `is_default` marker flip.
+    pub(super) fn set_runtime_model_entry_default(&mut self, entry_index: usize) -> bool {
+        let Some(ref picker) = self.inline_interactive_state else {
+            return false;
+        };
+        if !picker_is_runtime_model_picker(picker) {
+            return false;
+        }
+        let Some(entry) = picker.entries.get(entry_index) else {
+            return false;
+        };
+        if !matches!(entry.action, PickerAction::Model) {
+            return false;
+        }
+        let route = entry.options.get(entry.selected_option);
+
+        let bare_name = model_entry_base_name(entry);
+        let entry_effort = entry.effort.clone();
+
+        let (model_spec, provider_key) = if let Some(r) = route {
+            let selection = crate::provider::MultiProvider::default_model_selection_from_route(
+                &bare_name,
+                &r.api_method,
+                &r.provider,
+            );
+            (selection.model_spec, selection.provider_key)
+        } else {
+            (bare_name.clone(), None)
+        };
+
+        let notice = format!(
+            "Default → {} via {}",
+            model_spec,
+            provider_key.as_deref().unwrap_or("auto")
+        );
+
+        match crate::config::Config::set_default_model(Some(&model_spec), provider_key.as_deref())
+        {
+            Ok(()) => {
+                // Persist the effort variant the user picked, so an
+                // effort-qualified entry (e.g. "Claude Opus 5 (high)")
+                // survives restarts instead of silently dropping the effort
+                // (issue #675).
+                if let Some(effort) = entry_effort.as_deref() {
+                    let save_result = match provider_key.as_deref() {
+                        Some("claude-oauth") | Some("claude-api") => {
+                            Some(crate::config::Config::set_anthropic_reasoning_effort(Some(
+                                effort,
+                            )))
+                        }
+                        Some("openai-oauth") | Some("openai-api") => {
+                            Some(crate::config::Config::set_openai_reasoning_effort(Some(effort)))
+                        }
+                        _ => None,
+                    };
+                    if let Some(Err(e)) = save_result {
+                        self.push_display_message(DisplayMessage::error(format!(
+                            "Saved default model, but failed to save effort: {}",
+                            e
+                        )));
+                    }
+                }
+                self.invalidate_model_picker_cache();
+                if let Some(ref mut picker) = self.inline_interactive_state {
+                    for entry in &mut picker.entries {
+                        entry.is_default = false;
+                    }
+                    if let Some(entry) = picker.entries.get_mut(entry_index) {
+                        entry.is_default = true;
+                    }
+                }
+                self.push_display_message(DisplayMessage::system(format!(
+                    "Saved default model: {} via {}. This affects future sessions.",
+                    model_spec,
+                    provider_key.as_deref().unwrap_or("auto")
+                )));
+                self.set_status_notice(notice);
+                true
+            }
+            Err(e) => {
+                self.set_status_notice(format!("Failed to save default: {}", e));
+                false
+            }
+        }
+    }
+
+    /// Best-effort endpoint URL for a route's provider/login method. Used by
+    /// the right-click model detail popup; unknown combos render as "—".
+    fn model_route_base_url(provider_label: &str, api_method: &str) -> Option<String> {
+        let method = api_method.to_ascii_lowercase();
+        if method.contains("jcode") || method.contains("subscription") {
+            return Some(
+                crate::subscription_catalog::configured_api_base().unwrap_or_else(|| {
+                    crate::subscription_catalog::DEFAULT_JCODE_API_BASE.to_string()
+                }),
+            );
+        }
+        if method.contains("openrouter") {
+            return Some("https://openrouter.ai/api/v1".to_string());
+        }
+        if method.contains("claude") || method.contains("anthropic") {
+            return std::env::var("ANTHROPIC_BASE_URL")
+                .ok()
+                .or_else(|| Some("https://api.anthropic.com".to_string()));
+        }
+        if method.contains("openai") && !method.contains("compatible") {
+            return std::env::var("OPENAI_BASE_URL")
+                .ok()
+                .or_else(|| Some("https://api.openai.com/v1".to_string()));
+        }
+        // Named/openai-compatible profiles carry their own endpoint.
+        crate::config::config()
+            .providers
+            .get(provider_label)
+            .filter(|profile| !profile.base_url.is_empty())
+            .map(|profile| profile.base_url.clone())
+    }
+
+    /// Open the right-click detail card for a Model picker entry.
+    pub(super) fn open_model_detail_popup(&mut self, entry_index: usize) -> bool {
+        let Some(ref picker) = self.inline_interactive_state else {
+            return false;
+        };
+        if !picker_is_runtime_model_picker(picker) {
+            return false;
+        }
+        let Some(entry) = picker.entries.get(entry_index) else {
+            return false;
+        };
+        let Some(route) = entry.options.get(entry.selected_option) else {
+            return false;
+        };
+
+        let bare_name = model_entry_base_name(entry);
+        let selection = crate::provider::MultiProvider::default_model_selection_from_route(
+            &bare_name,
+            &route.api_method,
+            &route.provider,
+        );
+        let login_method =
+            crate::provider::ModelRouteApiMethod::parse(&route.api_method).display_label();
+        let is_default = crate::config::config()
+            .provider
+            .default_model
+            .as_deref()
+            == Some(selection.model_spec.as_str());
+
+        self.model_detail_popup = Some(crate::tui::ModelDetailPopup {
+            entry_index,
+            model_name: entry.name.clone(),
+            model_spec: selection.model_spec,
+            provider_label: route.provider.clone(),
+            login_method,
+            api_method: route.api_method.clone(),
+            base_url: Self::model_route_base_url(&route.provider, &route.api_method),
+            status: if route.available {
+                "available".to_string()
+            } else if route.detail.is_empty() {
+                "unavailable".to_string()
+            } else {
+                route.detail.trim().to_string()
+            },
+            available: route.available,
+            is_default,
+            selected_button: crate::tui::ModelDetailButton::SetDefault,
+            button_rects: Vec::new(),
+            card_rect: ratatui::layout::Rect::default(),
+        });
+        true
+    }
+
+    pub(super) fn close_model_detail_popup(&mut self) {
+        self.model_detail_popup = None;
+    }
+
+    /// Activate a popup pill button.
+    pub(super) fn activate_model_detail_button(
+        &mut self,
+        button: crate::tui::ModelDetailButton,
+    ) -> bool {
+        match button {
+            crate::tui::ModelDetailButton::SetDefault => {
+                let entry_index = self.model_detail_popup.as_ref().map(|p| p.entry_index);
+                self.close_model_detail_popup();
+                let Some(entry_index) = entry_index else {
+                    return true;
+                };
+                if self.is_remote {
+                    self.set_status_notice(
+                        "Default model is managed by the remote server for this session",
+                    );
+                    return true;
+                }
+                self.set_runtime_model_entry_default(entry_index);
+                true
+            }
+            crate::tui::ModelDetailButton::SelectSession => {
+                let entry_index = self.model_detail_popup.as_ref().map(|p| p.entry_index);
+                self.close_model_detail_popup();
+                if let Some(entry_index) = entry_index
+                    && let Some(ref mut picker) = self.inline_interactive_state
+                {
+                    if let Some(position) =
+                        picker.filtered.iter().position(|&index| index == entry_index)
+                    {
+                        picker.selected = position;
+                        picker.column = 0;
+                    }
+                }
+                // Reuse the normal Enter commit path so session switching,
+                // notices, and effort handling stay identical to keyboard use.
+                let _ = self.handle_inline_interactive_key(KeyCode::Enter, KeyModifiers::empty());
+                true
+            }
+        }
+    }
+
+    /// Keyboard handling while the right-click detail popup is open. Claims
+    /// every key so the underlying picker stays frozen behind the card.
+    pub(super) fn handle_model_detail_popup_key(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> bool {
+        use crate::tui::ModelDetailButton;
+        let Some(ref mut popup) = self.model_detail_popup else {
+            return false;
+        };
+        match code {
+            KeyCode::Esc => {
+                self.close_model_detail_popup();
+                true
+            }
+            KeyCode::Left | KeyCode::Right | KeyCode::Tab => {
+                popup.selected_button = match popup.selected_button {
+                    ModelDetailButton::SetDefault => ModelDetailButton::SelectSession,
+                    ModelDetailButton::SelectSession => ModelDetailButton::SetDefault,
+                };
+                true
+            }
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                let button = popup.selected_button;
+                self.activate_model_detail_button(button)
+            }
+            KeyCode::Char(c)
+                if modifiers.is_empty() && c.eq_ignore_ascii_case(&'d') =>
+            {
+                self.activate_model_detail_button(ModelDetailButton::SetDefault)
+            }
+            KeyCode::Char(c)
+                if modifiers.is_empty() && c.eq_ignore_ascii_case(&'s') =>
+            {
+                self.activate_model_detail_button(ModelDetailButton::SelectSession)
+            }
+            _ => true,
+        }
+    }
+
     fn open_model_picker_preserving_input(&mut self) {
         self.open_model_picker_inner(true);
     }
@@ -3286,89 +3556,12 @@ impl App {
             code if modifiers.contains(KeyModifiers::CONTROL)
                 && key_char_eq_ignore_ascii_case(code, 'o') =>
             {
-                if let Some(ref picker) = self.inline_interactive_state {
-                    if !picker_is_runtime_model_picker(picker) {
-                        return Ok(());
-                    }
-                    if picker.filtered.is_empty() {
-                        return Ok(());
-                    }
-                    let idx = picker.filtered[picker.selected];
-                    let entry = &picker.entries[idx];
-                    if !matches!(entry.action, PickerAction::Model) {
-                        return Ok(());
-                    }
-                    let route = entry.options.get(entry.selected_option);
-
-                    let bare_name = model_entry_base_name(entry);
-                    let entry_effort = entry.effort.clone();
-
-                    let (model_spec, provider_key) = if let Some(r) = route {
-                        let selection =
-                            crate::provider::MultiProvider::default_model_selection_from_route(
-                                &bare_name,
-                                &r.api_method,
-                                &r.provider,
-                            );
-                        (selection.model_spec, selection.provider_key)
-                    } else {
-                        (bare_name.clone(), None)
-                    };
-
-                    let notice = format!(
-                        "Default → {} via {}",
-                        model_spec,
-                        provider_key.as_deref().unwrap_or("auto")
-                    );
-
-                    match crate::config::Config::set_default_model(
-                        Some(&model_spec),
-                        provider_key.as_deref(),
-                    ) {
-                        Ok(()) => {
-                            // Persist the effort variant the user picked, so an
-                            // effort-qualified entry (e.g. "Claude Opus 5 (high)")
-                            // survives restarts instead of silently dropping the
-                            // effort (issue #675).
-                            if let Some(effort) = entry_effort.as_deref() {
-                                let save_result = match provider_key.as_deref() {
-                                    Some("claude-oauth") | Some("claude-api") => {
-                                        Some(crate::config::Config::set_anthropic_reasoning_effort(
-                                            Some(effort),
-                                        ))
-                                    }
-                                    Some("openai-oauth") | Some("openai-api") => {
-                                        Some(crate::config::Config::set_openai_reasoning_effort(
-                                            Some(effort),
-                                        ))
-                                    }
-                                    _ => None,
-                                };
-                                if let Some(Err(e)) = save_result {
-                                    self.push_display_message(DisplayMessage::error(format!(
-                                        "Saved default model, but failed to save effort: {}",
-                                        e
-                                    )));
-                                }
-                            }
-                            self.invalidate_model_picker_cache();
-                            if let Some(ref mut picker) = self.inline_interactive_state {
-                                for entry in &mut picker.entries {
-                                    entry.is_default = false;
-                                }
-                                if let Some(entry) = picker.entries.get_mut(idx) {
-                                    entry.is_default = true;
-                                }
-                            }
-                            self.push_display_message(DisplayMessage::system(format!(
-                                "Saved default model: {} via {}. This affects future sessions.",
-                                model_spec,
-                                provider_key.as_deref().unwrap_or("auto")
-                            )));
-                            self.set_status_notice(notice)
-                        }
-                        Err(e) => self.set_status_notice(format!("Failed to save default: {}", e)),
-                    }
+                let entry_index = self
+                    .inline_interactive_state
+                    .as_ref()
+                    .and_then(|picker| picker.filtered.get(picker.selected).copied());
+                if let Some(entry_index) = entry_index {
+                    self.set_runtime_model_entry_default(entry_index);
                 }
             }
             code if modifiers.contains(KeyModifiers::CONTROL)
