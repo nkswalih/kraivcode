@@ -867,9 +867,11 @@ async fn handle_remote_key_internal(
     }
 
     if let Some(text) = text_input.or_else(|| input::text_input_for_key(code, modifiers)) {
-        // Drop injected right-click paste floods while a modal owns input.
+        // While a modal owns input, drop only injected CONTROL characters
+        // (CR/LF/Tab) from raw paste floods; printable typing always passes.
         if app.paste_input_suppressed()
             && crate::tui::app::input::paste_burst_enter_is_synthetic()
+            && matches!(text.as_str(), "\r" | "\n" | "\t")
         {
             return Ok(());
         }
