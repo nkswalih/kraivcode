@@ -4,9 +4,17 @@
 //! Persona selection persists to `agent_persona.json` inside the shared app
 //! config directory so local runs and the daemon observe the same active
 //! persona without protocol changes.
+//!
+//! Tool availability is enforced at the **definition level**: each persona
+//! declares an allowlist that filters `Registry::definitions()` so the model
+//! never sees tools it may not use.  This is zero-token-cost enforcement
+//! (OpenCode-style) — no system-prompt injection needed for tool gating.
+//! The optional `persona_directive()` strings provide *behavioral guidance*
+//! only and may be removed in a later pass.
 
 use crate::tui::AgentMode;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 const AGENT_PERSONA_FILE: &str = "agent_persona.json";
@@ -65,12 +73,88 @@ fn read_store() -> Option<AgentPersonaStore> {
 }
 
 // ---------------------------------------------------------------------------
-// Per-turn directives
+// Permission rulesets (zero-token enforcement)
 // ---------------------------------------------------------------------------
 
-/// System-reminder directive appended to every turn while a persona is
-/// active. `Build` is the default and injects nothing extra beyond its
-/// structured-workflow guidance; other personas get their own guidance.
+/// Tool-policy outcome for a given persona.
+///
+/// Mirrors OpenCode's permission-based approach: the model never sees tools
+/// it may not use, so no system-prompt instruction is needed to block them.
+#[derive(Debug, Clone)]
+pub struct PersonaToolPolicy {
+    /// `None` = all registered tools are visible to the model.
+    /// `Some(set)` = only tools in the set are visible.
+    pub allowed_tools: Option<HashSet<String>>,
+    /// Tools blocked even if present in the allowlist (defense-in-depth).
+    /// Currently unused — reserved for per-tool overrides (e.g. blocking
+    /// specific MCP tools while allowing others).
+    #[allow(dead_code)]
+    pub disabled_tools: HashSet<String>,
+}
+
+/// Return the tool-policy ruleset for the given persona.
+///
+/// - **Build** (default): full tool access (`None` allowlist).
+/// - **Plan**: read-only tools only; write/edit/bash/browser/… are hidden.
+/// - All other personas: full access (future work may restrict these).
+pub fn persona_tool_policy(mode: AgentMode) -> PersonaToolPolicy {
+    match mode {
+        AgentMode::Build => PersonaToolPolicy {
+            allowed_tools: None,
+            disabled_tools: HashSet::new(),
+        },
+        AgentMode::Plan => {
+            let mut allowed = HashSet::<String>::new();
+            // File / code reading
+            allowed.insert("read".into());
+            allowed.insert("glob".into());
+            allowed.insert("ls".into());
+            // Code search
+            allowed.insert("agentgrep".into());
+            allowed.insert("session_search".into());
+            allowed.insert("conversation_search".into());
+            // Memory / knowledge
+            allowed.insert("memory".into());
+            // UI / scratchpad
+            allowed.insert("side_panel".into());
+            allowed.insert("todo".into());
+            // Docs
+            allowed.insert("jcode_docs".into());
+            // Web (read-only research)
+            allowed.insert("webfetch".into());
+            allowed.insert("websearch".into());
+            // Background / scheduling (non-mutating)
+            allowed.insert("bg".into());
+            allowed.insert("initiative".into());
+            allowed.insert("schedule".into());
+            // MCP tools (filtered further by MCP server permissions)
+            allowed.insert("mcp".into());
+            PersonaToolPolicy {
+                allowed_tools: Some(allowed),
+                disabled_tools: HashSet::new(),
+            }
+        }
+        _ => PersonaToolPolicy {
+            allowed_tools: None,
+            disabled_tools: HashSet::new(),
+        },
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Per-turn directives (reserved — behavioral guidance only)
+// ---------------------------------------------------------------------------
+
+/// Behavioral guidance appended to the system reminder for each persona.
+///
+/// This is **not** used for tool gating — tool availability is enforced at
+/// the definition level via [`persona_tool_policy`].  The directives here
+/// provide *how* the agent should work, not *what* it may do.
+///
+/// Currently unused (zero-token approach).  Kept for a potential future
+/// pass where a short behavioral hint is desirable alongside the hard
+/// permission rules.
+#[allow(dead_code)]
 pub(in crate::tui::app) fn persona_directive(mode: AgentMode) -> &'static str {
     match mode {
         AgentMode::Build => {
@@ -100,24 +184,15 @@ pub(in crate::tui::app) fn persona_directive(mode: AgentMode) -> &'static str {
 }
 
 /// Merge an optional base reminder with the active persona directive.
+///
+/// Under the zero-token permission-based approach, persona directives are
+/// **not** injected into the system prompt — tool gating handles enforcement.
+/// This function simply passes through the base reminder unchanged.
 pub(in crate::tui::app) fn merge_turn_reminder(
     base: Option<String>,
-    mode: AgentMode,
+    _mode: AgentMode,
 ) -> Option<String> {
-    let directive = persona_directive(mode);
-    match (base, directive.is_empty()) {
-        (Some(base), true) => Some(base),
-        (None, true) => None,
-        (base, false) => {
-            let mut combined = String::new();
-            if let Some(base) = base.filter(|value| !value.is_empty()) {
-                combined.push_str(&base);
-                combined.push_str("\n\n");
-            }
-            combined.push_str(directive);
-            Some(combined)
-        }
-    }
+    base
 }
 
 // ---------------------------------------------------------------------------
@@ -128,18 +203,8 @@ pub(in crate::tui::app) fn merge_turn_reminder(
 pub(in crate::tui::app) enum ToolGateDecision {
     /// Run the tool normally.
     Allow,
-    /// Block the call; the string is returned to the model as the tool error.
-    Deny(String),
     /// Block until the user answers the in-chat permission panel.
     NeedsPermission { reason: String },
-}
-
-/// Tools the Plan persona may always use (pure reads / non-mutating).
-fn plan_allowed_tool(name_lower: &str) -> bool {
-    matches!(
-        name_lower,
-        "read" | "grep" | "glob" | "ls" | "list" | "todo" | "todos"
-    )
 }
 
 /// Path substrings treated as secrets for the Plan persona.
@@ -166,36 +231,42 @@ fn allowlisted(path_lower: &str) -> bool {
 
 /// Gate one tool call under the Plan persona.
 ///
-/// `tool_name`/`input_json` come from the dispatch site; `extract_paths`
-/// pulls candidate filesystem paths out of the input for the secret guard.
+/// Under the permission-based approach, non-read tools are already hidden
+/// from the model via [`persona_tool_policy`].  This function only handles
+/// **secret-path reads**: files that look like secrets (.env, .pem, .ssh/…)
+/// require explicit user approval even if the `read` tool is allowed.
+///
+/// For non-Plan personas, this always returns `Allow`.
 pub(in crate::tui::app) fn gate_plan_tool(
     tool_name: &str,
     input_json: &serde_json::Value,
 ) -> ToolGateDecision {
+    // Only the Plan persona has restricted access — Build and all others
+    // pass everything through.  (We don't check self.agent_mode here
+    // because the caller doesn't pass it; the caller is always the TUI
+    // turn loop, which only calls this for the active persona.)
+    //
+    // For Plan: secret-path reads of the `read` tool raise the panel.
     let name_lower = tool_name.to_ascii_lowercase();
-    if plan_allowed_tool(&name_lower) {
+    if !name_lower.contains("read") {
+        // Non-read tool: already blocked at definition level for Plan;
+        // allowed for Build.  Nothing to gate here.
         return ToolGateDecision::Allow;
     }
 
-    // Secret guard first on read-ish tools carrying a path argument.
     let path = ["file_path", "path", "absolute_path"]
         .iter()
         .find_map(|key| input_json.get(*key).and_then(|value| value.as_str()));
     if let Some(path) = path {
         let lowered = path.to_ascii_lowercase();
-        if !allowlisted(&lowered)
-            && (is_secret_path(&lowered) || name_lower.contains("read"))
-        {
+        if is_secret_path(&lowered) && !allowlisted(&lowered) {
             return ToolGateDecision::NeedsPermission {
                 reason: format!("Plan agent wants to READ {path}"),
             };
         }
     }
 
-    ToolGateDecision::Deny(format!(
-        "{tool_name} is blocked in Plan mode. This agent is read-only — \
-         switch agents (Tab) to Build to make changes."
-    ))
+    ToolGateDecision::Allow
 }
 
 /// Persist an "Always allow" rule for `path`.
@@ -218,26 +289,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn plan_gate_allows_reads_blocks_writes_and_gates_secret_paths() {
+    fn secret_path_gate_requires_permission_for_plan_reads() {
         use serde_json::json;
 
+        // Non-read tools: always Allow (filtered at definition level)
+        assert!(matches!(
+            gate_plan_tool("write", &json!({ "file_path": "src/main.rs" })),
+            ToolGateDecision::Allow
+        ));
+        assert!(matches!(
+            gate_plan_tool("bash", &json!({ "command": "ls" })),
+            ToolGateDecision::Allow
+        ));
+
+        // Read of normal file: Allow
         assert!(matches!(
             gate_plan_tool("read", &json!({ "file_path": "src/main.rs" })),
             ToolGateDecision::Allow
         ));
-        assert!(matches!(
-            gate_plan_tool(
-                "write",
-                &json!({ "file_path": "src/main.rs", "content": "x" })
-            ),
-            ToolGateDecision::Deny(_)
-        ));
-        assert!(matches!(
-            gate_plan_tool("bash", &json!({ "command": "ls" })),
-            ToolGateDecision::Deny(_)
-        ));
+
+        // Read of secret file: NeedsPermission
         assert!(matches!(
             gate_plan_tool("read", &json!({ "file_path": ".env" })),
+            ToolGateDecision::NeedsPermission { .. }
+        ));
+        assert!(matches!(
+            gate_plan_tool("read", &json!({ "file_path": "/home/u/.ssh/id_rsa" })),
             ToolGateDecision::NeedsPermission { .. }
         ));
     }
@@ -253,9 +330,34 @@ mod tests {
     }
 
     #[test]
-    fn directives_present_for_build_and_plan_only() {
-        assert!(!persona_directive(AgentMode::Build).is_empty());
-        assert!(!persona_directive(AgentMode::Plan).is_empty());
-        assert!(persona_directive(AgentMode::Swarm).is_empty());
+    fn persona_tool_policy_build_has_no_restrictions() {
+        let policy = persona_tool_policy(AgentMode::Build);
+        assert!(policy.allowed_tools.is_none());
+        assert!(policy.disabled_tools.is_empty());
+    }
+
+    #[test]
+    fn persona_tool_policy_plan_restricts_to_read_only() {
+        let policy = persona_tool_policy(AgentMode::Plan);
+        let allowed = policy.allowed_tools.unwrap();
+        assert!(allowed.contains("read"));
+        assert!(allowed.contains("agentgrep"));
+        assert!(allowed.contains("ls"));
+        assert!(allowed.contains("glob"));
+        assert!(allowed.contains("memory"));
+        assert!(!allowed.contains("write"));
+        assert!(!allowed.contains("edit"));
+        assert!(!allowed.contains("bash"));
+        assert!(!allowed.contains("multiedit"));
+        assert!(!allowed.contains("patch"));
+        assert!(!allowed.contains("apply_patch"));
+        assert!(!allowed.contains("browser"));
+        assert!(!allowed.contains("open"));
+    }
+
+    #[test]
+    fn persona_tool_policy_others_have_no_restrictions() {
+        let policy = persona_tool_policy(AgentMode::Swarm);
+        assert!(policy.allowed_tools.is_none());
     }
 }
