@@ -4,6 +4,29 @@ use serde_json::Value;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+/// One ordered piece of a submitted user prompt. Paste-backed blocks keep
+/// their original text so the TUI can render them as dedicated inline cards
+/// while typed text keeps its normal gutter rendering.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UserPromptSegment {
+    Typed(String),
+    Pasted {
+        /// Compact composer representation, e.g. `[Pasted ~4 lines]`.
+        placeholder: String,
+        /// Complete original pasted content.
+        content: String,
+    },
+}
+
+impl UserPromptSegment {
+    pub fn text(&self) -> &str {
+        match self {
+            Self::Typed(text) => text,
+            Self::Pasted { content, .. } => content,
+        }
+    }
+}
+
 /// A message in the conversation for TUI display.
 #[derive(Clone, Debug)]
 pub struct DisplayMessage {
@@ -14,16 +37,20 @@ pub struct DisplayMessage {
     pub title: Option<String>,
     /// Full tool call data for role="tool" messages.
     pub tool_data: Option<ToolCall>,
+    /// Ordered typed/paste segmentation for a submitted user prompt whose
+    /// input contained tracked paste placeholders. `None` for every other
+    /// message (and for user prompts without paste metadata).
+    pub pasted_segments: Option<Vec<UserPromptSegment>>,
 }
 
 impl DisplayMessage {
-    pub const PASTED_CONTENT_TITLE: &'static str = "Pasted content";
     /// Create an error message.
     pub fn error(content: impl Into<String>) -> Self {
         Self {
             role: "error".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: None,
@@ -36,6 +63,7 @@ impl DisplayMessage {
             role: "system".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: None,
@@ -48,6 +76,7 @@ impl DisplayMessage {
             role: "background_task".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: None,
@@ -61,6 +90,7 @@ impl DisplayMessage {
             role: "usage".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: Some("Usage".to_string()),
             tool_data: None,
@@ -74,6 +104,7 @@ impl DisplayMessage {
             role: "overnight".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: Some("Overnight".to_string()),
             tool_data: None,
@@ -89,6 +120,7 @@ impl DisplayMessage {
             role: "todos".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: Some("Todos".to_string()),
             tool_data: None,
@@ -101,6 +133,7 @@ impl DisplayMessage {
             role: "memory".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: Some(title.into()),
             tool_data: None,
@@ -113,6 +146,7 @@ impl DisplayMessage {
             role: "swarm".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: Some(title.into()),
             tool_data: None,
@@ -125,21 +159,24 @@ impl DisplayMessage {
             role: "user".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: None,
         }
     }
 
-    /// Create a user message whose visible content contains tracked paste
-    /// placeholders. The title is display-only provenance used by the TUI
-    /// renderer; provider/session payloads remain separate and expanded.
-    pub fn pasted_user(content: impl Into<String>) -> Self {
-        Self::user(content).with_title(Self::PASTED_CONTENT_TITLE)
-    }
-
-    pub fn is_pasted_user(&self) -> bool {
-        self.role == "user" && self.title.as_deref() == Some(Self::PASTED_CONTENT_TITLE)
+    /// Create a user message carrying ordered paste segmentation so the TUI
+    /// renders pasted blocks as dedicated inline cards. `content` is the fully
+    /// expanded prompt (what the provider receives); the segments describe
+    /// which byte ranges were pasted blocks vs typed text.
+    pub fn user_with_segments(
+        content: impl Into<String>,
+        segments: Vec<UserPromptSegment>,
+    ) -> Self {
+        let mut message = Self::user(content);
+        message.pasted_segments = Some(segments);
+        message
     }
 
     /// Create an assistant message.
@@ -148,6 +185,7 @@ impl DisplayMessage {
             role: "assistant".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: None,
@@ -160,6 +198,7 @@ impl DisplayMessage {
             role: "assistant".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: Some(duration_secs),
             title: None,
             tool_data: None,
@@ -172,6 +211,7 @@ impl DisplayMessage {
             role: "tool".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: Some(tool_data),
@@ -184,6 +224,7 @@ impl DisplayMessage {
             role: "tool".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: None,
@@ -196,6 +237,7 @@ impl DisplayMessage {
             role: "meta".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: None,
@@ -211,6 +253,7 @@ impl DisplayMessage {
             role: "spacer".to_string(),
             content: rows.to_string(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: None,
@@ -225,6 +268,7 @@ impl DisplayMessage {
             role: "reasoning".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: None,
             tool_data: None,
@@ -240,6 +284,7 @@ impl DisplayMessage {
             duration_secs: None,
             title: None,
             tool_data: item.tool_data,
+            pasted_segments: None,
         }
     }
 
@@ -253,6 +298,7 @@ impl DisplayMessage {
             role: "tool".to_string(),
             content: content.into(),
             tool_calls: Vec::new(),
+            pasted_segments: None,
             duration_secs: None,
             title: Some(title.into()),
             tool_data: Some(tool_data),
@@ -459,12 +505,21 @@ mod tests {
     }
 
     #[test]
-    fn pasted_user_metadata_is_explicit_and_not_content_inferred() {
-        let pasted = DisplayMessage::pasted_user("[Pasted ~4 lines]");
-        assert!(pasted.is_pasted_user());
+    fn pasted_segments_are_explicit_metadata_not_content_inferred() {
+        let segments = vec![
+            UserPromptSegment::Typed("fix ".to_string()),
+            UserPromptSegment::Pasted {
+                placeholder: "[Pasted ~2 lines]".to_string(),
+                content: "a\nb".to_string(),
+            },
+        ];
+        let pasted = DisplayMessage::user_with_segments("fix a\nb", segments.clone());
+        assert!(pasted.pasted_segments.is_some());
 
-        let typed = DisplayMessage::user("[Pasted ~4 lines]");
-        assert!(!typed.is_pasted_user());
+        // A typed message that merely contains placeholder-looking text has no
+        // paste metadata.
+        let typed = DisplayMessage::user("[Pasted ~2 lines]");
+        assert!(typed.pasted_segments.is_none());
     }
 
     #[test]
