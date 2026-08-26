@@ -3309,7 +3309,15 @@ impl App {
             // the newline instead of submitting mid-paste, and re-arm the
             // stray-Enter guard so the terminal's final trailing Enter after
             // the burst is swallowed too.
-            if handle_possible_raw_paste_enter(self) {
+            //
+            // Carve-out: while a slash-command palette is visible (or the
+            // draft starts with '/'), the timing detector's false positives
+            // turned normal typed Enters into line breaks. Real paste into an
+            // open palette is already suppressed upstream, so skip the
+            // fallback entirely in slash context.
+            let slash_context =
+                !self.command_suggestions().is_empty() || self.input.starts_with('/');
+            if !slash_context && handle_possible_raw_paste_enter(self) {
                 return Ok(());
             }
             // During the onboarding model-selection phase, Enter on an empty
