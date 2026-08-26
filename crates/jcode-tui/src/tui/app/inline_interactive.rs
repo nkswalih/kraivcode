@@ -1095,6 +1095,9 @@ impl App {
     pub(super) fn paste_input_suppressed(&self) -> bool {
         self.model_detail_popup.is_some()
             || self.inline_interactive_state.is_some()
+            // Preview mode: the picker pane is visible while typing /model,
+            // but the suggestion list is deliberately empty — without this
+            // clause right-click paste would leak into the draft behind it.
             || !self.command_suggestions().is_empty()
     }
 
@@ -1111,7 +1114,20 @@ impl App {
     /// Shared by the Ctrl+O shortcut and the right-click detail popup's
     /// "Set as default model" pill. Handles provider/effort persistence,
     /// picker-cache invalidation, and the in-place `is_default` marker flip.
-    pub(super) fn set_runtime_model_entry_default(&mut self, entry_index: usize) -> bool {
+    ///
+    /// `caller` tags the interactive surface that triggered the change so any
+    /// unexpected default flips are attributable via
+    /// JCODE_LOG_MODEL_PICKER_TIMING=1 logs instead of guesswork.
+    pub(super) fn set_runtime_model_entry_default(
+        &mut self,
+        entry_index: usize,
+        caller: &'static str,
+    ) -> bool {
+        if std::env::var("JCODE_LOG_MODEL_PICKER_TIMING").is_ok() {
+            crate::logging::info(&format!(
+                "[MODEL-DEFAULT] invoke caller={caller} entry_index={entry_index}"
+            ));
+        }
         let Some(ref picker) = self.inline_interactive_state else {
             return false;
         };
@@ -1186,6 +1202,12 @@ impl App {
                     model_spec,
                     provider_key.as_deref().unwrap_or("auto")
                 )));
+                if std::env::var("JCODE_LOG_MODEL_PICKER_TIMING").is_ok() {
+                    crate::logging::info(&format!(
+                        "[MODEL-DEFAULT] applied caller={caller} spec={model_spec} provider={}",
+                        provider_key.as_deref().unwrap_or("auto")
+                    ));
+                }
                 self.set_status_notice(notice);
                 true
             }
@@ -1301,7 +1323,7 @@ impl App {
                 let Some(entry_index) = entry_index else {
                     return true;
                 };
-                self.set_runtime_model_entry_default(entry_index);
+                self.set_runtime_model_entry_default(entry_index, "popup_pill");
                 true
             }
             crate::tui::ModelDetailButton::SelectSession => {
@@ -2436,19 +2458,25 @@ impl App {
         if !active {
             return Ok(false);
         }
-        // Use Ctrl+O (set default) and Ctrl+N (toggle favorite) so the picker
-        // preview no longer steals Ctrl+B / Ctrl+F / Alt+F, which are the tmux
-        // prefix and readline word-navigation keys users rely on while editing
-        // the `/model` command line. Cycling favorites stays on Shift+Tab.
         let is_default =
             modifiers.contains(KeyModifiers::CONTROL) && key_char_eq_ignore_ascii_case(code, 'o');
         let is_favorite =
             modifiers.contains(KeyModifiers::CONTROL) && key_char_eq_ignore_ascii_case(code, 'n');
-        if is_default || is_favorite {
-            self.handle_inline_interactive_key(code, modifiers)?;
+        if !(is_default || is_favorite) {
+            return Ok(false);
+        }
+        // Torn right-click-paste sequences can resynchronize into stray
+        // Ctrl+O / Ctrl+N chords. In preview mode these hotkeys are the ONLY
+        // unguarded default/favorite writers reachable without the detail
+        // popup, and a silent default flip here is exactly the bug class we
+        // are eliminating. Swallow them during paste bursts; deliberate use
+        // stays available in the full picker (Enter first).
+        if crate::tui::app::input::paste_burst_enter_is_synthetic() {
+            self.set_status_notice("Ignored shortcut during paste");
             return Ok(true);
         }
-        Ok(false)
+        self.handle_inline_interactive_key(code, modifiers)?;
+        Ok(true)
     }
 
     pub(super) fn handle_inline_interactive_preview_key(
@@ -3595,7 +3623,7 @@ impl App {
                     .as_ref()
                     .and_then(|picker| picker.filtered.get(picker.selected).copied());
                 if let Some(entry_index) = entry_index {
-                    self.set_runtime_model_entry_default(entry_index);
+                    self.set_runtime_model_entry_default(entry_index, "ctrl_o");
                 }
             }
             code if modifiers.contains(KeyModifiers::CONTROL)
