@@ -1367,8 +1367,14 @@ impl App {
             finish_mouse_event!(false, "model_detail_popup_hover");
         }
 
-        // Right-click a runtime /model picker row to open its detail popup.
-        if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Right))
+        // Click (left or right) a runtime /model picker row to open its
+        // detail popup. Left-click is the reliable path on Windows terminals
+        // where right-click pastes; both are supported.
+        if !self.model_detail_popup.is_some()
+            && matches!(
+                mouse.kind,
+                MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Down(MouseButton::Right)
+            )
             && let Some(rows) = crate::tui::ui::model_picker_rows_geometry()
             && rect_contains_point(rows.area, mouse.column, mouse.row)
             && let Some(picker) = self.inline_interactive_state.as_ref()
@@ -1383,7 +1389,7 @@ impl App {
                     finish_mouse_event!(false, "model_detail_popup_open");
                 }
             }
-            finish_mouse_event!(false, "model_detail_popup_right_click");
+            finish_mouse_event!(false, "model_detail_popup_click_row");
         }
 
         if self.changelog_scroll.is_some() {

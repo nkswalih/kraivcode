@@ -3437,16 +3437,33 @@ impl App {
         code: KeyCode,
         modifiers: KeyModifiers,
     ) -> Result<()> {
+        let result = self.handle_inline_interactive_key_inner(code, modifiers);
+        // When handling closes the picker, any floating detail popup for it
+        // must go too — never leave a ghost card behind a dead picker.
+        if self.inline_interactive_state.is_none() {
+            self.close_model_detail_popup();
+        }
+        result
+    }
+
+    fn handle_inline_interactive_key_inner(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> Result<()> {
         use crate::tui::app::input::paste_burst_enter_is_synthetic;
         // Terminals without bracketed-paste support inject right-click paste
         // as raw key events. While a picker is open, an injected Enter storm
-        // must never commit a model/agent selection, and injected CR/LF must
-        // not pollute the filter box.
+        // must never commit a model/agent selection, injected CR/LF must not
+        // pollute the filter box, and torn paste sequences that resynchronize
+        // into stray Ctrl+O / Ctrl+N chords must not flip default/favorite.
         if paste_burst_enter_is_synthetic()
-            && matches!(
+            && (matches!(
                 code,
                 KeyCode::Enter | KeyCode::Char('\r') | KeyCode::Char('\n')
             )
+                || (modifiers.contains(KeyModifiers::CONTROL)
+                    && matches!(code, KeyCode::Char('o') | KeyCode::Char('n'))))
         {
             return Ok(());
         }
