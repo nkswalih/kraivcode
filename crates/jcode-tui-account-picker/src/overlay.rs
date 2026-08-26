@@ -16,13 +16,13 @@ use render_support::{
     metric_span, provider_header_line, provider_style, truncate_with_ellipsis,
 };
 
-const PANEL_BG: Color = Color::Rgb(24, 28, 40);
-const PANEL_BORDER: Color = Color::Rgb(90, 95, 110);
-const PANEL_BORDER_ACTIVE: Color = Color::Rgb(120, 140, 190);
+const PANEL_BG: Color = Color::Rgb(18, 18, 14);
+const PANEL_BORDER: Color = Color::Rgb(80, 75, 40);
+const PANEL_BORDER_ACTIVE: Color = Color::Rgb(160, 140, 50);
 const SECTION_BORDER: Color = Color::Rgb(70, 78, 94);
-const SELECTED_BG: Color = Color::Rgb(38, 42, 56);
-const MUTED: Color = Color::Rgb(140, 146, 163);
-const MUTED_DARK: Color = Color::Rgb(100, 106, 122);
+const SELECTED_BG: Color = Color::Rgb(38, 35, 20);
+const MUTED: Color = Color::Rgb(140, 130, 80);
+const MUTED_DARK: Color = Color::Rgb(100, 95, 55);
 const OVERLAY_PERCENT_X: u16 = 88;
 const OVERLAY_PERCENT_Y: u16 = 74;
 
@@ -762,7 +762,7 @@ impl AccountPicker {
                 metric_span(
                     "providers",
                     summary.provider_count,
-                    Color::Rgb(140, 176, 255),
+                    Color::Rgb(255, 180, 60),
                 ),
             ];
             if summary.named_account_count > 0 {
@@ -770,7 +770,7 @@ impl AccountPicker {
                 spans.push(metric_span(
                     "accounts",
                     summary.named_account_count,
-                    Color::Rgb(196, 170, 255),
+                    Color::Rgb(255, 220, 100),
                 ));
             }
             return Line::from(spans);

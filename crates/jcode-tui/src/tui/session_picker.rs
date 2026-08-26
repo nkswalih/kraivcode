@@ -1302,7 +1302,7 @@ impl SessionPicker {
 
     fn render_preview(&mut self, frame: &mut Frame, area: Rect) {
         let empty_border_color = if self.focus == PaneFocus::Preview {
-            rgb(130, 130, 160)
+            rgb(130, 120, 60)
         } else {
             rgb(50, 50, 50)
         };
@@ -1361,7 +1361,7 @@ impl SessionPicker {
         // Draw the bordered block first so we know the inner rect (which drives
         // wrapping width and the scrollbar decision) before building content.
         let preview_border_color = if self.focus == PaneFocus::Preview {
-            rgb(130, 130, 160)
+            rgb(130, 120, 60)
         } else {
             rgb(70, 70, 70)
         };
@@ -1656,7 +1656,7 @@ impl SessionPicker {
                 "Compacted (context too large)".to_string(),
                 rgb(255, 193, 7),
             ),
-            SessionStatus::RateLimited => ("⏳", "Rate limited".to_string(), rgb(186, 139, 255)),
+            SessionStatus::RateLimited => ("⏳", "Rate limited".to_string(), rgb(255, 200, 50)),
             SessionStatus::Error { message } => {
                 let text = format!("Error: {}", safe_truncate(message, 40));
                 ("❌", text, rgb(220, 100, 100))
@@ -2104,7 +2104,7 @@ impl SessionPicker {
         if area.height == 0 {
             return;
         }
-        let accent = rgb(186, 139, 255);
+        let accent = rgb(255, 200, 50);
         let inner = area.inner(Margin {
             horizontal: 2,
             vertical: 1,
@@ -2251,14 +2251,14 @@ impl SessionPicker {
 
             let cursor_char = if self.search_active { "▎" } else { "" };
             let search_line = Line::from(vec![
-                Span::styled(" 🔍 ", Style::default().fg(rgb(186, 139, 255))),
+                Span::styled(" 🔍 ", Style::default().fg(rgb(255, 200, 50))),
                 Span::styled(
                     &self.search_query,
                     Style::default()
                         .fg(Color::White)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(cursor_char, Style::default().fg(rgb(186, 139, 255))),
+                Span::styled(cursor_char, Style::default().fg(rgb(255, 200, 50))),
                 if self.search_active {
                     Span::styled("  Esc to clear", Style::default().fg(rgb(60, 60, 60)))
                 } else {
