@@ -3275,9 +3275,14 @@ impl App {
 
         if let Some(text) = text_input.or_else(|| text_input_for_key(code, modifiers)) {
             // While a slash-command palette / picker / detail popup is open,
-            // drop injected right-click paste floods so nothing leaks into
-            // the composer draft behind the modal.
-            if self.paste_input_suppressed() && paste_burst_enter_is_synthetic() {
+            // drop only injected CONTROL characters (CR/LF/Tab) from raw
+            // right-click paste floods. Printable typing must always reach
+            // the composer — the timing detector is far too aggressive to
+            // gate it without eating normal keystrokes.
+            if self.paste_input_suppressed()
+                && paste_burst_enter_is_synthetic()
+                && matches!(text.as_str(), "\r" | "\n" | "\t")
+            {
                 return Ok(());
             }
             if handle_raw_paste_newline_text(self, &text) {
