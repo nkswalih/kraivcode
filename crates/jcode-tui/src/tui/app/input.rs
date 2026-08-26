@@ -1142,6 +1142,10 @@ pub(super) fn insert_input_text(app: &mut App, text: &str) {
         return;
     }
 
+    // Any edit intentionally replaces a composer selection: collapse it so
+    // stale highlights never linger over changed text.
+    app.clear_composer_selection();
+
     // Drop terminal escape remnants before they can land in the draft (#540).
     let sanitized = strip_terminal_control_sequences(text);
     let text: &str = &sanitized;
@@ -1263,6 +1267,9 @@ pub(super) fn handle_multiline_input_navigation(
     if !modifiers.is_empty() || !matches!(code, KeyCode::Up | KeyCode::Down) {
         return false;
     }
+
+    // Cursor movement collapses an active composer selection.
+    app.clear_composer_selection();
 
     // Prefer true visual-row movement: with soft wrapping a single logical
     // line can occupy several rows, and Up/Down should follow what the user
@@ -2089,7 +2096,12 @@ pub(super) fn handle_control_key(app: &mut App, code: KeyCode) -> bool {
             true
         }
         KeyCode::Char('a') => {
-            app.cursor_pos = 0;
+            // Select-all semantics for a non-empty draft (editor muscle
+            // memory). Falls back to readline home when there is nothing to
+            // select or no composer snapshot exists yet.
+            if app.input.is_empty() || !app.select_all_input() {
+                app.cursor_pos = 0;
+            }
             true
         }
         KeyCode::Char('e') => {
@@ -2781,6 +2793,15 @@ pub(super) fn handle_global_control_shortcuts(
 
     match code {
         KeyCode::Char('d') if try_ctrl_d_forward_delete(app) => true,
+        // Ctrl+C with an actual selection anywhere copies it first (universal
+        // copy muscle memory, #497). Only a bare Ctrl+C reaches the
+        // interrupt/quit path below, preserving two-step exit semantics.
+        KeyCode::Char('c')
+            if app.has_nonempty_copy_selection()
+                && app.copy_current_selection_to_clipboard() =>
+        {
+            true
+        }
         KeyCode::Char('c') | KeyCode::Char('d') => {
             if app.is_processing {
                 app.cancel_requested = true;
@@ -2845,6 +2866,11 @@ pub(super) fn handle_basic_key(app: &mut App, code: KeyCode) -> bool {
     match code {
         KeyCode::Char(c) => handle_text_input(app, &c.to_string()),
         KeyCode::Backspace => {
+            // Selection-aware: remove the whole selected range in one step
+            // instead of falling through to single-character deletion.
+            if app.delete_selected_input() {
+                return true;
+            }
             if app.cursor_pos > 0 {
                 let prev = crate::tui::core::prev_char_boundary(&app.input, app.cursor_pos);
                 app.remember_input_undo_state();
@@ -2856,6 +2882,10 @@ pub(super) fn handle_basic_key(app: &mut App, code: KeyCode) -> bool {
             true
         }
         KeyCode::Delete => {
+            // Selection-aware: same whole-range removal as Backspace.
+            if app.delete_selected_input() {
+                return true;
+            }
             if app.cursor_pos < app.input.len() {
                 let next = crate::tui::core::next_char_boundary(&app.input, app.cursor_pos);
                 app.remember_input_undo_state();
@@ -2866,6 +2896,7 @@ pub(super) fn handle_basic_key(app: &mut App, code: KeyCode) -> bool {
             true
         }
         KeyCode::Left => {
+            app.clear_composer_selection();
             if app.cursor_pos > 0 {
                 app.cursor_pos = crate::tui::core::prev_char_boundary(&app.input, app.cursor_pos);
             } else {
@@ -2876,16 +2907,19 @@ pub(super) fn handle_basic_key(app: &mut App, code: KeyCode) -> bool {
             true
         }
         KeyCode::Right => {
+            app.clear_composer_selection();
             if app.cursor_pos < app.input.len() {
                 app.cursor_pos = crate::tui::core::next_char_boundary(&app.input, app.cursor_pos);
             }
             true
         }
         KeyCode::Home => {
+            app.clear_composer_selection();
             app.cursor_pos = 0;
             true
         }
         KeyCode::End => {
+            app.clear_composer_selection();
             app.cursor_pos = app.input.len();
             true
         }
@@ -2959,6 +2993,7 @@ pub(super) fn take_prepared_input(app: &mut App) -> PreparedInput {
     let segments = paste_segments_for_expanded(app, &expanded);
     let has_pasted_content = segments.is_some();
     app.pasted_contents.clear();
+    app.clear_composer_selection();
     let images = std::mem::take(&mut app.pending_images);
     app.cursor_pos = 0;
     app.clear_input_undo_history();
@@ -3845,6 +3880,7 @@ impl App {
             return;
         }
         self.pasted_contents.clear();
+        self.clear_composer_selection();
         self.cursor_pos = 0;
         self.clear_input_undo_history();
         self.follow_chat_bottom(); // Reset to bottom and resume auto-scroll on new input

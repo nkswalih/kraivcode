@@ -698,6 +698,15 @@ async fn handle_remote_key_internal(
             KeyCode::Char('d') if input::try_ctrl_d_forward_delete(app) => {
                 return Ok(());
             }
+            // Ctrl+C with an actual selection copies first (#497 semantics,
+            // extended outside copy-selection mode). Bare Ctrl+C keeps the
+            // interrupt/quit path below untouched.
+            KeyCode::Char('c')
+                if app.has_nonempty_copy_selection()
+                    && app.copy_current_selection_to_clipboard() =>
+            {
+                return Ok(());
+            }
             KeyCode::Char('c') | KeyCode::Char('d') => {
                 if app.is_processing {
                     remote.cancel_with_reason("keyboard_ctrl_c_or_d").await?;
@@ -737,8 +746,10 @@ async fn handle_remote_key_internal(
                 return Ok(());
             }
             KeyCode::Char('a') => {
-                app.cursor_pos = 0;
-                return Ok(());
+                // Select-all for a non-empty draft; readline home otherwise.
+                if app.input.is_empty() || !app.select_all_input() {
+                    app.cursor_pos = 0;
+                }
             }
             KeyCode::Char('e') => {
                 app.cursor_pos = app.input.len();
@@ -883,6 +894,10 @@ async fn handle_remote_key_internal(
             handle_remote_char_input(app, c);
         }
         KeyCode::Backspace => {
+            // Selection-aware: remove the whole selected range in one step.
+            if app.delete_selected_input() {
+                return Ok(());
+            }
             if app.cursor_pos > 0 {
                 let prev = core::prev_char_boundary(&app.input, app.cursor_pos);
                 app.remember_input_undo_state();
@@ -893,6 +908,10 @@ async fn handle_remote_key_internal(
             }
         }
         KeyCode::Delete => {
+            // Selection-aware: same whole-range removal as Backspace.
+            if app.delete_selected_input() {
+                return Ok(());
+            }
             if app.cursor_pos < app.input.len() {
                 let next = core::next_char_boundary(&app.input, app.cursor_pos);
                 app.remember_input_undo_state();
@@ -902,6 +921,7 @@ async fn handle_remote_key_internal(
             }
         }
         KeyCode::Left => {
+            app.clear_composer_selection();
             if app.cursor_pos > 0 {
                 app.cursor_pos = core::prev_char_boundary(&app.input, app.cursor_pos);
             } else {
@@ -911,14 +931,17 @@ async fn handle_remote_key_internal(
             }
         }
         KeyCode::Right => {
+            app.clear_composer_selection();
             if app.cursor_pos < app.input.len() {
                 app.cursor_pos = core::next_char_boundary(&app.input, app.cursor_pos);
             }
         }
         KeyCode::Home => {
+            app.clear_composer_selection();
             app.cursor_pos = 0;
         }
         KeyCode::End => {
+            app.clear_composer_selection();
             app.cursor_pos = app.input.len();
         }
         KeyCode::Tab => {

@@ -1593,6 +1593,7 @@ impl App {
 
     pub(super) fn undo_input_change(&mut self) {
         if let Some((input, cursor_pos)) = self.input_undo_stack.pop() {
+            self.clear_composer_selection();
             self.input = input;
             self.cursor_pos = cursor_pos.min(self.input.len());
             self.reset_tab_completion();

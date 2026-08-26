@@ -60,6 +60,72 @@ impl App {
         crate::tui::ui::copy_selection_text(range)
     }
 
+    /// True when any pane currently has a selection that would copy real
+    /// text. Guards the global Ctrl+C arm so copy only wins over
+    /// interrupt/quit when something is actually selected (#497 semantics,
+    /// extended outside copy-selection mode).
+    pub(super) fn has_nonempty_copy_selection(&self) -> bool {
+        self.current_copy_selection_text().is_some_and(|text| !text.is_empty())
+    }
+
+    /// Select the entire composer input (Ctrl+A on a non-empty draft).
+    /// Deliberately does NOT enter copy-selection mode: the next typed key
+    /// should replace/collapse the selection, not be swallowed as movement.
+    pub(super) fn select_all_input(&mut self) -> bool {
+        let end = match crate::tui::ui::input_select_all_end_point() {
+            Some(end) => end,
+            None => return false,
+        };
+        self.note_copy_selection_activity(crate::tui::CopySelectionPane::Input);
+        self.copy_selection_anchor = Some(crate::tui::CopySelectionPoint {
+            pane: crate::tui::CopySelectionPane::Input,
+            abs_line: 0,
+            column: 0,
+        });
+        self.copy_selection_cursor = Some(end);
+        self.copy_selection_goal_column = None;
+        true
+    }
+
+    /// Collapse an active composer selection (Input pane only). Transcript
+    /// and side-pane selections are untouched. Called whenever a cursor or
+    /// edit action should intentionally destroy the selection.
+    pub(super) fn clear_composer_selection(&mut self) {
+        if self.current_copy_selection_pane() == Some(crate::tui::CopySelectionPane::Input) {
+            self.copy_selection_anchor = None;
+            self.copy_selection_cursor = None;
+            self.copy_selection_goal_column = None;
+            self.copy_selection_dragging = false;
+        }
+    }
+
+    /// Delete the selected composer range (Backspace/Delete with an active
+    /// Input-pane selection). Removes the whole range in one step, places
+    /// the cursor at the selection start, and collapses the selection.
+    pub(super) fn delete_selected_input(&mut self) -> bool {
+        let Some(range) = self.normalized_copy_selection() else {
+            return false;
+        };
+        if range.start.pane != crate::tui::CopySelectionPane::Input {
+            return false;
+        }
+        let Some((start, end)) =
+            crate::tui::ui::input_selection_byte_range(range.start, range.end)
+        else {
+            return false;
+        };
+        if start >= end || end > self.input.len() {
+            return false;
+        }
+        self.remember_input_undo_state();
+        self.input.drain(start..end);
+        self.cursor_pos = start.min(self.input.len());
+        self.clear_composer_selection();
+        self.reset_tab_completion();
+        self.sync_model_picker_preview_from_input();
+        true
+    }
+
     fn line_text(pane: crate::tui::CopySelectionPane, abs_line: usize) -> Option<String> {
         match pane {
             crate::tui::CopySelectionPane::Chat => {

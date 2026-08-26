@@ -2333,6 +2333,45 @@ pub(crate) fn input_pane_line_count() -> Option<usize> {
     copy_pane_line_count(crate::tui::CopySelectionPane::Input)
 }
 
+/// Byte offsets of an Input-pane selection inside the composer's logical
+/// input string (`App::input`). The snapshot's raw lines are exactly the
+/// `\n`-split composer text, so prefix lengths reconstruct byte offsets
+/// directly, and display columns map to bytes through `display_col_slice`.
+pub(crate) fn input_selection_byte_range(
+    start: crate::tui::CopySelectionPoint,
+    end: crate::tui::CopySelectionPoint,
+) -> Option<(usize, usize)> {
+    let snapshot = copy_snapshot_for_pane(crate::tui::CopySelectionPane::Input)?;
+    let point_offset = |point: crate::tui::CopySelectionPoint| -> Option<usize> {
+        let map = snapshot.wrapped_line_map(point.abs_line)?;
+        let mut offset = 0usize;
+        for index in 0..map.raw_line {
+            offset += snapshot.raw_plain_line(index)?.len() + 1; // + '\n'
+        }
+        let line_text = snapshot.raw_plain_line(map.raw_line)?;
+        let relative_col = point.column.saturating_sub(map.start_col);
+        let col = clamp_display_col(line_text, relative_col);
+        Some(offset + display_col_slice(line_text, 0, col).len())
+    };
+    let a = point_offset(start)?;
+    let b = point_offset(end)?;
+    Some((a.min(b), a.max(b)))
+}
+
+/// Selection endpoint covering the entire recorded Input snapshot: last
+/// wrapped row at full width. Paired with an anchor at (0,0) this selects
+/// everything currently in the composer.
+pub(crate) fn input_select_all_end_point() -> Option<crate::tui::CopySelectionPoint> {
+    let snapshot = copy_snapshot_for_pane(crate::tui::CopySelectionPane::Input)?;
+    let last = snapshot.wrapped_plain_line_count().checked_sub(1)?;
+    let column = unicode_width::UnicodeWidthStr::width(snapshot.wrapped_plain_line(last)?);
+    Some(crate::tui::CopySelectionPoint {
+        pane: crate::tui::CopySelectionPane::Input,
+        abs_line: last,
+        column,
+    })
+}
+
 pub(crate) fn copy_viewport_visible_range() -> Option<(usize, usize)> {
     let snapshot = copy_snapshot_for_pane(crate::tui::CopySelectionPane::Chat)?;
     Some((snapshot.scroll, snapshot.visible_end))
