@@ -1687,6 +1687,10 @@ pub struct ModelDetailPopup {
     pub selected_button: ModelDetailButton,
     pub button_rects: Vec<(ratatui::layout::Rect, ModelDetailButton)>,
     pub card_rect: ratatui::layout::Rect,
+    /// When the popup was opened. Mouse clicks arriving within a few
+    /// milliseconds of this are the same gesture that spawned the popup and
+    /// must never activate a pill.
+    pub opened_at: std::time::Instant,
 }
 
 /// A single available option for a picker entry.
