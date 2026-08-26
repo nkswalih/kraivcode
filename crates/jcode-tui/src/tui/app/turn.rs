@@ -152,7 +152,9 @@ impl App {
                                 }
                             }
                             Some(Ok(Event::Paste(text))) => {
-                                self.handle_paste(text);
+                                if !self.paste_input_suppressed() {
+                                    self.handle_paste(text);
+                                }
                                 status_spinner_renderer.draw_full(self, terminal)?;
                                 super::run_shell::reset_status_spinner_interval(&mut status_spinner_interval, self);
                             }
@@ -454,7 +456,9 @@ impl App {
                                 }
                             }
                             Some(Ok(Event::Paste(text))) => {
-                                self.handle_paste(text);
+                                if !self.paste_input_suppressed() {
+                                    self.handle_paste(text);
+                                }
                                 status_spinner_renderer.draw_full(self, terminal)?;
                             }
                             Some(Ok(Event::Mouse(mouse))) => {
@@ -1348,7 +1352,9 @@ impl App {
                                     }
                                 }
                                 Some(Ok(Event::Paste(text))) => {
-                                    self.handle_paste(text);
+                                    if !self.paste_input_suppressed() {
+                                        self.handle_paste(text);
+                                    }
                                     status_spinner_renderer.draw_full(self, terminal)?;
                                 }
                                 Some(Ok(Event::Mouse(mouse))) => {

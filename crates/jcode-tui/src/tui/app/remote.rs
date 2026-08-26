@@ -509,10 +509,16 @@ async fn apply_terminal_event(
             needs_redraw |= dispatch_compacted_history_load(app, remote).await;
         }
         Some(Ok(Event::Paste(text))) => {
-            input_attribution.event = Some(format!("paste:{}", text.len()));
-            app.note_client_interaction();
-            app.handle_paste(text);
-            needs_redraw = true;
+            // Slash-command pickers and the model detail popup own input while
+            // open; terminal right-click paste must not leak behind them.
+            if app.paste_input_suppressed() {
+                input_attribution.event = Some("paste-suppressed".to_string());
+            } else {
+                input_attribution.event = Some(format!("paste:{}", text.len()));
+                app.note_client_interaction();
+                app.handle_paste(text);
+                needs_redraw = true;
+            }
         }
         Some(Ok(Event::Mouse(mouse))) => {
             input_attribution.event = Some(format!("mouse:{:?}", mouse.kind));

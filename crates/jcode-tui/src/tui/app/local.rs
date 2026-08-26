@@ -414,6 +414,11 @@ fn apply_terminal_event(
             Ok(true)
         }
         Some(Ok(Event::Paste(text))) => {
+            // Slash-command pickers and the model detail popup own input while
+            // open; terminal right-click paste must not leak behind them.
+            if app.paste_input_suppressed() {
+                return Ok(false);
+            }
             app.note_client_interaction();
             app.handle_paste(text);
             Ok(true)

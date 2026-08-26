@@ -282,6 +282,10 @@ async fn handle_remote_key_internal(
         return Ok(());
     }
 
+    // Timing sample for the paste-burst detector so injected right-click
+    // paste Enters are classified identically to the local dispatcher.
+    crate::tui::app::input::paste_burst_note_key_event();
+
     // Alt+5 always resets the simulator before modal routing, including in the
     // remote/client mode used by self-dev sessions.
     if app.handle_onboarding_sim_reset_shortcut(code, modifiers) {

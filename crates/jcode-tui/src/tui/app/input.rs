@@ -629,6 +629,8 @@ mod paste_guard;
 pub(in crate::tui::app) use paste_burst::reset_for_test as paste_burst_reset_for_test;
 #[cfg(test)]
 pub(in crate::tui::app) use paste_guard::expire_for_test as paste_guard_expire_for_test;
+pub(in crate::tui::app) use paste_burst::enter_is_synthetic as paste_burst_enter_is_synthetic;
+pub(in crate::tui::app) use paste_burst::note_key_event as paste_burst_note_key_event;
 use paste_guard::image_media_type;
 
 pub(super) fn handle_paste(app: &mut App, text: String) {
