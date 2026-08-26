@@ -1327,10 +1327,16 @@ impl App {
 
     /// Keyboard handling while the right-click detail popup is open. Claims
     /// every key so the underlying picker stays frozen behind the card.
+    ///
+    /// Deliberately has NO single-letter hotkeys: injected right-click paste
+    /// arrives as raw key events, and any letter-triggered action (a 'd' in
+    /// pasted text firing "Set as default") would silently mutate settings.
+    /// Activation is explicit only — Enter/Space on the highlighted pill,
+    /// arrow/Tab pill switching, mouse clicks, Esc to close.
     pub(super) fn handle_model_detail_popup_key(
         &mut self,
         code: KeyCode,
-        modifiers: KeyModifiers,
+        _modifiers: KeyModifiers,
     ) -> bool {
         use crate::tui::ModelDetailButton;
         let Some(ref mut popup) = self.model_detail_popup else {
@@ -1351,16 +1357,6 @@ impl App {
             KeyCode::Enter | KeyCode::Char(' ') => {
                 let button = popup.selected_button;
                 self.activate_model_detail_button(button)
-            }
-            KeyCode::Char(c)
-                if modifiers.is_empty() && c.eq_ignore_ascii_case(&'d') =>
-            {
-                self.activate_model_detail_button(ModelDetailButton::SetDefault)
-            }
-            KeyCode::Char(c)
-                if modifiers.is_empty() && c.eq_ignore_ascii_case(&'s') =>
-            {
-                self.activate_model_detail_button(ModelDetailButton::SelectSession)
             }
             _ => true,
         }
