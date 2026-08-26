@@ -3480,18 +3480,28 @@ impl App {
         modifiers: KeyModifiers,
     ) -> Result<()> {
         use crate::tui::app::input::paste_burst_enter_is_synthetic;
+        use crate::tui::app::input::paste_burst_enter_is_injected_storm;
         // Terminals without bracketed-paste support inject right-click paste
-        // as raw key events. While a picker is open, an injected Enter storm
-        // must never commit a model/agent selection, injected CR/LF must not
-        // pollute the filter box, and torn paste sequences that resynchronize
-        // into stray Ctrl+O / Ctrl+N chords must not flip default/favorite.
+        // as raw key events. While a picker is open:
+        //   * injected Enter/CR/LF storms (printable flood immediately
+        //     before each newline) must never commit a selection or pollute
+        //     the filter box — detected structurally via the refined
+        //     predicate, so human arrow→Enter and typed-filter→Enter are
+        //     never misclassified;
+        //   * torn paste sequences resynchronizing into stray Ctrl+O /
+        //     Ctrl+N chords must not flip default/favorite (coarse burst
+        //     check is sufficient here because isolated deliberate chords
+        //     arrive outside any burst).
+        if matches!(
+            code,
+            KeyCode::Enter | KeyCode::Char('\r') | KeyCode::Char('\n')
+        ) && paste_burst_enter_is_injected_storm()
+        {
+            return Ok(());
+        }
         if paste_burst_enter_is_synthetic()
-            && (matches!(
-                code,
-                KeyCode::Enter | KeyCode::Char('\r') | KeyCode::Char('\n')
-            )
-                || (modifiers.contains(KeyModifiers::CONTROL)
-                    && matches!(code, KeyCode::Char('o') | KeyCode::Char('n'))))
+            && modifiers.contains(KeyModifiers::CONTROL)
+            && matches!(code, KeyCode::Char('o') | KeyCode::Char('n'))
         {
             return Ok(());
         }

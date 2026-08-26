@@ -269,22 +269,21 @@ async fn handle_remote_key_internal(
     remote: &mut RemoteConnection,
     text_input: Option<String>,
 ) -> Result<()> {
-    if input::observe_paste_key_event(code, modifiers, text_input.as_deref()) {
-        return Ok(());
-    }
     let mut code = code;
     let mut modifiers = modifiers;
     ctrl_bracket_fallback_to_esc(&mut code, &mut modifiers);
+    // Consume any remaining recovered raw-paste events, then record the
+    // timing/kind sample — both before dispatch decisions that consult the
+    // classification predicates.
+    if input::observe_paste_key_event(code, modifiers, text_input.as_deref()) {
+        return Ok(());
+    }
 
     // Floating right-click model-detail popup claims all keys while open.
     if app.model_detail_popup.is_some() {
         let _ = app.handle_model_detail_popup_key(code, modifiers);
         return Ok(());
     }
-
-    // Timing sample for the paste-burst detector so injected right-click
-    // paste Enters are classified identically to the local dispatcher.
-    crate::tui::app::input::paste_burst_note_key_event();
 
     // Alt+5 always resets the simulator before modal routing, including in the
     // remote/client mode used by self-dev sessions.

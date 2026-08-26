@@ -34,19 +34,59 @@ struct RawPasteRemainder {
     last_event: Instant,
 }
 
+/// Coarse classification used to tell injected paste floods (printable
+/// characters interleaved with Enters) apart from human navigation
+/// sequences (arrow keys, then Enter).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EventKind {
+    Printable,
+    Navigation,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct KeyEventSample {
+    at: Instant,
+    kind: EventKind,
+}
+
 thread_local! {
-    static KEY_TIMES: std::cell::RefCell<VecDeque<Instant>> =
-        const { std::cell::RefCell::new(VecDeque::new()) };
+    static KEY_EVENTS: RefCell<VecDeque<KeyEventSample>> =
+        const { RefCell::new(VecDeque::new()) };
     static RAW_PASTE_REMAINDER: RefCell<Option<RawPasteRemainder>> = const { RefCell::new(None) };
 }
 
-/// Record one handled key event. Call exactly once per key event, before any
-/// dispatch decision that consults [`enter_is_synthetic`].
-pub(in crate::tui::app) fn note_key_event() {
-    let now = Instant::now();
-    KEY_TIMES.with(|cell| {
+fn classify_key_event(
+    code: crossterm::event::KeyCode,
+    modifiers: crossterm::event::KeyModifiers,
+) -> EventKind {
+    use crossterm::event::KeyModifiers;
+    let chord = modifiers.intersects(
+        KeyModifiers::CONTROL
+            | KeyModifiers::ALT
+            | KeyModifiers::SUPER
+            | KeyModifiers::HYPER
+            | KeyModifiers::META,
+    );
+    match code {
+        crossterm::event::KeyCode::Char(c) if !chord && !c.is_control() => EventKind::Printable,
+        _ => EventKind::Navigation,
+    }
+}
+
+/// Record one handled key event. Call exactly once per key event, after any
+/// chord normalization and before dispatch decisions that consult the
+/// classification predicates.
+pub(in crate::tui::app) fn note_key_event(
+    code: crossterm::event::KeyCode,
+    modifiers: crossterm::event::KeyModifiers,
+) {
+    let sample = KeyEventSample {
+        at: Instant::now(),
+        kind: classify_key_event(code, modifiers),
+    };
+    KEY_EVENTS.with(|cell| {
         let mut ring = cell.borrow_mut();
-        ring.push_back(now);
+        ring.push_back(sample);
         while ring.len() > RING_LEN {
             ring.pop_front();
         }
@@ -57,24 +97,54 @@ pub(in crate::tui::app) fn note_key_event() {
 /// at most [`BURST_GAP`] since the previous event AND at least
 /// [`MIN_BURST_EVENTS`] events within the trailing [`BURST_WINDOW`].
 pub(in crate::tui::app) fn enter_is_synthetic() -> bool {
-    KEY_TIMES.with(|cell| {
+    KEY_EVENTS.with(|cell| {
         let ring = cell.borrow();
-        let Some(&last) = ring.iter().next_back() else {
+        let Some(last) = ring.iter().next_back() else {
             return false;
         };
-        let Some(&prev) = ring.iter().rev().nth(1) else {
+        let Some(prev) = ring.iter().rev().nth(1) else {
             return false;
         };
-        if last.duration_since(prev) > BURST_GAP {
+        if last.at.duration_since(prev.at) > BURST_GAP {
             return false;
         }
-        let window_start = last.checked_sub(BURST_WINDOW);
+        let window_start = last.at.checked_sub(BURST_WINDOW);
         let in_window = ring
             .iter()
             .rev()
-            .take_while(|&&t| window_start.is_none_or(|start| t >= start))
+            .take_while(|sample| window_start.is_none_or(|start| sample.at >= start))
             .count();
         in_window >= MIN_BURST_EVENTS
+    })
+}
+
+/// True when the current Enter looks like part of an injected paste flood:
+/// the two preceding events form a tight printable chain (both gaps within
+/// [`BURST_GAP`], and the immediate predecessor a printable character).
+///
+/// Human selection never matches — Enter follows navigation keys or a pause;
+/// conhost-style floods always interleave printables directly before each
+/// newline.
+pub(in crate::tui::app) fn enter_is_injected_storm() -> bool {
+    KEY_EVENTS.with(|cell| {
+        let ring = cell.borrow();
+        let mut iter = ring.iter().rev();
+        let Some(last) = iter.next() else {
+            return false;
+        };
+        let Some(prev) = iter.next() else {
+            return false;
+        };
+        if prev.kind != EventKind::Printable {
+            return false;
+        }
+        if last.at.duration_since(prev.at) > BURST_GAP {
+            return false;
+        }
+        let Some(prev2) = iter.next() else {
+            return false;
+        };
+        prev.at.duration_since(prev2.at) <= BURST_GAP
     })
 }
 
@@ -88,7 +158,7 @@ pub(super) fn observe_key(
     if consume_raw_paste_event(code, modifiers, text_input) {
         return true;
     }
-    note_key_event();
+    note_key_event(code, modifiers);
     false
 }
 
@@ -100,7 +170,7 @@ pub(super) fn begin_raw_paste_recovery(remainder: &str) {
     RAW_PASTE_REMAINDER.with(|cell| {
         if remainder.is_empty() {
             *cell.borrow_mut() = None;
-            KEY_TIMES.with(|times| times.borrow_mut().clear());
+            KEY_EVENTS.with(|times| times.borrow_mut().clear());
             return;
         }
         *cell.borrow_mut() = Some(RawPasteRemainder {
@@ -166,7 +236,7 @@ pub(super) fn consume_raw_paste_event(
         state.last_event = Instant::now();
         if state.chars.is_empty() {
             *remainder = None;
-            KEY_TIMES.with(|times| times.borrow_mut().clear());
+            KEY_EVENTS.with(|times| times.borrow_mut().clear());
         }
         true
     })
@@ -176,7 +246,7 @@ pub(super) fn consume_raw_paste_event(
 /// from an empty slate regardless of earlier test activity on this thread.
 #[cfg(test)]
 pub(in crate::tui::app) fn reset_for_test() {
-    KEY_TIMES.with(|cell| cell.borrow_mut().clear());
+    KEY_EVENTS.with(|cell| cell.borrow_mut().clear());
     RAW_PASTE_REMAINDER.with(|cell| *cell.borrow_mut() = None);
 }
 
