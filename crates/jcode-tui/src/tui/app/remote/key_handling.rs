@@ -279,6 +279,27 @@ async fn handle_remote_key_internal(
         return Ok(());
     }
 
+    // Tab / Shift+Tab: agent persona switcher (mirrors the local dispatcher).
+    if matches!(code, KeyCode::Tab | KeyCode::BackTab)
+        && app.agent_tab_switch_applies()
+        && !modifiers.intersects(
+            KeyModifiers::CONTROL
+                | KeyModifiers::ALT
+                | KeyModifiers::SUPER
+                | KeyModifiers::HYPER
+                | KeyModifiers::META,
+        )
+    {
+        app.cycle_agent_persona(code == KeyCode::BackTab);
+        return Ok(());
+    }
+
+    // In-chat permission panel gates a blocked tool call; claims all keys.
+    if app.permission_panel.is_some() {
+        let _ = app.handle_permission_panel_key(code);
+        return Ok(());
+    }
+
     // Floating right-click model-detail popup claims all keys while open.
     if app.model_detail_popup.is_some() {
         let _ = app.handle_model_detail_popup_key(code, modifiers);

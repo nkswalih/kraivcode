@@ -1952,6 +1952,10 @@ impl crate::tui::TuiState for App {
         self.model_detail_popup.clone()
     }
 
+    fn permission_panel(&self) -> Option<crate::tui::PermissionPanelState> {
+        self.permission_panel.as_ref().map(|(state, _)| state.clone())
+    }
+
     fn copy_selection_status(&self) -> Option<crate::tui::CopySelectionStatus> {
         if !self.copy_selection_mode {
             return None;

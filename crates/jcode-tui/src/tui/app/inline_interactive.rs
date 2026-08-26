@@ -1311,6 +1311,82 @@ impl App {
         self.model_detail_popup = None;
     }
 
+    /// Raise the in-chat permission panel and hand the decision channel to
+    /// the blocked tool call. The panel claims all input until resolved.
+    pub(super) fn open_permission_panel(
+        &mut self,
+        request: crate::tui::PermissionPanelRequest,
+        sender: tokio::sync::oneshot::Sender<crate::tui::PermissionPanelDecision>,
+    ) {
+        crate::tui::ui::clear_permission_panel_geometry();
+        self.permission_panel = Some((
+            crate::tui::PermissionPanelState {
+                request,
+                selected: 0,
+                opened_at: std::time::Instant::now(),
+            },
+            sender,
+        ));
+    }
+
+    /// Resolve the panel with a decision (Allow / Always allow / Deny).
+    pub(super) fn resolve_permission_panel(
+        &mut self,
+        decision: crate::tui::PermissionPanelDecision,
+    ) {
+        let Some((state, sender)) = self.permission_panel.take() else {
+            return;
+        };
+        crate::tui::ui::clear_permission_panel_geometry();
+        if decision == crate::tui::PermissionPanelDecision::AlwaysAllow {
+            super::agent_persona::allow_plan_read_path(&state.request.path);
+        }
+        let _ = sender.send(decision);
+    }
+
+    /// Dismiss the panel WITHOUT deciding — the pending tool call resolves
+    /// as cancelled, but nothing is denied on the user's behalf.
+    pub(super) fn dismiss_permission_panel(&mut self) {
+        if let Some((_state, sender)) = self.permission_panel.take() {
+            let _ = sender.send(crate::tui::PermissionPanelDecision::Deny);
+        }
+        crate::tui::ui::clear_permission_panel_geometry();
+    }
+
+    /// Keyboard handling while the permission panel is open. Claims every
+    /// key; arrows move the pill selection, Enter activates, Esc dismisses
+    /// without denying.
+    pub(super) fn handle_permission_panel_key(
+        &mut self,
+        code: KeyCode,
+    ) -> bool {
+        use crate::tui::PermissionPanelDecision;
+        let Some(ref mut panel) = self.permission_panel else {
+            return false;
+        };
+        let pill_count = PermissionPanelDecision::PILLS.len();
+        match code {
+            KeyCode::Esc => {
+                self.dismiss_permission_panel();
+                true
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                panel.0.selected = (panel.0.selected + pill_count - 1) % pill_count;
+                true
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                panel.0.selected = (panel.0.selected + 1) % pill_count;
+                true
+            }
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                let decision = PermissionPanelDecision::PILLS[panel.0.selected];
+                self.resolve_permission_panel(decision);
+                true
+            }
+            _ => true,
+        }
+    }
+
     /// Activate a popup pill button.
     pub(super) fn activate_model_detail_button(
         &mut self,

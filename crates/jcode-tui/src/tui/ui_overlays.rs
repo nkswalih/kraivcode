@@ -841,6 +841,185 @@ pub(crate) fn clear_model_detail_popup_geometry() {
     {}
 }
 
+/// Captured hit-test geometry of the permission panel card + pill lines.
+#[derive(Debug, Clone)]
+pub(crate) struct PermissionPanelGeometry {
+    pub card: Rect,
+    pub pills: Vec<(Rect, crate::tui::PermissionPanelDecision)>,
+}
+
+#[cfg(not(test))]
+static PERMISSION_PANEL_GEOMETRY: OnceLock<Mutex<Option<PermissionPanelGeometry>>> =
+    OnceLock::new();
+
+#[cfg(not(test))]
+fn permission_panel_geometry_slot() -> &'static Mutex<Option<PermissionPanelGeometry>> {
+    PERMISSION_PANEL_GEOMETRY.get_or_init(|| Mutex::new(None))
+}
+
+pub(crate) fn store_permission_panel_geometry(geometry: PermissionPanelGeometry) {
+    #[cfg(not(test))]
+    if let Ok(mut slot) = permission_panel_geometry_slot().lock() {
+        *slot = Some(geometry);
+    }
+    #[cfg(test)]
+    let _ = geometry;
+}
+
+pub(crate) fn permission_panel_geometry() -> Option<PermissionPanelGeometry> {
+    #[cfg(not(test))]
+    {
+        let guard = permission_panel_geometry_slot().lock().ok()?;
+        guard.clone()
+    }
+    #[cfg(test)]
+    {
+        None
+    }
+}
+
+pub(crate) fn clear_permission_panel_geometry() {
+    #[cfg(not(test))]
+    if let Ok(mut slot) = permission_panel_geometry_slot().lock() {
+        *slot = None;
+    }
+    #[cfg(test)]
+    {}
+}
+
+/// Draw the in-chat permission panel as a floating card anchored directly
+/// above the composer (falling back to lower-center of `area` when no
+/// composer snapshot exists yet). Pills stack line-by-line; geometry is
+/// recorded for mouse hit-testing.
+pub(super) fn draw_permission_panel(
+    frame: &mut Frame,
+    area: Rect,
+    panel: &crate::tui::PermissionPanelState,
+) {
+    use crate::tui::PermissionPanelDecision;
+
+    let dim_style = Style::default().fg(dim_color());
+    let value_style = Style::default().fg(user_text());
+
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    lines.push(Line::from(vec![
+        Span::styled("Plan agent wants to ", value_style),
+        Span::styled(panel.request.tool_name.to_uppercase(), Style::default().fg(user_color()).bold()),
+    ]));
+    if !panel.request.path.is_empty() {
+        lines.push(Line::from(Span::styled(
+            panel.request.path.clone(),
+            value_style,
+        )));
+    }
+    lines.push(Line::from(Span::styled(
+        format!("Reason: {}", panel.request.reason),
+        dim_style,
+    )));
+    lines.push(Line::from(""));
+
+    // Stacked pills, one per line. The selected row gets the ❯ marker and
+    // the Kraivcode accent treatment.
+    for (index, decision) in PermissionPanelDecision::PILLS.into_iter().enumerate() {
+        let selected = index == panel.selected;
+        let marker = if selected { "❯ " } else { "  " };
+        let style = if selected {
+            Style::default()
+                .fg(user_color())
+                .bg(user_bg())
+                .add_modifier(Modifier::BOLD)
+        } else {
+            dim_style
+        };
+        lines.push(Line::from(vec![
+            Span::raw(marker),
+            Span::styled(format!("◖ {} ◗", decision.label()), style),
+        ]));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "↑/↓ select · Enter confirm · Esc dismiss",
+        dim_style,
+    )));
+
+    let content_width = lines
+        .iter()
+        .map(|line| line.width())
+        .max()
+        .unwrap_or(0)
+        .clamp(34, area.width.saturating_sub(4) as usize);
+    let boxed = render_rounded_box(
+        "Permission required",
+        lines,
+        content_width + 6,
+        Style::default().fg(user_color()),
+    );
+
+    let box_width = boxed.iter().map(|line| line.width()).max().unwrap_or(0) as u16;
+    let box_height = boxed.len() as u16;
+    if box_width == 0 || box_width > area.width || box_height > area.height {
+        return;
+    }
+
+    // Anchor: bottom of the card sits just above the composer's top border.
+    let anchor_y = crate::tui::ui::composer_anchor_rect()
+        .map(|rect| rect.y.saturating_sub(box_height + 1))
+        .unwrap_or_else(|| area.y + area.height.saturating_sub(box_height + 2));
+    let anchor_y = anchor_y.max(area.y);
+    let card = Rect {
+        x: area.x + (area.width.saturating_sub(box_width)) / 2,
+        y: anchor_y,
+        width: box_width,
+        height: box_height,
+    };
+
+    // Record pill rects: pills stack one per line, so each line containing a
+    // ◖ maps to the next decision in order.
+    let mut pills: Vec<(Rect, PermissionPanelDecision)> = Vec::new();
+    for (index, line) in boxed.iter().enumerate() {
+        let plain: String = line
+            .spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect();
+        let Some(marker_offset) = plain.find("◖") else {
+            continue;
+        };
+        let Some(decision) = PermissionPanelDecision::PILLS.get(pills.len()).copied() else {
+            break;
+        };
+        let label_end = plain[marker_offset..]
+            .find("◗")
+            .map(|position| position + 2)
+            .unwrap_or(plain.len() - marker_offset);
+        pills.push((
+            Rect {
+                x: card.x + marker_offset as u16,
+                y: card.y + 1 + index as u16,
+                width: label_end as u16,
+                height: 1,
+            },
+            decision,
+        ));
+    }
+
+    store_permission_panel_geometry(PermissionPanelGeometry {
+        card,
+        pills,
+    });
+
+    frame.render_widget(ratatui::widgets::Clear, card);
+    for (index, line) in boxed.iter().enumerate() {
+        let row = Rect {
+            x: card.x,
+            y: card.y + index as u16,
+            width: card.width,
+            height: 1,
+        };
+        frame.render_widget(Paragraph::new(line.clone()), row);
+    }
+}
+
 /// Draw the right-click "Model details" card centered over `area`.
 ///
 /// Renders key/value facts, the two action pills, and records their screen

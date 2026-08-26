@@ -1335,6 +1335,50 @@ impl App {
             }};
         }
 
+        // In-chat permission panel claims mouse input while open: hover
+        // previews a pill, left-click activates it, clicking outside (or any
+        // other event) is contained. Esc-style dismissal stays keyboard-only
+        // so an accidental click never denies.
+        if self.permission_panel.is_some() {
+            let geometry = crate::tui::ui::permission_panel_geometry();
+            match mouse.kind {
+                MouseEventKind::Down(MouseButton::Left) => {
+                    if let Some(geometry) = geometry.as_ref() {
+                        let inside_card =
+                            rect_contains_point(geometry.card, mouse.column, mouse.row);
+                        let clicked = geometry
+                            .pills
+                            .iter()
+                            .find(|(rect, _)| {
+                                rect_contains_point(*rect, mouse.column, mouse.row)
+                            })
+                            .map(|(_, decision)| *decision);
+                        if let Some(decision) = clicked {
+                            self.resolve_permission_panel(decision);
+                        } else if !inside_card {
+                            self.dismiss_permission_panel();
+                        }
+                    } else {
+                        self.dismiss_permission_panel();
+                    }
+                }
+                MouseEventKind::Moved => {
+                    if let Some(geometry) = geometry.as_ref() {
+                        for (index, (rect, _)) in geometry.pills.iter().enumerate() {
+                            if rect_contains_point(*rect, mouse.column, mouse.row)
+                                && let Some((panel, _)) = self.permission_panel.as_mut()
+                                && panel.selected != index
+                            {
+                                panel.selected = index;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+            finish_mouse_event!(false, "permission_panel_mouse");
+        }
+
         if self.model_detail_popup.is_some() {
             // While open: left-click activates pills or dismisses the card;
             // right-click RE-TARGETS the popup to the row under the cursor.
