@@ -630,7 +630,8 @@ pub(in crate::tui::app) use paste_burst::reset_for_test as paste_burst_reset_for
 #[cfg(test)]
 pub(in crate::tui::app) use paste_guard::expire_for_test as paste_guard_expire_for_test;
 pub(in crate::tui::app) use paste_burst::enter_is_synthetic as paste_burst_enter_is_synthetic;
-pub(in crate::tui::app) use paste_burst::note_key_event as paste_burst_note_key_event;
+pub(in crate::tui::app) use paste_burst::enter_is_injected_storm
+    as paste_burst_enter_is_injected_storm;
 use paste_guard::image_media_type;
 
 pub(super) fn handle_paste(app: &mut App, text: String) {
@@ -3112,18 +3113,15 @@ impl App {
         modifiers: KeyModifiers,
         text_input: Option<String>,
     ) -> Result<()> {
-        // Once a non-bracketed paste is recovered atomically from the
-        // clipboard, consume the terminal's remaining injected key events
-        // before they can mutate the composer or reach Enter/submit handling.
-        if paste_burst::observe_key(code, modifiers, text_input.as_deref()) {
-            return Ok(());
-        }
-        // Timing sample for paste-burst classification; must land before any
-        // dispatch decision that consults enter_is_synthetic().
-        paste_burst::note_key_event();
         let mut code = code;
         let mut modifiers = modifiers;
         ctrl_bracket_fallback_to_esc(&mut code, &mut modifiers);
+        // Consume any remaining recovered raw-paste events, then record the
+        // timing/kind sample. Both must land before dispatch decisions that
+        // consult the classification predicates.
+        if paste_burst::observe_key(code, modifiers, text_input.as_deref()) {
+            return Ok(());
+        }
 
         // Alt+5 always starts the onboarding simulator from a pristine first
         // screen, even when another modal or a previous sim screen is active.
