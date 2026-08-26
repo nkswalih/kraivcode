@@ -358,6 +358,7 @@ fn test_remote_rewind_completion_shows_undo_hint_after_history_refresh() {
                 content: "hello".to_string(),
                 tool_calls: None,
                 tool_data: None,
+                pasted_segments: None,
             }],
             images: vec![],
             provider_name: Some("mock".to_string()),

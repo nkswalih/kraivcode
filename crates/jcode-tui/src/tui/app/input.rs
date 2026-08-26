@@ -184,6 +184,10 @@ pub(super) struct PreparedInput {
     pub expanded: String,
     pub images: Vec<(String, String)>,
     pub has_pasted_content: bool,
+    /// Ordered typed/paste segmentation when the submitted prompt contained
+    /// tracked paste placeholders. Drives the transcript's pasted-content
+    /// cards; provider payloads always use `expanded`.
+    pub segments: Option<Vec<jcode_tui_messages::UserPromptSegment>>,
 }
 
 // Roughly 500k English words at ~6 bytes/word including spaces. This is still
@@ -1498,6 +1502,71 @@ pub(super) fn expand_paste_placeholders(app: &mut App, input: &str) -> String {
         }
     }
     result
+}
+
+/// Locate every tracked paste payload inside an already-expanded prompt and
+/// split it into ordered typed/paste segments. Longest-match-first at each
+/// byte position keeps nested or duplicated payloads unambiguous, and the
+/// concatenation of all segments is byte-identical to `expanded`.
+///
+/// Returns `None` when the prompt contains no tracked paste payload.
+fn paste_segments_for_expanded(
+    app: &App,
+    expanded: &str,
+) -> Option<Vec<jcode_tui_messages::UserPromptSegment>> {
+    use jcode_tui_messages::UserPromptSegment;
+
+    if app.pasted_contents.is_empty() {
+        return None;
+    }
+    let mut payloads: Vec<&str> = app.pasted_contents.iter().map(String::as_str).collect();
+    payloads.sort_by_key(|content| std::cmp::Reverse(content.len()));
+
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+    let mut pos = 0usize;
+    while pos < expanded.len() {
+        let rest = &expanded[pos..];
+        match payloads.iter().find(|payload| rest.starts_with(**payload)) {
+            Some(payload) => {
+                spans.push((pos, pos + payload.len()));
+                pos += payload.len();
+            }
+            None => {
+                pos += rest.chars().next().map(char::len_utf8).unwrap_or(1);
+            }
+        }
+    }
+    if spans.is_empty() {
+        return None;
+    }
+
+    // Merge into ordered segments. Whitespace-only typed gaps *between* two
+    // paste blocks are dropped so adjacent cards sit flush; leading/trailing
+    // typed text keeps its original spacing.
+    let mut segments: Vec<UserPromptSegment> = Vec::new();
+    let mut cursor = 0usize;
+    for (start, end) in spans {
+        if start > cursor {
+            let typed = &expanded[cursor..start];
+            if !typed.trim().is_empty() || segments.is_empty() {
+                segments.push(UserPromptSegment::Typed(typed.to_string()));
+            }
+        } else if segments.is_empty() {
+            // Leading paste block: nothing to emit before it.
+        }
+        segments.push(UserPromptSegment::Pasted {
+            placeholder: paste_placeholder(expanded[start..end].trim_end()),
+            content: expanded[start..end].to_string(),
+        });
+        cursor = end;
+    }
+    if cursor < expanded.len() {
+        let tail = &expanded[cursor..];
+        if !tail.trim().is_empty() || segments.is_empty() {
+            segments.push(UserPromptSegment::Typed(tail.to_string()));
+        }
+    }
+    (!segments.is_empty()).then_some(segments)
 }
 
 pub(super) fn queue_message(app: &mut App) {
@@ -2883,9 +2952,12 @@ pub(super) fn handle_basic_key(app: &mut App, code: KeyCode) -> bool {
 
 pub(super) fn take_prepared_input(app: &mut App) -> PreparedInput {
     let raw_input = std::mem::take(&mut app.input);
-    app.record_prompt_history(&raw_input);
     let expanded = expand_paste_placeholders(app, &raw_input);
-    let has_pasted_content = raw_input != expanded;
+    // History recall must restore the full original text, never the compact
+    // placeholder representation.
+    app.record_prompt_history(&expanded);
+    let segments = paste_segments_for_expanded(app, &expanded);
+    let has_pasted_content = segments.is_some();
     app.pasted_contents.clear();
     let images = std::mem::take(&mut app.pending_images);
     app.cursor_pos = 0;
@@ -2895,6 +2967,7 @@ pub(super) fn take_prepared_input(app: &mut App) -> PreparedInput {
         expanded,
         images,
         has_pasted_content,
+        segments,
     }
 }
 
@@ -3757,11 +3830,13 @@ impl App {
         }
 
         let raw_input = std::mem::take(&mut self.input);
-        // Persist to cross-session prompt history (no-op for slash/shell
-        // commands, secret-intercept inputs, and oversized pastes).
-        self.record_prompt_history(&raw_input);
         let mut input = self.expand_paste_placeholders(&raw_input);
-        let has_pasted_content = raw_input != input;
+        let segments = paste_segments_for_expanded(self, &input);
+        // Persist to cross-session prompt history (no-op for slash/shell
+        // commands, secret-intercept inputs, and oversized pastes). History
+        // stores the expanded text so recall restores the full content
+        // instead of compact paste placeholders.
+        self.record_prompt_history(&input);
         if let Some(notice) = input_exceeds_submit_limit(&input) {
             self.input = raw_input;
             self.cursor_pos = self.input.len();
@@ -3868,6 +3943,7 @@ impl App {
                     duration_secs: None,
                     title: None,
                     tool_data: None,
+                    pasted_segments: None,
                 });
                 if let Some(prompt) = trailing_prompt {
                     input = prompt;
@@ -3899,6 +3975,7 @@ impl App {
                     duration_secs: None,
                     title: None,
                     tool_data: None,
+                    pasted_segments: None,
                 });
                 return;
             }
@@ -3907,12 +3984,12 @@ impl App {
         // Leaving the preview should happen as soon as the user acts on it.
         self.onboarding_preview_mode = false;
 
-        // Keep the composer representation in the visible transcript. Pasted
-        // blocks remain compact there, while `input` below is the expanded
-        // payload sent to the provider.
-        // Remember the typed prompt so we can restore it to the input box if this
-        // turn fails (e.g. "token refresh needed"), instead of dropping it.
-        self.last_submitted_input = Some(raw_input.clone());
+        // The transcript shows the full submitted prompt (identical to the
+        // provider payload); paste segmentation drives the inline pasted
+        // content cards. Remember the typed prompt so we can restore it to
+        // the input box if this turn fails (e.g. "token refresh needed"),
+        // instead of dropping it.
+        self.last_submitted_input = Some(input.clone());
 
         // See `stage_turn_for_remote_tick_loop`: a remote client must never
         // park on the local-only `pending_turn` flag.
@@ -3920,11 +3997,9 @@ impl App {
             return;
         }
 
-        self.push_display_message(if has_pasted_content {
-            DisplayMessage::pasted_user(raw_input.clone())
-        } else {
-            DisplayMessage::user(raw_input.clone())
-        });
+        let mut user_message = DisplayMessage::user(input.clone());
+        user_message.pasted_segments = segments;
+        self.push_display_message(user_message);
         // Send expanded content (with actual pasted text) to model
         let images = std::mem::take(&mut self.pending_images);
         if !images.is_empty() {

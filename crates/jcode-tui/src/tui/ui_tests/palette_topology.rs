@@ -37,6 +37,7 @@ fn measure() -> (
             duration_secs: None,
             title: None,
             tool_data: None,
+            pasted_segments: None,
         };
         let app = TestState {
             display_messages: vec![

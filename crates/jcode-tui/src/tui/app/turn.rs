@@ -357,6 +357,7 @@ impl App {
                                                     duration_secs: self.display_turn_duration_secs(),
                                                     title: None,
                                                     tool_data: None,
+                                                    pasted_segments: None,
                                                 });
                                                 }
                                             }
@@ -421,6 +422,7 @@ impl App {
                                                     duration_secs: None,
                                                     title: None,
                                                     tool_data: None,
+                                                    pasted_segments: None,
                                                 });
                                                 }
                                             }
@@ -434,6 +436,7 @@ impl App {
                                             duration_secs: None,
                                             title: None,
                                             tool_data: None,
+                                            pasted_segments: None,
                                         });
                                         // Clear streaming state and continue with new turn
                                         self.clear_streaming_render_state();
@@ -593,6 +596,7 @@ impl App {
                                                 duration_secs: None,
                                                 title: None,
                                                 tool_data: Some(tool.clone()),
+                                                pasted_segments: None,
                                             });
 
                                             tool_calls.push(tool);
@@ -936,6 +940,7 @@ impl App {
                                             duration_secs: None,
                                             title: Some("Generated image".to_string()),
                                             tool_data: Some(tool_call),
+                                            pasted_segments: None,
                                         });
                                         if let Some(image) = crate::message::generated_image_rendered_image(
                                             &id,
@@ -1136,6 +1141,7 @@ impl App {
                         duration_secs: duration,
                         title: None,
                         tool_data: None,
+                        pasted_segments: None,
                     });
                     self.push_turn_footer(duration);
                 }
@@ -1153,6 +1159,7 @@ impl App {
                             duration_secs: duration,
                             title: None,
                             tool_data: None,
+                            pasted_segments: None,
                         });
                     }
                 }
@@ -1322,6 +1329,7 @@ impl App {
                                                     duration_secs: self.display_turn_duration_secs(),
                                                     title: None,
                                                     tool_data: None,
+                                                    pasted_segments: None,
                                                 });
                                                 }
                                             }

@@ -389,96 +389,85 @@ fn push_user_prompt_lines(
     }
 }
 
-fn pasted_placeholder_end(content: &str, start: usize) -> Option<usize> {
-    const PREFIX: &str = "[Pasted ~";
-    let rest = content.get(start..)?.strip_prefix(PREFIX)?;
-    let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
-    if digits == 0 {
-        return None;
-    }
-    let suffix = rest.get(digits..)?;
-    let suffix_len = if suffix.starts_with(" line]") {
-        " line]".len()
-    } else if suffix.starts_with(" lines]") {
-        " lines]".len()
-    } else {
-        return None;
-    };
-    Some(start + PREFIX.len() + digits + suffix_len)
-}
-
-fn push_pasted_user_prompt_lines(
+/// Render a paste-backed user prompt: typed text keeps the standard ┃ gutter
+/// while every pasted block renders as a rounded card whose lines also carry
+/// the gutter, so the left border line stays continuous across the whole
+/// message.
+fn push_segmented_user_prompt_lines(
     acc: &mut BodyAcc,
-    content: &str,
+    segments: &[jcode_tui_messages::UserPromptSegment],
     align: ratatui::layout::Alignment,
     width: u16,
 ) {
-    const PREFIX: &str = "[Pasted ~";
-    let mut cursor = 0usize;
-    let mut first_segment = true;
+    const GUTTER: &str = "┃ ";
+    let gutter_width = unicode_width::UnicodeWidthStr::width(GUTTER);
+    let first_line_index = acc.lines.len();
 
-    while let Some(relative) = content[cursor..].find(PREFIX) {
-        let start = cursor + relative;
-        let Some(end) = pasted_placeholder_end(content, start) else {
-            cursor = start + PREFIX.len();
-            continue;
-        };
-
-        let normal = &content[cursor..start];
-        if !normal.is_empty() && !normal.trim().is_empty() {
-            let prompt_indices_before = acc.user_line_indices.len();
-            push_user_prompt_lines(
-                &mut acc.lines,
-                &mut acc.raw_plain_lines,
-                &mut acc.line_raw_overrides,
-                &mut acc.line_copy_offsets,
-                &mut acc.user_line_indices,
-                normal,
-                align,
-            );
-            if !first_segment {
-                acc.user_line_indices.truncate(prompt_indices_before);
+    for segment in segments {
+        match segment {
+            jcode_tui_messages::UserPromptSegment::Typed(text) => {
+                if text.trim().is_empty() {
+                    continue;
+                }
+                let registered_before = acc.user_line_indices.len();
+                push_user_prompt_lines(
+                    &mut acc.lines,
+                    &mut acc.raw_plain_lines,
+                    &mut acc.line_raw_overrides,
+                    &mut acc.line_copy_offsets,
+                    &mut acc.user_line_indices,
+                    text,
+                    align,
+                );
+                acc.user_line_indices.truncate(registered_before);
             }
-            first_segment = false;
+            jcode_tui_messages::UserPromptSegment::Pasted { content, .. } => {
+                let available = (width as usize).saturating_sub(gutter_width + 2);
+                if available < 12 {
+                    continue;
+                }
+                let inner_width = available.saturating_sub(4).clamp(8, 72);
+                let normalized = content.replace("\r\n", "\n").replace('\r', "\n");
+                let body: Vec<Line<'static>> = normalized
+                    .split('\n')
+                    .map(|line| {
+                        Line::from(Span::styled(line.to_string(), user_prompt_text_style()))
+                    })
+                    .collect();
+                let mut wrapped = markdown::wrap_lines(body, inner_width);
+                if wrapped.is_empty() {
+                    wrapped.push(Line::from(""));
+                }
+                let boxed = render_rounded_box(
+                    "Pasted content",
+                    wrapped,
+                    inner_width + 4,
+                    Style::default().fg(user_color()),
+                );
+                for line in boxed {
+                    let mut spans: Vec<Span<'static>> = Vec::with_capacity(line.spans.len() + 1);
+                    spans.push(Span::styled(GUTTER, user_border_style()));
+                    spans.extend(line.spans);
+                    let composed = Line::from(spans).alignment(align);
+                    let raw_text = ui::line_plain_text(&composed);
+                    let raw_width = unicode_width::UnicodeWidthStr::width(raw_text.as_str());
+                    let raw_index = acc.raw_plain_lines.len();
+                    acc.raw_plain_lines.push(raw_text);
+                    acc.lines.push(composed);
+                    acc.line_raw_overrides.push(Some(WrappedLineMap {
+                        raw_line: raw_index,
+                        start_col: 0,
+                        end_col: raw_width,
+                    }));
+                    acc.line_copy_offsets.push(gutter_width);
+                }
+            }
         }
-
-        let placeholder = &content[start..end];
-        let available_width = width.saturating_sub(2) as usize;
-        let max_box_width = available_width.min(64);
-        let box_lines = render_rounded_box(
-            "Pasted content",
-            vec![Line::from(Span::styled(
-                placeholder.to_string(),
-                Style::default().fg(user_color()).bold(),
-            ))],
-            max_box_width,
-            Style::default().fg(user_color()),
-        );
-        if first_segment {
-            acc.user_line_indices.push(acc.lines.len());
-        }
-        for line in box_lines {
-            acc.push_auto(line.alignment(align));
-        }
-        first_segment = false;
-        cursor = end;
     }
 
-    if cursor < content.len() {
-        let prompt_indices_before = acc.user_line_indices.len();
-        push_user_prompt_lines(
-            &mut acc.lines,
-            &mut acc.raw_plain_lines,
-            &mut acc.line_raw_overrides,
-            &mut acc.line_copy_offsets,
-            &mut acc.user_line_indices,
-            &content[cursor..],
-            align,
-        );
-        if !first_segment {
-            acc.user_line_indices.truncate(prompt_indices_before);
-        }
-    }
+    // One prompt registration per submitted message regardless of how many
+    // paste cards it contains.
+    acc.user_line_indices.push(first_line_index);
 }
 
 fn empty_prepared_messages() -> PreparedMessages {
@@ -1448,8 +1437,8 @@ fn render_message_into(
         "user" => {
             acc.prompt_num += 1;
             acc.user_prompt_texts.push(msg.content.clone());
-            if msg.is_pasted_user() {
-                push_pasted_user_prompt_lines(acc, &msg.content, align, width);
+            if let Some(segments) = msg.pasted_segments.as_ref() {
+                push_segmented_user_prompt_lines(acc, segments, align, width);
             } else {
                 push_user_prompt_lines(
                     &mut acc.lines,

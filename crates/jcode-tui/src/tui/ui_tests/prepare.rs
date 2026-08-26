@@ -537,6 +537,7 @@ fn test_prepare_messages_shows_live_batch_progress_in_chat_history() {
             duration_secs: None,
             title: None,
             tool_data: None,
+            pasted_segments: None,
         }],
         status: ProcessingStatus::RunningTool("batch".to_string()),
         anim_elapsed: 0.0,
@@ -823,6 +824,7 @@ fn test_prepare_messages_centers_meta_footer_in_centered_mode() {
                 duration_secs: None,
                 title: None,
                 tool_data: None,
+                pasted_segments: None,
             },
         ],
         ..Default::default()
