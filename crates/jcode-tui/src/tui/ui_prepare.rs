@@ -379,7 +379,8 @@ fn push_user_prompt_lines(
             content_line.to_string(),
             user_prompt_text_style(),
         ));
-        lines.push(Line::from(spans).alignment(align));
+        let user_bg_style = Style::default().bg(user_bg());
+        lines.push(Line::from(spans).alignment(align).style(user_bg_style));
         line_raw_overrides.push(Some(WrappedLineMap {
             raw_line,
             start_col: 0,
@@ -2603,6 +2604,7 @@ fn wrap_lines_with_map(
         raw_to_wrapped.push(wrapped_idx);
         let is_user_line = user_line_mask.get(orig_idx).copied().unwrap_or(false);
         let wrap_width = if is_user_line { user_width } else { full_width };
+        let orig_style = line.style;
         let new_lines = markdown::wrap_line(line, wrap_width);
         let count = new_lines.len();
         let mut remaining_copy_offset = line_copy_offsets.get(orig_idx).copied().unwrap_or(0);
@@ -2629,7 +2631,12 @@ fn wrap_lines_with_map(
             }
         }
 
-        wrapped_lines.extend(new_lines);
+        for mut new_line in new_lines {
+            if orig_style.bg.is_some() {
+                new_line = new_line.style(orig_style);
+            }
+            wrapped_lines.push(new_line);
+        }
         wrapped_idx += count;
     }
     raw_to_wrapped.push(wrapped_idx);

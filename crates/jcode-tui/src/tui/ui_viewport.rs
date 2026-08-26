@@ -963,6 +963,44 @@ pub(super) fn draw_messages(
         }
     }
 
+    // Fill user message rows with full-width background before rendering the
+    // paragraph. This ensures the dark olive background extends across the
+    // entire row, not just behind the text spans.
+    {
+        let user_bg = super::user_bg();
+        let user_bg_style = Style::default().bg(user_bg);
+        let prompt_start_idx =
+            lower_bound(wrapped_user_prompt_starts, scroll);
+        let prompt_end_idx =
+            lower_bound(wrapped_user_prompt_starts, visible_end);
+        for prompt_i in prompt_start_idx..prompt_end_idx {
+            let abs_start = wrapped_user_prompt_starts[prompt_i];
+            let abs_end = wrapped_user_prompt_ends
+                .get(prompt_i)
+                .copied()
+                .unwrap_or(abs_start + 1);
+            let vis_start = abs_start.max(scroll);
+            let vis_end = abs_end.min(visible_end);
+            for abs_line in vis_start..vis_end {
+                let rel = abs_line - scroll;
+                if let Some(line) = visible_lines.get_mut(rel) {
+                    line.style = line.style.bg(user_bg);
+                    // Extend the last span to fill the full row width so the
+                    // background covers trailing whitespace.
+                    let line_width = line.width();
+                    let fill_needed = (content_area.width as usize)
+                        .saturating_sub(line_width);
+                    if fill_needed > 0 {
+                        line.spans.push(Span::styled(
+                            " ".repeat(fill_needed),
+                            user_bg_style,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     frame.render_widget(Paragraph::new(visible_lines), content_area);
 
     let centered = app.centered_mode();

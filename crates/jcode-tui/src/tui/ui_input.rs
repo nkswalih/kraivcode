@@ -387,9 +387,8 @@ pub(super) fn input_hint_line_height(app: &dyn TuiState) -> u16 {
     )
 }
 
-pub(super) fn send_mode_reserved_width(app: &dyn TuiState) -> usize {
-    let (icon, _) = send_mode_indicator(app);
-    if icon.is_empty() { 0 } else { icon.len() + 1 }
+pub(super) fn send_mode_reserved_width(_app: &dyn TuiState) -> usize {
+    0
 }
 
 pub(super) fn input_prompt(app: &dyn TuiState) -> (&'static str, Color) {
@@ -755,7 +754,24 @@ fn append_batch_progress_spans(
     }
 }
 
-pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pending_count: usize, empty_session_home: bool) {
+/// Returns true when there is transient activity to display above the composer.
+pub(super) fn activity_line_visible(app: &dyn TuiState) -> bool {
+    crate::build::read_build_progress().is_some()
+        || app.rate_limit_remaining().is_some()
+        || app.is_processing()
+}
+
+/// Draw the live activity line (above composer) for transient processing states.
+/// Collapses to zero height when idle — no output is emitted to `area`.
+pub(super) fn draw_activity_line(
+    frame: &mut Frame,
+    app: &dyn TuiState,
+    area: Rect,
+    pending_count: usize,
+) {
+    if area.height == 0 {
+        return;
+    }
     let elapsed = app.elapsed().map(|d| d.as_secs_f32()).unwrap_or(0.0);
     let stale_secs = app.time_since_activity().map(|d| d.as_secs_f32());
     let (cache_read, cache_creation) = app.streaming_cache_tokens();
@@ -817,7 +833,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         let spinner = super::activity_indicator(elapsed, 12.5);
 
         match app.status() {
-            ProcessingStatus::Idle => Line::from(""),
+            ProcessingStatus::Idle => return,
             ProcessingStatus::Sending => {
                 let model_name = app
                     .info_widget_data()
@@ -846,9 +862,6 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                     format_elapsed(elapsed)
                 );
                 append_transport_context(&mut label, app);
-                // "Suspiciously long" is measured per connection attempt, not
-                // across the whole turn, so later round-trips don't immediately
-                // render yellow just because the turn has been running a while.
                 let phase_elapsed = app
                     .connection_phase_elapsed()
                     .map_or(elapsed, |d| d.as_secs_f32());
@@ -899,7 +912,6 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 let time_str = format_elapsed(elapsed);
                 let (input_tokens, output_tokens) = app.streaming_tokens();
                 let stream_message_ended = app.stream_message_ended();
-                // Prepend model name for OpenCode-style status.
                 let model_name = app
                     .info_widget_data()
                     .model
@@ -962,9 +974,6 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             ProcessingStatus::RunningTool(ref name) => {
                 let half_width = 3;
                 let decorative = crate::perf::tui_policy().enable_decorative_animations;
-                // When decorative animations are disabled we still nudge the bar
-                // forward at a slow "liveness" rate so a long-running tool (e.g.
-                // bash) reads as alive instead of frozen.
                 let bar_speed = if decorative {
                     2.0
                 } else {
@@ -988,7 +997,6 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 let anim_color = animated_tool_color(elapsed);
                 let batch_prog = app.batch_progress();
                 let is_batch = name == "batch";
-                // For batch: compute initial total from the streaming tool call input
                 let batch_total_initial = if is_batch {
                     app.streaming_tool_calls()
                         .last()
@@ -999,7 +1007,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                     None
                 };
                 let tool_detail = if is_batch {
-                    None // batch always uses progress display
+                    None
                 } else {
                     app.streaming_tool_calls()
                         .last()
@@ -1017,7 +1025,6 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                     Span::styled(right_bar, Style::default().fg(anim_color)),
                 ];
 
-                // For batch tool: show "completed/total · last_tool" progress
                 if is_batch {
                     append_batch_progress_spans(
                         &mut spans,
@@ -1080,7 +1087,19 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 Line::from(spans)
             }
         }
-    } else if empty_session_home {
+    } else {
+        return;
+    };
+
+    frame.render_widget(Paragraph::new(line), area);
+}
+
+pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pending_count: usize, empty_session_home: bool) {
+    if area.height == 0 {
+        return;
+    }
+
+    let line = if empty_session_home {
         home_idle_status_line(app, area.width)
     } else {
         // Active session idle status: >> AgentMode · Model Provider  X.Xk/Y.Yk ████░░
@@ -1140,7 +1159,6 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         }
 
         // Context usage, right-aligned: 3.1k/272k · ▰▰▰▱▱▱▱▱▱▱ 1%
-        // (historical slim segmented meter, Kraivcode yellow theme)
         let ctx_bar = if let Some((used, limit)) = overscroll_context_usage(&data) {
             let bar_cells = 10usize;
             let mut bar_spans = overscroll_context_bar(used, limit, bar_cells);
@@ -2669,7 +2687,6 @@ pub(super) fn draw_input(
 
     let cursor = Position::new(cursor_x, cursor_y);
     frame.set_cursor_position(cursor);
-    draw_send_mode_indicator(frame, app, inner);
     Some(cursor)
 }
 
@@ -2968,47 +2985,6 @@ pub(crate) fn wrap_input_text<'a>(
     }
 
     (lines, cursor_line, cursor_col)
-}
-
-fn send_mode_indicator(app: &dyn TuiState) -> (&'static str, Color) {
-    let mode = composer_mode(app.input(), app.is_remote_mode());
-    if mode.is_shell() {
-        ("$", shell_mode_color())
-    } else if app.next_prompt_new_session_armed() {
-        ("↗", rgb(120, 200, 255))
-    } else if app.queue_mode() {
-        ("⏳", queued_color())
-    } else if let Some(ref conn) = app.connection_type() {
-        let lower = conn.to_lowercase();
-        if lower.contains("websocket") {
-            ("󰌘", rgb(100, 200, 180))
-        } else if lower.contains("subprocess") || lower.contains("cli") {
-            ("󰆍", rgb(180, 160, 220))
-        } else {
-            ("󰖟", rgb(140, 180, 255))
-        }
-    } else {
-        ("", asap_color())
-    }
-}
-
-fn draw_send_mode_indicator(frame: &mut Frame, app: &dyn TuiState, area: Rect) {
-    if area.width == 0 || area.height == 0 {
-        return;
-    }
-    let indicator_area = Rect {
-        x: area.x,
-        y: area.y + area.height.saturating_sub(1),
-        width: area.width,
-        height: 1,
-    };
-
-    let (icon, color) = send_mode_indicator(app);
-    if !icon.is_empty() {
-        let line = Line::from(Span::styled(icon, Style::default().fg(color)));
-        let paragraph = Paragraph::new(line).alignment(Alignment::Right);
-        frame.render_widget(paragraph, indicator_area);
-    }
 }
 
 #[derive(Clone, Copy)]
