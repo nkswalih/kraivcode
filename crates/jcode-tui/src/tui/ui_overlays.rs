@@ -1,8 +1,10 @@
 use super::{
     accent_color, ai_color, ai_text, asap_color, clear_area, dim_color, get_grouped_changelog,
     header_icon_color, header_name_color, header_session_color, pending_color, queued_color,
-    record_chat_overlay_copy_snapshot, rgb, tool_color, user_bg, user_color, user_text,
+    record_chat_overlay_copy_snapshot, render_rounded_box, rgb, tool_color, user_bg, user_color,
+    user_text,
 };
+use std::sync::{Mutex, OnceLock};
 use crate::tui::TuiState;
 use crate::tui::info_widget::WidgetPlacement;
 use ratatui::{
@@ -786,5 +788,188 @@ fn color_to_rgb(color: Color) -> Option<[u8; 3]> {
             Some([r, g, b])
         }
         _ => None,
+    }
+}
+
+/// Captured hit-test geometry of the floating model-detail card. Refreshed
+/// every frame by the renderer; consumed by mouse routing.
+#[derive(Debug, Clone)]
+pub(crate) struct ModelDetailPopupGeometry {
+    pub card: Rect,
+    pub buttons: Vec<(Rect, crate::tui::ModelDetailButton)>,
+}
+
+#[cfg(not(test))]
+static MODEL_DETAIL_POPUP_GEOMETRY: OnceLock<Mutex<Option<ModelDetailPopupGeometry>>> =
+    OnceLock::new();
+
+#[cfg(not(test))]
+fn model_detail_popup_geometry_slot()
+-> &'static Mutex<Option<ModelDetailPopupGeometry>> {
+    MODEL_DETAIL_POPUP_GEOMETRY.get_or_init(|| Mutex::new(None))
+}
+
+pub(crate) fn store_model_detail_popup_geometry(geometry: ModelDetailPopupGeometry) {
+    #[cfg(not(test))]
+    if let Ok(mut slot) = model_detail_popup_geometry_slot().lock() {
+        *slot = Some(geometry);
+    }
+    #[cfg(test)]
+    let _ = geometry;
+}
+
+pub(crate) fn model_detail_popup_geometry() -> Option<ModelDetailPopupGeometry> {
+    #[cfg(not(test))]
+    {
+        let guard = model_detail_popup_geometry_slot().lock().ok()?;
+        guard.clone()
+    }
+    #[cfg(test)]
+    {
+        None
+    }
+}
+
+/// Draw the right-click "Model details" card centered over `area`.
+///
+/// Renders key/value facts, the two action pills, and records their screen
+/// rects for mouse hit-testing. Called late in the frame so the card floats
+/// above the picker, transcript, and info widgets.
+pub(super) fn draw_model_detail_popup(frame: &mut Frame, area: Rect, popup: &crate::tui::ModelDetailPopup) {
+    use crate::tui::ModelDetailButton;
+
+    let dim_value_style = Style::default().fg(dim_color());
+    let value_style = Style::default().fg(user_text());
+    let kv = |key: &str, value: &str| -> Line<'static> {
+        Line::from(vec![
+            Span::styled(format!("{key:<11}"), dim_value_style),
+            Span::styled(value.to_string(), value_style),
+        ])
+    };
+
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    lines.push(kv("Model", popup.model_name.as_str()));
+    lines.push(kv("Spec", popup.model_spec.as_str()));
+    lines.push(kv("Provider", popup.provider_label.as_str()));
+    lines.push(kv("Login", popup.login_method.as_str()));
+    lines.push(kv("API", popup.api_method.as_str()));
+    lines.push(kv(
+        "Base URL",
+        popup.base_url.as_deref().unwrap_or("—"),
+    ));
+    let default_suffix = if popup.is_default { "  ◆ current default" } else { "" };
+    lines.push(kv(
+        "Status",
+        format!("{}{}", popup.status, default_suffix).as_str(),
+    ));
+
+    // Action pills.
+    let pill = |button: ModelDetailButton, selected: bool| -> (Span<'static>, usize) {
+        let label = button.label();
+        let text = format!("◖ {label} ◗");
+        let style = if selected {
+            Style::default()
+                .fg(user_color())
+                .bg(user_bg())
+                .add_modifier(Modifier::BOLD)
+        } else {
+            dim_value_style
+        };
+        (Span::styled(text, style), label.chars().count() + 4)
+    };
+    let (set_span, _) = pill(
+        ModelDetailButton::SetDefault,
+        popup.selected_button == ModelDetailButton::SetDefault,
+    );
+    let (sel_span, _) = pill(
+        ModelDetailButton::SelectSession,
+        popup.selected_button == ModelDetailButton::SelectSession,
+    );
+    let buttons_line = Line::from(vec![
+        Span::raw(" "),
+        set_span,
+        Span::raw("   "),
+        sel_span,
+        Span::raw(" "),
+    ]);
+    lines.push(Line::from(""));
+    lines.push(buttons_line);
+
+    let content_width = lines
+        .iter()
+        .map(|line| line.width())
+        .max()
+        .unwrap_or(0)
+        .clamp(30, area.width.saturating_sub(4) as usize);
+    let border_style = Style::default().fg(user_color());
+    let boxed = render_rounded_box("Model details", lines, content_width + 6, border_style);
+
+    let box_width = boxed.iter().map(|l| l.width()).max().unwrap_or(0) as u16;
+    let box_height = boxed.len() as u16;
+    if box_width == 0 || box_width > area.width || box_height + 2 > area.height {
+        return;
+    }
+    let card = Rect {
+        x: area.x + (area.width.saturating_sub(box_width)) / 2,
+        y: area.y + (area.height.saturating_sub(box_height)) / 2,
+        width: box_width,
+        height: box_height,
+    };
+
+    // Locate each pill's x range inside the composed plain text so click
+    // rects match what is on screen exactly.
+    let plain_for = |index: usize| -> String {
+        boxed
+            .get(index)
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .unwrap_or_default()
+    };
+    let button_line_index = boxed
+        .iter()
+        .position(|line| line.spans.iter().any(|span| span.content.contains('◖')))
+        .unwrap_or(0);
+    let button_plain = plain_for(button_line_index);
+    let mut button_rects: Vec<(Rect, ModelDetailButton)> = Vec::new();
+    let mut search_from = 0usize;
+    for (button, label) in [
+        (ModelDetailButton::SetDefault, ModelDetailButton::SetDefault.label()),
+        (
+            ModelDetailButton::SelectSession,
+            ModelDetailButton::SelectSession.label(),
+        ),
+    ] {
+        let needle_start = format!("◖ {label}");
+        if let Some(relative) = button_plain[search_from..].find(&needle_start) {
+            let start = search_from + relative;
+            let rect = Rect {
+                x: card.x + start as u16,
+                y: card.y + 1 + button_line_index as u16,
+                width: needle_start.chars().count() as u16 + 2, // + trailing ◗ and space
+                height: 1,
+            };
+            button_rects.push((rect, button));
+            search_from = start + needle_start.len();
+        }
+    }
+
+    store_model_detail_popup_geometry(ModelDetailPopupGeometry {
+        card,
+        buttons: button_rects,
+    });
+
+    frame.render_widget(ratatui::widgets::Clear, card);
+    for (index, line) in boxed.iter().enumerate() {
+        let row = Rect {
+            x: card.x,
+            y: card.y + index as u16,
+            width: card.width,
+            height: 1,
+        };
+        frame.render_widget(Paragraph::new(line.clone()), row);
     }
 }

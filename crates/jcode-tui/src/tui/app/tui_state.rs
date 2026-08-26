@@ -1948,6 +1948,10 @@ impl crate::tui::TuiState for App {
         self.normalized_copy_selection()
     }
 
+    fn model_detail_popup(&self) -> Option<crate::tui::ModelDetailPopup> {
+        self.model_detail_popup.clone()
+    }
+
     fn copy_selection_status(&self) -> Option<crate::tui::CopySelectionStatus> {
         if !self.copy_selection_mode {
             return None;

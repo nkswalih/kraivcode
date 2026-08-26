@@ -2703,6 +2703,12 @@ pub(super) fn handle_modal_key(
     code: KeyCode,
     modifiers: KeyModifiers,
 ) -> Result<bool> {
+    // The floating right-click model-detail popup sits above every other
+    // modal and claims all keys while open.
+    if app.model_detail_popup.is_some() {
+        return Ok(app.handle_model_detail_popup_key(code, modifiers));
+    }
+
     if app.prompt_history_search.is_some() {
         app.handle_prompt_history_search_key(code, modifiers);
         return Ok(true);

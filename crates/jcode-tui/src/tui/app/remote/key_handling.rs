@@ -276,6 +276,12 @@ async fn handle_remote_key_internal(
     let mut modifiers = modifiers;
     ctrl_bracket_fallback_to_esc(&mut code, &mut modifiers);
 
+    // Floating right-click model-detail popup claims all keys while open.
+    if app.model_detail_popup.is_some() {
+        let _ = app.handle_model_detail_popup_key(code, modifiers);
+        return Ok(());
+    }
+
     // Alt+5 always resets the simulator before modal routing, including in the
     // remote/client mode used by self-dev sessions.
     if app.handle_onboarding_sim_reset_shortcut(code, modifiers) {

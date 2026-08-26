@@ -1335,6 +1335,57 @@ impl App {
             }};
         }
 
+        if self.model_detail_popup.is_some() {
+            // The floating detail card claims all mouse input while open.
+            if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
+                match crate::tui::ui::model_detail_popup_geometry() {
+                    Some(geometry) => {
+                        let inside_card =
+                            rect_contains_point(geometry.card, mouse.column, mouse.row);
+                        let clicked = geometry
+                            .buttons
+                            .iter()
+                            .find(|(rect, _)| {
+                                rect_contains_point(*rect, mouse.column, mouse.row)
+                            })
+                            .map(|(_, button)| *button);
+                        match clicked {
+                            Some(button) => {
+                                let _ = self.activate_model_detail_button(button);
+                            }
+                            None => {
+                                if !inside_card {
+                                    self.close_model_detail_popup();
+                                }
+                            }
+                        }
+                    }
+                    None => self.close_model_detail_popup(),
+                }
+                finish_mouse_event!(false, "model_detail_popup_click");
+            }
+            finish_mouse_event!(false, "model_detail_popup_hover");
+        }
+
+        // Right-click a runtime /model picker row to open its detail popup.
+        if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Right))
+            && let Some(rows) = crate::tui::ui::model_picker_rows_geometry()
+            && rect_contains_point(rows.area, mouse.column, mouse.row)
+            && let Some(picker) = self.inline_interactive_state.as_ref()
+            && picker.kind == crate::tui::PickerKind::Model
+            && self.runtime_model_picker_is_open()
+        {
+            let offset = (mouse.row - rows.area.y) as usize * rows.row_height.max(1) as usize;
+            let index = rows.first_visible_index + offset;
+            if index < picker.filtered.len() {
+                let entry_index = picker.filtered[index];
+                if self.open_model_detail_popup(entry_index) {
+                    finish_mouse_event!(false, "model_detail_popup_open");
+                }
+            }
+            finish_mouse_event!(false, "model_detail_popup_right_click");
+        }
+
         if self.changelog_scroll.is_some() {
             match mouse.kind {
                 MouseEventKind::ScrollUp => {
@@ -1948,4 +1999,11 @@ impl App {
     pub(super) fn debug_scroll_bottom(&mut self) {
         self.follow_chat_bottom();
     }
+}
+
+fn rect_contains_point(rect: Rect, column: u16, row: u16) -> bool {
+    column >= rect.x
+        && column < rect.x.saturating_add(rect.width)
+        && row >= rect.y
+        && row < rect.y.saturating_add(rect.height)
 }
