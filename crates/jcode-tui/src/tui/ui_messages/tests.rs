@@ -1622,6 +1622,7 @@ fn render_assistant_message_truncates_tool_calls_to_single_line() {
         duration_secs: None,
         title: None,
         tool_data: None,
+        pasted_segments: None,
     };
 
     let lines = render_assistant_message(&msg, 20, crate::config::DiffDisplayMode::Off);
@@ -1668,6 +1669,7 @@ fn render_assistant_message_centers_single_line_tool_summary() {
         duration_secs: None,
         title: None,
         tool_data: None,
+        pasted_segments: None,
     };
 
     let lines = render_assistant_message(&msg, 28, crate::config::DiffDisplayMode::Off);
@@ -1714,6 +1716,7 @@ fn render_assistant_message_without_body_does_not_add_extra_blank_line_before_to
         duration_secs: None,
         title: None,
         tool_data: None,
+        pasted_segments: None,
     };
 
     let lines = render_assistant_message(&msg, 28, crate::config::DiffDisplayMode::Off);

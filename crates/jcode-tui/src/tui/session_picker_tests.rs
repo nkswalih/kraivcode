@@ -42,6 +42,7 @@ fn make_session_with_flags(
             content: "hello".to_string(),
             tool_calls: Vec::new(),
             tool_data: None,
+            pasted_segments: None,
             timestamp: None,
         },
         PreviewMessage {
@@ -49,6 +50,7 @@ fn make_session_with_flags(
             content: "world".to_string(),
             tool_calls: Vec::new(),
             tool_data: None,
+            pasted_segments: None,
             timestamp: None,
         },
     ];
@@ -692,6 +694,7 @@ fn benchmark_resume_search_reports_incremental_timings() {
                 content: format!("benchmark transcript content alpha beta zebra-token-{idx:03}"),
                 tool_calls: Vec::new(),
                 tool_data: None,
+                pasted_segments: None,
                 timestamp: None,
             }];
             session.search_index = build_search_index(
@@ -1461,6 +1464,7 @@ fn make_session_with_many_turns(id: &str, turns: usize) -> SessionInfo {
             content: format!("user prompt number {i}"),
             tool_calls: Vec::new(),
             tool_data: None,
+            pasted_segments: None,
             timestamp: None,
         });
         preview.push(PreviewMessage {
@@ -1468,6 +1472,7 @@ fn make_session_with_many_turns(id: &str, turns: usize) -> SessionInfo {
             content: format!("assistant reply number {i}"),
             tool_calls: Vec::new(),
             tool_data: None,
+            pasted_segments: None,
             timestamp: None,
         });
     }
@@ -1512,6 +1517,7 @@ fn bench_preview_messages(turns: usize, assistant_paragraphs: usize) -> Vec<Prev
             ),
             tool_calls: Vec::new(),
             tool_data: None,
+            pasted_segments: None,
             timestamp: None,
         });
 
@@ -1533,6 +1539,7 @@ fn bench_preview_messages(turns: usize, assistant_paragraphs: usize) -> Vec<Prev
             content: body,
             tool_calls: Vec::new(),
             tool_data: None,
+            pasted_segments: None,
             timestamp: None,
         });
     }

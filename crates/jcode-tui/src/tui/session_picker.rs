@@ -1730,6 +1730,7 @@ impl SessionPicker {
                 duration_secs: None,
                 title: None,
                 tool_data: msg.tool_data.clone(),
+                pasted_segments: None,
             };
 
             match msg.role.as_str() {
@@ -1819,6 +1820,7 @@ impl SessionPicker {
                             duration_secs: None,
                             title: None,
                             tool_data: msg.tool_data.clone(),
+                            pasted_segments: None,
                         },
                         assistant_width,
                         crate::config::DiffDisplayMode::Off,
@@ -1837,6 +1839,7 @@ impl SessionPicker {
                             duration_secs: None,
                             title: None,
                             tool_data: msg.tool_data.clone(),
+                            pasted_segments: None,
                         },
                         assistant_width,
                         crate::config::DiffDisplayMode::Off,

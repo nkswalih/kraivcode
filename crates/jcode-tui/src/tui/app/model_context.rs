@@ -1483,6 +1483,7 @@ pub(super) fn handle_model_command(app: &mut App, trimmed: &str) -> bool {
                     duration_secs: None,
                     title: None,
                     tool_data: None,
+                    pasted_segments: None,
                 });
                 app.set_status_notice(format!("Model → {}", model_name));
             }

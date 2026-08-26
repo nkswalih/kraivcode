@@ -782,6 +782,7 @@ impl App {
                 duration_secs: None,
                 title: None,
                 tool_data: msg.tool_data,
+                pasted_segments: None,
             })
             .collect();
         self.apply_compacted_history_window(

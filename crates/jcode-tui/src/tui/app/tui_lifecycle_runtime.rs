@@ -350,6 +350,7 @@ impl App {
                         duration_secs: None,
                         title: None,
                         tool_data: None,
+                        pasted_segments: None,
                     });
                 } else {
                     restored_model = true;
@@ -397,6 +398,7 @@ impl App {
                     duration_secs: None,
                     title: None,
                     tool_data: None,
+                    pasted_segments: None,
                 });
             }
 
@@ -467,6 +469,7 @@ impl App {
                     duration_secs: None,
                     title: None,
                     tool_data: None,
+                    pasted_segments: None,
                 });
             }
         }
@@ -661,6 +664,7 @@ pub(super) fn handle_dev_command(app: &mut App, trimmed: &str) -> bool {
                 duration_secs: None,
                 title: None,
                 tool_data: None,
+                pasted_segments: None,
             });
             return true;
         }
@@ -671,6 +675,7 @@ pub(super) fn handle_dev_command(app: &mut App, trimmed: &str) -> bool {
             duration_secs: None,
             title: None,
             tool_data: None,
+            pasted_segments: None,
         });
         app.session.provider_session_id = app.provider_session_id.clone();
         app.session
@@ -690,6 +695,7 @@ pub(super) fn handle_dev_command(app: &mut App, trimmed: &str) -> bool {
             duration_secs: None,
             title: None,
             tool_data: None,
+            pasted_segments: None,
         });
         app.session.provider_session_id = app.provider_session_id.clone();
         app.session

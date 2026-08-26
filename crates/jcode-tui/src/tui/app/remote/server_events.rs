@@ -406,6 +406,7 @@ mod history_dedup_tests {
             content: content.to_string(),
             tool_calls: None,
             tool_data: None,
+            pasted_segments: None,
         }
     }
 
@@ -1033,6 +1034,7 @@ pub(in crate::tui::app) fn handle_server_event(
                         duration_secs: app.display_turn_duration_secs(),
                         title: None,
                         tool_data: None,
+                        pasted_segments: None,
                     });
                 }
             }
@@ -1153,6 +1155,7 @@ pub(in crate::tui::app) fn handle_server_event(
                             duration_secs: duration,
                             title: None,
                             tool_data: None,
+                            pasted_segments: None,
                         });
                     }
                     app.push_turn_footer(duration);
@@ -1292,6 +1295,7 @@ pub(in crate::tui::app) fn handle_server_event(
                 duration_secs: None,
                 title: None,
                 tool_data: None,
+                pasted_segments: None,
             });
             app.is_processing = false;
             app.status = ProcessingStatus::Idle;
@@ -1861,6 +1865,7 @@ pub(in crate::tui::app) fn handle_server_event(
                                 duration_secs: None,
                                 title: None,
                                 tool_data: msg.tool_data,
+                                pasted_segments: None,
                             })
                             .collect();
                         app.replace_display_messages(restored_messages);
@@ -2066,6 +2071,7 @@ pub(in crate::tui::app) fn handle_server_event(
                     duration_secs: None,
                     title: None,
                     tool_data: msg.tool_data,
+                    pasted_segments: None,
                 })
                 .collect();
             app.apply_compacted_history_window(
@@ -2434,6 +2440,7 @@ pub(in crate::tui::app) fn handle_server_event(
                         duration_secs: duration,
                         title: None,
                         tool_data: None,
+                        pasted_segments: None,
                     });
                 }
                 app.push_turn_footer(duration);
@@ -2463,6 +2470,7 @@ pub(in crate::tui::app) fn handle_server_event(
                     duration_secs: None,
                     title: None,
                     tool_data: None,
+                    pasted_segments: None,
                 });
             }
             if let Some(n) = tools_skipped {

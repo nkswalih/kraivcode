@@ -526,6 +526,7 @@ fn user_history_message(content: &str) -> crate::protocol::HistoryMessage {
         content: content.to_string(),
         tool_calls: None,
         tool_data: None,
+        pasted_segments: None,
     }
 }
 

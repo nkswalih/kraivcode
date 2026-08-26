@@ -878,6 +878,7 @@ impl App {
                 duration_secs: None,
                 title: None,
                 tool_data: None,
+                pasted_segments: None,
             });
             let _ = self.session.add_message(role, kept_blocks);
         }

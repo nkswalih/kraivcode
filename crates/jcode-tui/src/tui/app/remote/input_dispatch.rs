@@ -124,13 +124,12 @@ pub(in crate::tui::app) async fn submit_prepared_remote_input(
     // offer (and its staged resend): the user chose to continue differently.
     app.clear_pending_fallback_offer();
     // Remember the typed prompt so we can restore it to the input box if this turn
-    // fails (e.g. "token refresh needed"), instead of dropping it.
-    app.last_submitted_input = Some(prepared.raw_input.clone());
-    app.push_display_message(if prepared.has_pasted_content {
-        DisplayMessage::pasted_user(prepared.raw_input)
-    } else {
-        DisplayMessage::user(prepared.raw_input)
-    });
+    // fails (e.g. "token refresh needed"), instead of dropping it. Restore the
+    // expanded text so recall never shows compact paste placeholders.
+    app.last_submitted_input = Some(prepared.expanded.clone());
+    let mut echo = DisplayMessage::user(prepared.expanded.clone());
+    echo.pasted_segments = prepared.segments;
+    app.push_display_message(echo);
     let _ = app
         .begin_remote_send(remote, prepared.expanded, prepared.images, false)
         .await;
@@ -221,6 +220,7 @@ pub(in crate::tui::app) async fn submit_remote_slash_input(
             expanded: expanded_prompt,
             images: prepared.images,
             has_pasted_content: prepared.has_pasted_content,
+                    segments: prepared.segments.clone(),
         },
     )
     .await
@@ -254,6 +254,7 @@ pub(in crate::tui::app) async fn route_prepared_input_to_new_remote_session(
                     expanded: prompt.content,
                     images: prompt.images,
                     has_pasted_content: prepared.has_pasted_content,
+                    segments: prepared.segments.clone(),
                 });
             app.pending_split_model_override = None;
             app.pending_split_provider_key_override = None;
@@ -277,6 +278,7 @@ pub(in crate::tui::app) async fn route_prepared_input_to_new_remote_session(
                 expanded: prompt.content,
                 images: prompt.images,
                 has_pasted_content: prepared.has_pasted_content,
+                    segments: prepared.segments.clone(),
             });
         app.pending_split_model_override = None;
         app.pending_split_provider_key_override = None;
@@ -394,11 +396,9 @@ async fn submit_remote_transcript_input(
     match app.send_action(false) {
         SendAction::Submit => {
             let prepared = input::take_prepared_input(app);
-            app.push_display_message(if prepared.has_pasted_content {
-                DisplayMessage::pasted_user(prepared.raw_input)
-            } else {
-                DisplayMessage::user(prepared.raw_input)
-            });
+            let mut echo = DisplayMessage::user(prepared.expanded.clone());
+            echo.pasted_segments = prepared.segments;
+            app.push_display_message(echo);
             app.begin_remote_send(remote, prepared.expanded, prepared.images, false)
                 .await?;
         }
