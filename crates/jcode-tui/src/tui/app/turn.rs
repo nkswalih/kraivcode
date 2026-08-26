@@ -75,7 +75,14 @@ impl App {
                 self.handle_compaction_event(event);
             }
 
-            let tools = self.registry.definitions(None).await;
+            // Permission-based tool filtering: each persona declares an allowlist
+            // that determines which tools the model can see.  The model never
+            // receives definitions for blocked tools — zero token cost, hard
+            // enforcement (OpenCode-style).
+            let persona_policy = super::agent_persona::persona_tool_policy(self.agent_mode);
+            let tools = self.registry
+                .definitions(persona_policy.allowed_tools.as_ref())
+                .await;
             // Non-blocking memory: uses pending result from last turn, spawns check for next turn
             let memory_pending = self.build_memory_prompt_nonblocking(&provider_messages);
             // Use split prompt for better caching - static content cached, dynamic not
@@ -1292,67 +1299,64 @@ impl App {
                 let tool_name = tc.name.clone();
                 let tool_input = tc.input.clone();
 
-                // Persona tool gate (Plan persona = read-only; secret reads
-                // require explicit approval via the in-chat permission panel).
-                // Every arm yields a boxed future with the same output type as
-                // registry.execute, so the poll loop below is unchanged.
+                // Secret-path guard: under the Plan persona, reading files
+                // that look like secrets (.env, .pem, .ssh/…) requires user
+                // approval via the in-chat permission panel.  Write/edit/bash
+                // are already blocked at the *definition* level (the model
+                // never sees them), so we only need this runtime check for
+                // reads that slip through the allowlist.
                 use futures::FutureExt;
-                let mut tool_future = match super::agent_persona::gate_plan_tool(
-                    &tool_name,
-                    &tool_input,
-                ) {
-                    super::agent_persona::ToolGateDecision::Allow => std::pin::pin!(
-                        registry
-                            .execute(&tool_name, tool_input.clone(), ctx)
-                            .boxed()
-                    ),
-                    super::agent_persona::ToolGateDecision::Deny(message) => std::pin::pin!(
-                        async move { Err(anyhow::anyhow!(message)) }.boxed()
-                    ),
-                    super::agent_persona::ToolGateDecision::NeedsPermission { reason } => {
-                        let path = ["file_path", "path", "absolute_path"]
-                            .iter()
-                            .find_map(|key| {
-                                tool_input.get(*key).and_then(|value| value.as_str())
-                            })
-                            .unwrap_or_default()
-                            .to_string();
-                        let (sender, receiver) =
-                            tokio::sync::oneshot::channel::<
-                                crate::tui::PermissionPanelDecision,
-                            >();
-                        self.open_permission_panel(
-                            crate::tui::PermissionPanelRequest {
-                                tool_name: tool_name.clone(),
-                                path,
-                                reason,
-                            },
-                            sender,
-                        );
-                        let registry = registry.clone();
-                        let tool_name = tool_name.clone();
-                        let tool_input = tool_input.clone();
-                        std::pin::pin!(
-                            async move {
-                                use crate::tui::PermissionPanelDecision;
-                                match receiver.await {
-                                    Ok(PermissionPanelDecision::Deny) => Err(
-                                        anyhow::anyhow!("Permission denied by user."),
-                                    ),
-                                    Ok(_) => {
-                                        registry
-                                            .execute(&tool_name, tool_input, ctx)
-                                            .await
+                let mut tool_future =
+                    match super::agent_persona::gate_plan_tool(&tool_name, &tool_input) {
+                        super::agent_persona::ToolGateDecision::Allow => std::pin::pin!(
+                            registry
+                                .execute(&tool_name, tool_input.clone(), ctx)
+                                .boxed()
+                        ),
+                        super::agent_persona::ToolGateDecision::NeedsPermission { reason } => {
+                            let path = ["file_path", "path", "absolute_path"]
+                                .iter()
+                                .find_map(|key| {
+                                    tool_input.get(*key).and_then(|value| value.as_str())
+                                })
+                                .unwrap_or_default()
+                                .to_string();
+                            let (sender, receiver) =
+                                tokio::sync::oneshot::channel::<
+                                    crate::tui::PermissionPanelDecision,
+                                >();
+                            self.open_permission_panel(
+                                crate::tui::PermissionPanelRequest {
+                                    tool_name: tool_name.clone(),
+                                    path,
+                                    reason,
+                                },
+                                sender,
+                            );
+                            let registry = registry.clone();
+                            let tool_name = tool_name.clone();
+                            let tool_input = tool_input.clone();
+                            std::pin::pin!(
+                                async move {
+                                    use crate::tui::PermissionPanelDecision;
+                                    match receiver.await {
+                                        Ok(PermissionPanelDecision::Deny) => Err(
+                                            anyhow::anyhow!("Permission denied by user."),
+                                        ),
+                                        Ok(_) => {
+                                            registry
+                                                .execute(&tool_name, tool_input, ctx)
+                                                .await
+                                        }
+                                        Err(_) => Err(anyhow::anyhow!(
+                                            "Permission request cancelled."
+                                        )),
                                     }
-                                    Err(_) => Err(anyhow::anyhow!(
-                                        "Permission request cancelled."
-                                    )),
                                 }
-                            }
-                            .boxed()
-                        )
-                    }
-                };
+                                .boxed()
+                            )
+                        }
+                    };
 
                 let tool_start = Instant::now();
                 let _tool_work = crate::logging::watchdog::begin_work("turn.tool");
