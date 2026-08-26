@@ -1088,6 +1088,14 @@ impl App {
         self.open_model_picker_inner(false);
     }
 
+    /// True while a slash-command picker or the right-click model detail
+    /// popup is open. Terminals treat right-click as paste; letting that
+    /// clipboard text through would leak it into the composer draft behind
+    /// the modal, or inject Enter commits into the picker itself.
+    pub(super) fn paste_input_suppressed(&self) -> bool {
+        self.model_detail_popup.is_some() || self.inline_interactive_state.is_some()
+    }
+
     /// True while the runtime `/model` picker (the one whose entries carry
     /// Model actions) is open.
     pub(super) fn runtime_model_picker_is_open(&self) -> bool {
@@ -1172,7 +1180,7 @@ impl App {
                     }
                 }
                 self.push_display_message(DisplayMessage::system(format!(
-                    "Saved default model: {} via {}. This affects future sessions.",
+                    "Default model set: {} via {} — applies the next time Kraivcode starts. The current session is unchanged.",
                     model_spec,
                     provider_key.as_deref().unwrap_or("auto")
                 )));
@@ -1289,7 +1297,7 @@ impl App {
                 };
                 if self.is_remote {
                     self.set_status_notice(
-                        "Default model is managed by the remote server for this session",
+                        "Remote session: this server manages its own default model",
                     );
                     return true;
                 }
@@ -3433,6 +3441,19 @@ impl App {
         code: KeyCode,
         modifiers: KeyModifiers,
     ) -> Result<()> {
+        use crate::tui::app::input::paste_burst_enter_is_synthetic;
+        // Terminals without bracketed-paste support inject right-click paste
+        // as raw key events. While a picker is open, an injected Enter storm
+        // must never commit a model/agent selection, and injected CR/LF must
+        // not pollute the filter box.
+        if paste_burst_enter_is_synthetic()
+            && matches!(
+                code,
+                KeyCode::Enter | KeyCode::Char('\r') | KeyCode::Char('\n')
+            )
+        {
+            return Ok(());
+        }
         match code {
             KeyCode::Esc => {
                 if let Some(ref mut picker) = self.inline_interactive_state

@@ -42,7 +42,7 @@ thread_local! {
 
 /// Record one handled key event. Call exactly once per key event, before any
 /// dispatch decision that consults [`enter_is_synthetic`].
-pub(super) fn note_key_event() {
+pub(in crate::tui::app) fn note_key_event() {
     let now = Instant::now();
     KEY_TIMES.with(|cell| {
         let mut ring = cell.borrow_mut();
@@ -56,7 +56,7 @@ pub(super) fn note_key_event() {
 /// True when the current Enter arrives inside a fast injection burst:
 /// at most [`BURST_GAP`] since the previous event AND at least
 /// [`MIN_BURST_EVENTS`] events within the trailing [`BURST_WINDOW`].
-pub(super) fn enter_is_synthetic() -> bool {
+pub(in crate::tui::app) fn enter_is_synthetic() -> bool {
     KEY_TIMES.with(|cell| {
         let ring = cell.borrow();
         let Some(&last) = ring.iter().next_back() else {
