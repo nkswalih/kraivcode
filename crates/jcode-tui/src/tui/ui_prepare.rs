@@ -1425,14 +1425,13 @@ fn render_message_into(
     }
     let align = default_message_alignment(role, centered);
 
-    // Tighter spacing: only add blank line before user messages (not assistant).
-    // User messages have the ┃ border so they're visually distinct already.
-    // Tool/meta/swarm messages never get blank lines between them.
-    // The blank line carries the ┃ gutter so the border is continuous across
-    // the entire user message block (including padding rows).
+    // Black break above user block: a plain blank line (no gutter, no bg)
+    // separates the user message from whatever came before, matching how
+    // AI/thinking/error messages all have breathing room around them.
     if (acc.body_has_content || !acc.lines.is_empty())
         && role == "user"
     {
+        acc.push_blank();
         let padding_idx = acc.lines.len();
         let padding_line = Line::from(vec![
             Span::styled("┃ ", user_border_style()),

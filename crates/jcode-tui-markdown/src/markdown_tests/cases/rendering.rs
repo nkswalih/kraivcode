@@ -1148,3 +1148,59 @@ fn test_reasoning_summary_line_markup_folds_to_single_dim_italic_trace() {
     }
     assert!(saw_marker, "summary marker '▸' must be visible: {lines:?}");
 }
+
+#[test]
+fn test_user_message_gutter_preserved_on_blank_lines_within_content() {
+    use ratatui::style::Style;
+
+    let gutter_style = Style::default().fg(ratatui::style::Color::Yellow);
+    let bg_style = Style::default().bg(ratatui::style::Color::Rgb(18, 18, 14));
+    let border_prefix = "┃ ";
+
+    // Simulate user content with blank line between paragraphs:
+    // "line 1\n\nline 2" -> each line gets ┃ prefix
+    let content_lines = vec!["line 1", "", "line 2"];
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    for content_line in &content_lines {
+        let mut spans = vec![Span::styled(border_prefix, gutter_style)];
+        spans.push(Span::styled(content_line.to_string(), Style::default()));
+        lines.push(Line::from(spans).style(bg_style));
+    }
+
+    let wrapped = wrap_lines(lines, 40);
+    let rendered: Vec<String> = wrapped.iter().map(line_to_string).collect();
+
+    assert_eq!(rendered.len(), 3, "expected 3 lines: {rendered:?}");
+    assert!(
+        rendered.iter().all(|line| line.starts_with("┃ ")),
+        "every line including blank lines must have the ┃ gutter: {rendered:?}"
+    );
+    // Verify the blank line still has the gutter (just ┃ with no content after)
+    assert_eq!(rendered[1], "┃ ", "blank line should be just gutter: {rendered:?}");
+}
+
+#[test]
+fn test_user_message_gutter_preserved_on_wrapped_continuations() {
+    use ratatui::style::Style;
+
+    let gutter_style = Style::default().fg(ratatui::style::Color::Yellow);
+    let content = "who am i and what i am doing with my life right now";
+    let border_prefix = "┃ ";
+
+    let line = Line::from(vec![
+        Span::styled(border_prefix, gutter_style),
+        Span::styled(content.to_string(), Style::default()),
+    ]);
+
+    let wrapped = wrap_line(line, 20);
+    let rendered: Vec<String> = wrapped.iter().map(line_to_string).collect();
+
+    assert!(
+        rendered.len() >= 2,
+        "expected at least 2 wrapped lines: {rendered:?}"
+    );
+    assert!(
+        rendered.iter().all(|line| line.starts_with("┃ ")),
+        "every wrapped continuation must preserve the ┃ gutter: {rendered:?}"
+    );
+}

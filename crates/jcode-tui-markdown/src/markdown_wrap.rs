@@ -22,18 +22,30 @@ pub fn wrap_line(
     });
 
     let seed_repeated_prefix =
-        |current_spans: &mut Vec<Span<'static>>, current_width: &mut usize, pending: &mut bool| {
+        |current_spans: &mut Vec<Span<'static>>,
+         current_width: &mut usize,
+         current_has_content: &mut bool,
+         pending: &mut bool| {
             if *pending {
                 if let Some((prefix_spans, prefix_width)) = &repeated_prefix {
                     current_spans.extend(prefix_spans.iter().cloned());
                     *current_width = *prefix_width;
+                    // The gutter prefix itself counts as content so trailing
+                    // spaces (part of the prefix token) are not dropped on
+                    // blank lines like "┃ ".
+                    *current_has_content = true;
                 }
                 *pending = false;
             }
         };
 
-    if let Some(balanced) = wrap_line_balanced(&line, width) {
-        return balanced;
+    // Skip balanced wrapping when a repeated gutter prefix is present
+    // (e.g. ┃ for user borders, │ for blockquotes). Balanced wrapping
+    // does not preserve the prefix on continuation lines.
+    if repeated_prefix.is_none() {
+        if let Some(balanced) = wrap_line_balanced(&line, width) {
+            return balanced;
+        }
     }
 
     let initial_prefix_width = repeated_prefix
@@ -113,6 +125,7 @@ pub fn wrap_line(
                 seed_repeated_prefix(
                     &mut current_spans,
                     &mut current_width,
+                    &mut current_has_content,
                     &mut pending_repeated_prefix,
                 );
                 let char_width = c.width().unwrap_or(0);
@@ -140,6 +153,7 @@ pub fn wrap_line(
                     seed_repeated_prefix(
                         &mut current_spans,
                         &mut current_width,
+                        &mut current_has_content,
                         &mut pending_repeated_prefix,
                     );
                 }
@@ -180,6 +194,7 @@ pub fn wrap_line(
             seed_repeated_prefix(
                 &mut current_spans,
                 &mut current_width,
+                &mut current_has_content,
                 &mut pending_repeated_prefix,
             );
             for piece in &token.word {
