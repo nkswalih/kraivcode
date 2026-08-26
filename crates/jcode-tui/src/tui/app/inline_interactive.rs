@@ -1230,6 +1230,8 @@ impl App {
 
     /// Open the right-click detail card for a Model picker entry.
     pub(super) fn open_model_detail_popup(&mut self, entry_index: usize) -> bool {
+        // Any previous popup's pill rects are stale by definition.
+        crate::tui::ui::clear_model_detail_popup_geometry();
         let Some(ref picker) = self.inline_interactive_state else {
             return false;
         };
@@ -1277,11 +1279,13 @@ impl App {
             selected_button: crate::tui::ModelDetailButton::SetDefault,
             button_rects: Vec::new(),
             card_rect: ratatui::layout::Rect::default(),
+            opened_at: std::time::Instant::now(),
         });
         true
     }
 
     pub(super) fn close_model_detail_popup(&mut self) {
+        crate::tui::ui::clear_model_detail_popup_geometry();
         self.model_detail_popup = None;
     }
 

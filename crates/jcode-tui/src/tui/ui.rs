@@ -77,7 +77,9 @@ mod onboarding;
 mod output_style;
 #[path = "ui_overlays.rs"]
 mod overlays;
-pub(crate) use overlays::model_detail_popup_geometry;
+pub(crate) use overlays::{
+    clear_model_detail_popup_geometry, model_detail_popup_geometry,
+};
 #[path = "ui_pinned.rs"]
 mod pinned_ui;
 #[path = "ui_prepare.rs"]

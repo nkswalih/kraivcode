@@ -1336,7 +1336,9 @@ impl App {
         }
 
         if self.model_detail_popup.is_some() {
-            // The floating detail card claims all mouse input while open.
+            // While open: left-click activates pills or dismisses the card;
+            // right-click RE-TARGETS the popup to the row under the cursor.
+            let retarget = matches!(mouse.kind, MouseEventKind::Down(MouseButton::Right));
             if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
                 match crate::tui::ui::model_detail_popup_geometry() {
                     Some(geometry) => {
@@ -1349,12 +1351,21 @@ impl App {
                                 rect_contains_point(*rect, mouse.column, mouse.row)
                             })
                             .map(|(_, button)| *button);
+                        // Same-gesture phantom clicks right after open are
+                        // ignored entirely.
+                        let fresh = self
+                            .model_detail_popup
+                            .as_ref()
+                            .is_some_and(|popup| {
+                                popup.opened_at.elapsed()
+                                    < std::time::Duration::from_millis(150)
+                            });
                         match clicked {
-                            Some(button) => {
+                            Some(button) if !fresh => {
                                 let _ = self.activate_model_detail_button(button);
                             }
-                            None => {
-                                if !inside_card {
+                            _ => {
+                                if !inside_card && !fresh {
                                     self.close_model_detail_popup();
                                 }
                             }
@@ -1363,8 +1374,30 @@ impl App {
                     None => self.close_model_detail_popup(),
                 }
                 finish_mouse_event!(false, "model_detail_popup_click");
+            } else if retarget {
+                let entry_index = self
+                    .inline_interactive_state
+                    .as_ref()
+                    .zip(crate::tui::ui::model_picker_rows_geometry())
+                    .filter(|(picker, rows)| {
+                        picker.kind == crate::tui::PickerKind::Model
+                            && rect_contains_point(rows.area, mouse.column, mouse.row)
+                    })
+                    .and_then(|(picker, rows)| {
+                        let offset = (mouse.row - rows.area.y) as usize
+                            * rows.row_height.max(1) as usize;
+                        picker
+                            .filtered
+                            .get(rows.first_visible_index + offset)
+                            .copied()
+                    });
+                if let Some(entry_index) = entry_index {
+                    let _ = self.open_model_detail_popup(entry_index);
+                }
+                finish_mouse_event!(false, "model_detail_popup_retarget");
+            } else {
+                finish_mouse_event!(false, "model_detail_popup_hover");
             }
-            finish_mouse_event!(false, "model_detail_popup_hover");
         }
 
         // Click (left or right) a runtime /model picker row to open its

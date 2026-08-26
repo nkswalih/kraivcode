@@ -830,6 +830,17 @@ pub(crate) fn model_detail_popup_geometry() -> Option<ModelDetailPopupGeometry> 
     }
 }
 
+/// Forget recorded pill/card rects. Must run whenever the popup opens or
+/// closes — stale rects made later clicks silently fire "Set as default".
+pub(crate) fn clear_model_detail_popup_geometry() {
+    #[cfg(not(test))]
+    if let Ok(mut slot) = model_detail_popup_geometry_slot().lock() {
+        *slot = None;
+    }
+    #[cfg(test)]
+    {}
+}
+
 /// Draw the right-click "Model details" card centered over `area`.
 ///
 /// Renders key/value facts, the two action pills, and records their screen
