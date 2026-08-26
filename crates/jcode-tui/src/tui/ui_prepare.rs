@@ -1428,13 +1428,17 @@ fn render_message_into(
     // Tighter spacing: only add blank line before user messages (not assistant).
     // User messages have the ┃ border so they're visually distinct already.
     // Tool/meta/swarm messages never get blank lines between them.
-    // The blank line is registered as a user line so the viewport fill covers
-    // it with the user_bg color, creating a solid top-padding block.
+    // The blank line carries the ┃ gutter so the border is continuous across
+    // the entire user message block (including padding rows).
     if (acc.body_has_content || !acc.lines.is_empty())
         && role == "user"
     {
         let padding_idx = acc.lines.len();
-        acc.push_blank();
+        let padding_line = Line::from(vec![
+            Span::styled("┃ ", user_border_style()),
+        ])
+        .style(Style::default().bg(user_bg()));
+        acc.push_auto(padding_line);
         acc.user_line_indices.push(padding_idx);
     }
 
@@ -1469,16 +1473,24 @@ fn render_message_into(
                     }
                 }
             }
-            // Bottom padding blank line: registered as a user line so the
+            // Bottom padding with ┃ gutter: registered as a user line so the
             // viewport fill covers it with user_bg, creating a solid
-            // bottom-padding block between this user message and the next.
+            // bottom-padding block with continuous border.
             {
                 let padding_idx = acc.lines.len();
-                acc.push_blank();
+                let padding_line = Line::from(vec![
+                    Span::styled("┃ ", user_border_style()),
+                ])
+                .style(Style::default().bg(user_bg()));
+                acc.push_auto(padding_line);
                 acc.user_line_indices.push(padding_idx);
             }
         }
         "assistant" => {
+            // Gap between user and AI messages: a plain blank line.
+            if acc.body_has_content || !acc.lines.is_empty() {
+                acc.push_blank();
+            }
             let content_width = width.saturating_sub(4);
             let cached = get_cached_message_lines(
                 msg,
