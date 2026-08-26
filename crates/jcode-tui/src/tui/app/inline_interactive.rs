@@ -1093,7 +1093,9 @@ impl App {
     /// clipboard text through would leak it into the composer draft behind
     /// the modal, or inject Enter commits into the picker itself.
     pub(super) fn paste_input_suppressed(&self) -> bool {
-        self.model_detail_popup.is_some() || self.inline_interactive_state.is_some()
+        self.model_detail_popup.is_some()
+            || self.inline_interactive_state.is_some()
+            || !self.command_suggestions().is_empty()
     }
 
     /// True while the runtime `/model` picker (the one whose entries carry
@@ -1295,12 +1297,6 @@ impl App {
                 let Some(entry_index) = entry_index else {
                     return true;
                 };
-                if self.is_remote {
-                    self.set_status_notice(
-                        "Remote session: this server manages its own default model",
-                    );
-                    return true;
-                }
                 self.set_runtime_model_entry_default(entry_index);
                 true
             }

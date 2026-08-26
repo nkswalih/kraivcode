@@ -867,6 +867,12 @@ async fn handle_remote_key_internal(
     }
 
     if let Some(text) = text_input.or_else(|| input::text_input_for_key(code, modifiers)) {
+        // Drop injected right-click paste floods while a modal owns input.
+        if app.paste_input_suppressed()
+            && crate::tui::app::input::paste_burst_enter_is_synthetic()
+        {
+            return Ok(());
+        }
         if input::handle_raw_paste_newline_text(app, &text) {
             return Ok(());
         }
