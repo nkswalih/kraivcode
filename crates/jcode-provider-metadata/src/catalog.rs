@@ -360,6 +360,27 @@ pub const OLLAMA_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
     requires_api_key: false,
 };
 
+pub const OMNIROUTE_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
+    id: "omniroute",
+    display_name: "Omniroute",
+    api_base: "http://localhost:20128",
+    api_key_env: "OMNIROUTE_API_KEY",
+    env_file: "omniroute.env",
+    setup_url: "https://github.com/1jehuang/jcode#openai-compatible-providers",
+    default_model: None,
+    requires_api_key: false,
+};
+
+pub const AGENTROUTER_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
+    id: "agentrouter",
+    display_name: "AgentRouter",
+    api_base: "https://agentrouter.org/v1",
+    api_key_env: "AGENTROUTER_API_KEY",
+    env_file: "agentrouter.env",
+    setup_url: "https://agentrouter.org",
+    default_model: None,
+    requires_api_key: true,
+};
 pub const CHUTES_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
     id: "chutes",
     display_name: "Chutes",
@@ -454,7 +475,7 @@ pub const OPENAI_COMPAT_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfi
     requires_api_key: true,
 };
 
-pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 39] = [
+pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 41] = [
     OPENCODE_PROFILE,
     OPENCODE_GO_PROFILE,
     ZAI_PROFILE,
@@ -493,6 +514,8 @@ pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 39] = [
     CELERIS_PROFILE,
     LMSTUDIO_PROFILE,
     OLLAMA_PROFILE,
+    OMNIROUTE_PROFILE,
+    AGENTROUTER_PROFILE,
     OPENAI_COMPAT_PROFILE,
 ];
 
@@ -1042,6 +1065,31 @@ pub const OLLAMA_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescript
     order: LoginProviderSurfaceOrder::new(Some(35), Some(35), Some(35), Some(35), Some(35)),
 };
 
+pub const OMNIROUTE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
+    id: "omniroute",
+    display_name: "Omniroute",
+    auth_kind: LoginProviderAuthKind::Local,
+    auth_state_key: LoginProviderAuthStateKey::OpenRouterLike,
+    auth_status_method: "local endpoint",
+    aliases: &[],
+    menu_detail: "local OpenAI-compatible endpoint",
+    recommended: false,
+    target: LoginProviderTarget::OpenAiCompatible(OMNIROUTE_PROFILE),
+    order: LoginProviderSurfaceOrder::new(Some(36), Some(36), Some(36), Some(36), Some(36)),
+};
+
+pub const AGENTROUTER_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
+    id: "agentrouter",
+    display_name: "AgentRouter",
+    auth_kind: LoginProviderAuthKind::ApiKey,
+    auth_state_key: LoginProviderAuthStateKey::OpenRouterLike,
+    auth_status_method: "API key",
+    aliases: &[],
+    menu_detail: "OpenAI-compatible router",
+    recommended: false,
+    target: LoginProviderTarget::OpenAiCompatible(AGENTROUTER_PROFILE),
+    order: LoginProviderSurfaceOrder::new(Some(37), Some(37), Some(37), Some(37), Some(37)),
+};
 pub const OPENAI_COMPAT_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
     id: "openai-compatible",
     display_name: "OpenAI-compatible",
@@ -1177,7 +1225,7 @@ pub const GOOGLE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescript
     order: LoginProviderSurfaceOrder::new(Some(13), None, None, None, None),
 };
 
-pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 51] = [
+pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 53] = [
     AUTO_IMPORT_LOGIN_PROVIDER,
     CLAUDE_LOGIN_PROVIDER,
     ANTHROPIC_API_LOGIN_PROVIDER,
@@ -1222,6 +1270,8 @@ pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 51] = [
     CELERIS_LOGIN_PROVIDER,
     LMSTUDIO_LOGIN_PROVIDER,
     OLLAMA_LOGIN_PROVIDER,
+    OMNIROUTE_LOGIN_PROVIDER,
+    AGENTROUTER_LOGIN_PROVIDER,
     OPENAI_COMPAT_LOGIN_PROVIDER,
     CURSOR_LOGIN_PROVIDER,
     COPILOT_LOGIN_PROVIDER,
