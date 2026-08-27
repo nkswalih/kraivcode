@@ -424,7 +424,9 @@ fn apply_terminal_event(
             Ok(true)
         }
         Some(Ok(Event::Mouse(mouse))) => {
-            if matches!(mouse.kind, crossterm::event::MouseEventKind::Moved) {
+            if matches!(mouse.kind, crossterm::event::MouseEventKind::Moved)
+                && !app.copy_selection_mouse_drag_active()
+            {
                 return Ok(false);
             }
             app.note_client_interaction();

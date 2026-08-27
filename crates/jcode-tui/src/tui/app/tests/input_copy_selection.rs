@@ -745,3 +745,64 @@ fn test_input_composer_drag_to_cell_past_end_selects_full_text() {
     let selected = drag_select(&mut app, start, end);
     assert_eq!(selected, "short");
 }
+
+#[test]
+fn test_input_composer_drag_via_moved_fallback_when_terminal_sends_no_drag() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "select this draft".to_string();
+    app.cursor_pos = app.input.len();
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+    let start = cell_for_point(&points, 0, 0);
+    let width = unicode_width::UnicodeWidthStr::width("select this draft");
+    let end = cell_at_or_after_point(&points, 0, width);
+
+    // Simulate a terminal that sends Moved instead of Drag during button-hold
+    // (e.g. Windows ConPTY with button state lost in translation).
+    // Down (plain) → arms pending anchor.
+    app.handle_copy_selection_mouse_with(
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: start.0,
+            row: start.1,
+            modifiers: KeyModifiers::empty(),
+        },
+        |_| true,
+    );
+    assert!(app.copy_selection_pending_anchor.is_some(), "pending anchor must be set on plain Down");
+
+    // Moved → the fallback handler should auto-enter mode and start the selection.
+    app.handle_copy_selection_mouse_with(
+        MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: end.0,
+            row: end.1,
+            modifiers: KeyModifiers::empty(),
+        },
+        |_| true,
+    );
+    assert!(app.copy_selection_mode, "Moved fallback must enter mode");
+    assert!(app.copy_selection_dragging, "Moved fallback must set dragging");
+    assert!(app.copy_selection_anchor.is_some(), "Moved fallback must set anchor");
+    assert!(app.copy_selection_cursor.is_some(), "Moved fallback must set cursor");
+
+    // Up → exits mode, keeps selection, no auto-copy.
+    app.handle_copy_selection_mouse_with(
+        MouseEvent {
+            kind: MouseEventKind::Up(MouseButton::Left),
+            column: end.0,
+            row: end.1,
+            modifiers: KeyModifiers::empty(),
+        },
+        |_| true,
+    );
+    assert!(!app.copy_selection_mode, "mode must be off after editor-style release");
+    assert!(app.copy_selection_anchor.is_some(), "selection must persist");
+    let selected = app.current_copy_selection_text().unwrap_or_default();
+    assert_eq!(selected, "select this draft");
+}

@@ -545,6 +545,12 @@ impl App {
         self.handle_copy_selection_mouse_with(mouse, super::helpers::copy_to_clipboard)
     }
 
+    pub(crate) fn copy_selection_mouse_drag_active(&self) -> bool {
+        // True while a press is armed or a drag is in progress, so the event
+        // dispatch knows to forward Moved motion events (which ConPTY hosts
+        // send instead of Drag) to the copy-selection handler.
+        self.copy_selection_pending_anchor.is_some() || self.copy_selection_dragging
+    }
     pub(super) fn handle_copy_selection_mouse_with<F>(
         &mut self,
         mouse: MouseEvent,
@@ -646,7 +652,50 @@ impl App {
                 }
                 Some(false)
             }
-            MouseEventKind::Up(MouseButton::Left) => {
+            MouseEventKind::Moved => {
+                // Some terminals (notably Windows ConPTY hosts) report
+                // button-hold motion as Moved with the SGR button state lost
+                // in translation, so the app never sees a Drag event. Treat
+                // Moved as a drag update whenever a press is armed or a drag
+                // is already active. A same-cell Moved is hand jitter on a
+                // plain click, so guard it to avoid swallowing click handlers.
+                if !self.copy_selection_dragging {
+                    let pending = self.copy_selection_pending_anchor?;
+                    let point = point.filter(|point| point.pane == pending.pane)?;
+                    if point == pending {
+                        return Some(false);
+                    }
+                    self.copy_selection_pending_anchor = None;
+                    if !self.copy_selection_mode {
+                        self.copy_selection_auto_entered = true;
+                        self.copy_selection_mode = true;
+                        self.diff_pane_focus = false;
+                        self.diagram_focus = false;
+                    }
+                    self.copy_selection_dragging = true;
+                    self.collapse_selection_to(pending);
+                    self.update_selection_with_point(point, true);
+                    return Some(false);
+                }
+                let active_pane = self.current_copy_selection_pane();
+                if let Some(pane) = active_pane
+                    && let Some((edge_point, upward)) =
+                        crate::tui::ui::copy_pane_vertical_edge_point(pane, mouse.column, mouse.row)
+                {
+                    self.update_selection_with_point(edge_point, true);
+                    self.scroll_copy_selection_pane(pane, upward);
+                    self.copy_selection_edge_autoscroll = Some((pane, upward));
+                    return Some(false);
+                }
+                self.copy_selection_edge_autoscroll = None;
+                let resolved = active_pane.and_then(|pane| {
+                    crate::tui::ui::copy_pane_drag_point(pane, mouse.column, mouse.row)
+                });
+                if let Some(point) = resolved.filter(|point| Some(point.pane) == active_pane) {
+                    self.update_selection_with_point(point, true);
+                }
+                Some(false)
+            }            MouseEventKind::Up(MouseButton::Left) => {
                 // Clear any armed (un-dragged) press anchor; a plain click does
                 // not start a selection.
                 self.copy_selection_pending_anchor = None;
