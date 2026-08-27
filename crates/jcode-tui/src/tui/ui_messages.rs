@@ -94,8 +94,8 @@ pub(crate) fn render_assistant_message(
     if centered {
         markdown::recenter_structured_blocks_for_display(&mut lines, width as usize);
     }
-    // Add 3-char left padding (OpenCode-style gutter) to each line.
-    let pad = Span::raw("   ");
+    // Add 2-char left padding gutter to each line.
+    let pad = Span::raw("  ");
     for line in &mut lines {
         line.spans.insert(0, pad.clone());
     }
