@@ -1120,7 +1120,8 @@ fn csi_run_length(bytes: &[u8]) -> Option<usize> {
 ///
 /// Requires at least one parameter byte and one of the final bytes emitted by
 /// the reporting modes jcode enables, so `array[0]` and `[TODO]` are left alone
-/// while `[<65;50;24M` and `[200~` are recognized.
+/// while `[<65;50;24M` and `[200~` are recognized.  Kitty keyboard protocol
+/// sequences (final `u`, parameters may include `:`) are also stripped.
 fn bare_terminal_report_length(bytes: &[u8]) -> Option<usize> {
     debug_assert_eq!(bytes.first(), Some(&b'['));
     let len = csi_run_length(bytes)?;
@@ -1129,14 +1130,15 @@ fn bare_terminal_report_length(bytes: &[u8]) -> Option<usize> {
         return None;
     }
     // Mouse/paste/cursor/focus reports carry digits, `;`, and an optional
-    // leading `<`. Reject anything with other parameter bytes.
+    // leading `<`.  Kitty keyboard protocol adds `:` as a parameter separator
+    // (e.g. `[115;1:3u`).  Reject anything with other parameter bytes.
     if !params
         .iter()
-        .all(|byte| byte.is_ascii_digit() || *byte == b';' || *byte == b'<')
+        .all(|byte| byte.is_ascii_digit() || *byte == b';' || *byte == b'<' || *byte == b':')
     {
         return None;
     }
-    const REPORT_FINALS: [u8; 6] = *b"Mm~RIO";
+    const REPORT_FINALS: [u8; 7] = *b"Mm~RIOu";
     REPORT_FINALS.contains(&bytes[len - 1]).then_some(len)
 }
 
@@ -4324,6 +4326,13 @@ mod terminal_control_sequence_tests {
             ("a\tb\nc", "a\tb\nc"),
             // Truncated escape with no final byte: drop the remnant.
             ("\x1b[<65;5", ""),
+            // Kitty keyboard protocol sequences (final `u`, params with `:`).
+            ("[115;1:3u", ""),
+            ("[101;1:3u", ""),
+            ("[47;1:3u", ""),
+            ("[115;83;10;3u", ""),
+            ("ses[115;1:3u", "ses"),
+            ("hi[115;1:3u[101;1:3u", "hihi"),
         ] {
             assert_eq!(
                 strip_terminal_control_sequences(input),
