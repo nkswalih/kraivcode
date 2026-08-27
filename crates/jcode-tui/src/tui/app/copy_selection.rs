@@ -16,6 +16,7 @@ impl App {
     pub(super) fn exit_copy_selection_mode(&mut self) {
         self.copy_selection_mode = false;
         self.copy_selection_dragging = false;
+        self.copy_selection_auto_entered = false;
         self.copy_selection_pending_anchor = None;
         self.copy_selection_anchor = None;
         self.copy_selection_cursor = None;
@@ -547,7 +548,7 @@ impl App {
     pub(super) fn handle_copy_selection_mouse_with<F>(
         &mut self,
         mouse: MouseEvent,
-        copy_text: F,
+        _copy_text: F,
     ) -> Option<bool>
     where
         F: FnOnce(&str) -> bool,
@@ -556,6 +557,7 @@ impl App {
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 let point = point?;
+                self.copy_selection_auto_entered = false;
                 if self.copy_selection_mode {
                     self.copy_selection_dragging = true;
                     self.copy_selection_pending_anchor = None;
@@ -574,17 +576,40 @@ impl App {
                     let pending = self.copy_selection_pending_anchor?;
                     let point = point.filter(|point| point.pane == pending.pane)?;
                     // Kitty reports mouse motion at pixel granularity, so a
-                    // plain click with sub-cell hand jitter still delivers
-                    // Drag events for the *same* cell between press and
-                    // release. That is not a selection drag: keep the press
-                    // armed as a pending click so the release can fall
-                    // through to the click handlers (inline-image expand
-                    // badge, link open) instead of being swallowed as an
-                    // empty selection.
-                    if point == pending {
+                    // physically plain click can arrive as Down -> Drag(same
+                    // cell) -> Up. Treating that same-cell motion as a drag
+                    // start would swallow the release and break expand-badge
+                    // /link clicks. Keep the press armed as a pending click on
+                    // terminals that deliver this sub-cell jitter.
+                    //
+                    // This guard must ONLY apply on such terminals. On ordinary
+                    // terminals (e.g. Windows Terminal, xterm) a plain click is
+                    // Down -> Up with no intermediate Drag, and a real drag
+                    // reliably steps cells. If we used the same-cell guard there,
+                    // a drag whose first motion still maps to the press cell
+                    // would never arm `copy_selection_dragging`, so releasing
+                    // would do nothing — plain drag-to-select would fail to
+                    // start (it only copied "sometimes", when motion happened to
+                    // cross a cell boundary before release). Since the built-in
+                    // selection is driven by these Drag events, gate the jitter
+                    // behavior on the granular-motion terminal actually being
+                    // active (Kitty/WezTerm keyboard protocol enabled).
+                    if point == pending && crate::tui::is_actual_keyboard_enhanced() {
                         return Some(false);
                     }
                     self.copy_selection_pending_anchor = None;
+                    if !self.copy_selection_mode {
+                        self.copy_selection_auto_entered = true;
+                        // Enter the mode state WITHOUT the full helper: the
+                        // helper resets `copy_selection_dragging` and
+                        // `copy_selection_pending_anchor`, which would destroy
+                        // the drag state armed just above and stall the
+                        // selection at two cells. This is what made plain
+                        // drag-to-select fail whenever the mode was off.
+                        self.copy_selection_mode = true;
+                        self.diff_pane_focus = false;
+                        self.diagram_focus = false;
+                    }
                     self.copy_selection_dragging = true;
                     self.collapse_selection_to(pending);
                     self.update_selection_with_point(point, true);
@@ -650,11 +675,24 @@ impl App {
                     self.update_selection_with_point(point, true);
                 }
                 if self.copy_selection_mode {
+                    if self.copy_selection_auto_entered {
+                        self.copy_selection_auto_entered = false;
+                        // Editor-style mouse drag: releasing must NOT auto-copy
+                        // the selection. Exit the mode so normal key handling
+                        // (Ctrl+C copy, Backspace/Delete delete, typing replace)
+                        // resumes, but keep the selection range so the highlight
+                        // persists for the user to act on.
+                        self.copy_selection_mode = false;
+                        self.copy_selection_dragging = false;
+                        self.copy_selection_pending_anchor = None;
+                        self.copy_selection_goal_column = None;
+                        self.diff_pane_focus = false;
+                        self.diagram_focus = false;
+                    }
                     return Some(false);
                 }
-                if !self.copy_current_selection_to_clipboard_with(copy_text) {
-                    self.exit_copy_selection_mode();
-                }
+                // Defensive: a drag that armed without the mode. Never
+                // auto-copy; keep the selection for the user to act on.
                 Some(false)
             }
             MouseEventKind::ScrollUp => {

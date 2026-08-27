@@ -598,7 +598,7 @@ fn test_copy_selection_mouse_click_does_not_enter_mode() {
 }
 
 #[test]
-fn test_copy_selection_mouse_drag_auto_copies_and_exits_mode() {
+fn test_copy_selection_mouse_drag_keeps_selection_without_auto_copy() {
     let _render_lock = scroll_render_test_lock();
     let (mut app, mut terminal) = create_copy_test_app();
     let copied = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
@@ -681,10 +681,16 @@ fn test_copy_selection_mouse_drag_auto_copies_and_exits_mode() {
     );
 
     assert!(!app.copy_selection_mode);
-    assert!(app.copy_selection_anchor.is_none());
-    assert!(app.copy_selection_cursor.is_none());
-    assert!(copied.lock().unwrap().contains("println!(\"hello\");"));
-    assert_eq!(app.status_notice(), Some("Copied selection".to_string()));
+    assert!(copied.lock().unwrap().is_empty(), "mouse release must not auto-copy the selection");
+    assert!(
+        app.copy_selection_anchor.is_some(),
+        "selection must persist after editor-style release"
+    );
+    assert!(
+        app.copy_selection_cursor.is_some(),
+        "selection must persist after editor-style release"
+    );
+    assert_ne!(app.status_notice(), Some("Copied selection".to_string()));
 }
 
 #[test]
@@ -786,7 +792,15 @@ fn test_side_panel_mouse_drag_extracts_expected_text() {
             true
         },
     );
-    assert!(copied.lock().unwrap().contains("beta highlight target"));
+    assert!(copied.lock().unwrap().is_empty(), "mouse release must not auto-copy the selection");
+    assert!(
+        app.copy_selection_anchor.is_some(),
+        "selection must persist after editor-style release"
+    );
+    assert!(
+        app.copy_selection_cursor.is_some(),
+        "selection must persist after editor-style release"
+    );
     assert!(!app.copy_selection_mode);
 }
 
@@ -809,8 +823,6 @@ fn test_copy_selection_copy_action_uses_clipboard_hook_and_exits_mode() {
 
     assert!(success);
     assert!(!app.copy_selection_mode);
-    assert!(app.copy_selection_anchor.is_none());
-    assert!(app.copy_selection_cursor.is_none());
     assert!(copied.lock().unwrap().contains("println!(\"hello\");"));
     assert_eq!(app.status_notice(), Some("Copied selection".to_string()));
 }
@@ -1479,10 +1491,17 @@ fn test_changelog_overlay_mouse_drag_release_copies_text() {
         modifiers: KeyModifiers::empty(),
     });
 
-    // A copy was attempted (success/failure depends on clipboard availability
-    // in the test environment, but the selection path must have run).
-    assert!(matches!(
+    // Editor-style: releasing must NOT auto-copy. The selection persists
+    // for the user to act on (Ctrl+C / Backspace / typing).
+    assert!(!app.copy_selection_mode, "mode must be off after editor-style release");
+    assert!(app.copy_selection_anchor.is_some(), "selection must persist");
+    assert!(app.copy_selection_cursor.is_some(), "selection must persist");
+    assert_ne!(
         app.status_notice().as_deref(),
-        Some("Copied selection") | Some("Failed to copy selection") | Some("Selection is empty")
-    ));
+        Some("Copied selection")
+    );
+    assert_ne!(
+        app.status_notice().as_deref(),
+        Some("Failed to copy selection")
+    );
 }

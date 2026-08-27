@@ -1,6 +1,7 @@
-// Tests for copy-selection in the prompt composer (input box), issue #430:
-// text being typed must be drag-selectable and copyable with the mouse, just
-// like the transcript, without ever copying the prompt decoration.
+// Tests for editor-style mouse drag text selection in the prompt composer
+// (input box). Drag-to-select works without Alt+Y, and releasing does NOT
+// auto-copy — the selection persists for the user to act on (Ctrl+C copies,
+// Backspace/Delete removes, typing replaces).
 
 /// Scan the rendered frame for screen cells that hit-test into the composer
 /// (`Input`) pane, returning `(col, row, point)` triples.
@@ -21,13 +22,47 @@ fn input_pane_screen_points(
     points
 }
 
-fn drag_copy(
+/// Find the first screen cell whose CopySelectionPoint matches the given
+/// (abs_line, column) pair. Panics if no cell matches.
+fn cell_for_point(
+    points: &[(u16, u16, crate::tui::CopySelectionPoint)],
+    abs_line: usize,
+    column: usize,
+) -> (u16, u16) {
+    points
+        .iter()
+        .find(|(_, _, p)| p.abs_line == abs_line && p.column == column)
+        .map(|(c, r, _)| (*c, *r))
+        .unwrap_or_else(|| panic!("no cell for point (line={abs_line}, col={column})"))
+}
+
+/// Find the first cell on the given line whose point column is >= `column`.
+/// Useful for selecting past the end of text (where all overshoot cells clamp
+/// to the line width).
+fn cell_at_or_after_point(
+    points: &[(u16, u16, crate::tui::CopySelectionPoint)],
+    abs_line: usize,
+    column: usize,
+) -> (u16, u16) {
+    points
+        .iter()
+        .find(|(_, _, p)| p.abs_line == abs_line && p.column >= column)
+        .map(|(c, r, _)| (*c, *r))
+        .unwrap_or_else(|| panic!("no cell >= point (line={abs_line}, col={column})"))
+}
+
+/// Perform a mouse drag (Down → Drag → Up) via `handle_copy_selection_mouse_with`.
+/// Returns the persistent selection text AFTER release (no auto-copy).
+/// Asserts the copy closure is never called (auto-copy disabled).
+fn drag_select(
     app: &mut App,
     start: (u16, u16),
     end: (u16, u16),
 ) -> String {
-    let copied = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
-    let copied_for_closure = copied.clone();
+    let copy_was_called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let copy_was_called_clone = copy_was_called.clone();
+
+    // Down
     app.handle_copy_selection_mouse_with(
         MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
@@ -35,8 +70,13 @@ fn drag_copy(
             row: start.1,
             modifiers: KeyModifiers::empty(),
         },
-        |_| true,
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        },
     );
+
+    // Drag
     app.handle_copy_selection_mouse_with(
         MouseEvent {
             kind: MouseEventKind::Drag(MouseButton::Left),
@@ -44,8 +84,13 @@ fn drag_copy(
             row: end.1,
             modifiers: KeyModifiers::empty(),
         },
-        |_| true,
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        },
     );
+
+    // Up — must NOT auto-copy
     app.handle_copy_selection_mouse_with(
         MouseEvent {
             kind: MouseEventKind::Up(MouseButton::Left),
@@ -53,17 +98,33 @@ fn drag_copy(
             row: end.1,
             modifiers: KeyModifiers::empty(),
         },
-        |text| {
-            *copied_for_closure.lock().unwrap() = text.to_string();
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
             true
         },
     );
-    
-    copied.lock().unwrap().clone()
+
+    assert!(
+        !copy_was_called.load(std::sync::atomic::Ordering::SeqCst),
+        "auto-copy must NOT fire on drag release (editor-style)"
+    );
+
+    // Mode is off but selection (anchor + cursor) persists.
+    assert!(!app.copy_selection_mode, "mode must be off after editor-style drag");
+    assert!(
+        app.copy_selection_anchor.is_some() && app.copy_selection_cursor.is_some(),
+        "selection (anchor + cursor) must persist after release"
+    );
+
+    app.current_copy_selection_text().unwrap_or_default()
 }
 
+// ---------------------------------------------------------------------------
+// Existing tests, updated to the new editor-style drag behavior
+// ---------------------------------------------------------------------------
+
 #[test]
-fn test_input_composer_drag_selects_and_copies_typed_text() {
+fn test_input_composer_drag_selects_typed_text_without_auto_copy() {
     let _render_lock = scroll_render_test_lock();
     let mut app = create_test_app();
     app.input = "select this draft".to_string();
@@ -73,36 +134,17 @@ fn test_input_composer_drag_selects_and_copies_typed_text() {
     let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
     render_and_snap(&app, &mut terminal);
 
-    // The composer registers a copy snapshot of the typed text (no prompt).
-    assert_eq!(
-        crate::tui::ui::input_pane_line_text(0).as_deref(),
-        Some("select this draft")
-    );
-    assert_eq!(crate::tui::ui::input_pane_line_count(), Some(1));
-
     let points = input_pane_screen_points(80, 24);
-    assert!(
-        !points.is_empty(),
-        "composer must be hit-testable for copy selection"
-    );
-    let start = points
-        .iter()
-        .find(|(_, _, p)| p.abs_line == 0 && p.column == 0)
-        .map(|(c, r, _)| (*c, *r))
-        .expect("screen cell for text start");
-    let end = points
-        .iter()
-        .filter(|(_, _, p)| p.abs_line == 0)
-        .max_by_key(|(_, _, p)| p.column)
-        .map(|(c, r, _)| (*c, *r))
-        .expect("screen cell for text end");
+    assert!(!points.is_empty(), "composer must be hit-testable");
 
-    let copied = drag_copy(&mut app, start, end);
-    assert_eq!(copied, "select this draft");
-    assert_eq!(app.status_notice(), Some("Copied selection".to_string()));
-    // Selection state is cleared after the copy.
-    assert!(app.copy_selection_anchor.is_none());
-    assert!(app.copy_selection_cursor.is_none());
+    let start = cell_for_point(&points, 0, 0);
+    let width = unicode_width::UnicodeWidthStr::width("select this draft");
+    // Drag to a cell past the text end to select the full line.
+    let end = cell_at_or_after_point(&points, 0, width);
+
+    let selected = drag_select(&mut app, start, end);
+    assert_eq!(selected, "select this draft");
+    assert_ne!(app.status_notice(), Some("Copied selection".to_string()));
 }
 
 #[test]
@@ -115,26 +157,20 @@ fn test_input_composer_selection_never_includes_prompt_prefix() {
     let backend = ratatui::backend::TestBackend::new(80, 24);
     let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
     let rendered = render_and_snap(&app, &mut terminal);
-    // Sanity: the prompt decoration is actually on screen ("1>" for the first prompt).
     assert!(rendered.contains("1>"), "expected prompt prefix on screen");
 
     let points = input_pane_screen_points(80, 24);
-    let row = points.first().map(|(_, r, _)| *r).expect("composer row");
+    // The leftmost hit-testable cell sits over the prompt decoration (inside
+    // the composer content area, before the typed text). Starting the drag
+    // there must clamp the selection to the first typed character.
+    let (start_col, row, _) = points[0];
 
-    // Start the drag on the far-left edge of the composer row: on the prompt
-    // decoration itself. The selection must clamp to the typed text.
-    let end = points
-        .iter()
-        .filter(|(_, _, p)| p.abs_line == 0)
-        .max_by_key(|(_, _, p)| p.column)
-        .map(|(c, r, _)| (*c, *r))
-        .expect("screen cell for text end");
-    let copied = drag_copy(&mut app, (0, row), end);
-    assert_eq!(copied, "no prompt here");
-    assert!(
-        !copied.contains('>'),
-        "prompt decoration must never be copied, got {copied:?}"
-    );
+    let width = unicode_width::UnicodeWidthStr::width("no prompt here");
+    let end = cell_at_or_after_point(&points, 0, width);
+
+    let selected = drag_select(&mut app, (start_col, row), end);
+    assert_eq!(selected, "no prompt here");
+    assert!(!selected.contains('>'), "prompt must never be copied");
 }
 
 #[test]
@@ -149,37 +185,21 @@ fn test_input_composer_multiline_selection_preserves_newlines() {
     render_and_snap(&app, &mut terminal);
 
     assert_eq!(crate::tui::ui::input_pane_line_count(), Some(2));
-    assert_eq!(
-        crate::tui::ui::input_pane_line_text(0).as_deref(),
-        Some("alpha one")
-    );
-    assert_eq!(
-        crate::tui::ui::input_pane_line_text(1).as_deref(),
-        Some("beta two")
-    );
 
     let points = input_pane_screen_points(80, 24);
-    let start = points
-        .iter()
-        .find(|(_, _, p)| p.abs_line == 0 && p.column == 0)
-        .map(|(c, r, _)| (*c, *r))
-        .expect("screen cell for first line start");
-    let end = points
-        .iter()
-        .filter(|(_, _, p)| p.abs_line == 1)
-        .max_by_key(|(_, _, p)| p.column)
-        .map(|(c, r, _)| (*c, *r))
-        .expect("screen cell for second line end");
+    let start = cell_for_point(&points, 0, 0);
+    // Drag to past the end of the second line.
+    let width_1 = unicode_width::UnicodeWidthStr::width("beta two");
+    let end = cell_at_or_after_point(&points, 1, width_1);
 
-    let copied = drag_copy(&mut app, start, end);
-    assert_eq!(copied, "alpha one\nbeta two");
+    let selected = drag_select(&mut app, start, end);
+    assert_eq!(selected, "alpha one\nbeta two");
 }
 
 #[test]
 fn test_input_composer_soft_wrapped_selection_copies_unwrapped_text() {
     let _render_lock = scroll_render_test_lock();
     let mut app = create_test_app();
-    // Narrow terminal so this single logical line soft-wraps across rows.
     let text = "abcdefghij klmnopqrst uvwxyz0123456789";
     app.input = text.to_string();
     app.cursor_pos = app.input.len();
@@ -195,24 +215,21 @@ fn test_input_composer_soft_wrapped_selection_copies_unwrapped_text() {
     );
 
     let points = input_pane_screen_points(30, 20);
-    let start = points
-        .iter()
-        .find(|(_, _, p)| p.abs_line == 0 && p.column == 0)
-        .map(|(c, r, _)| (*c, *r))
-        .expect("screen cell for wrap start");
+    let start = cell_for_point(&points, 0, 0);
     let last_line = wrapped_rows - 1;
-    let end = points
+    // Overshoot cells on the last wrapped line clamp to that line's display
+    // width, so derive the column from the actual hit-testable cells.
+    let last_line_width = points
         .iter()
         .filter(|(_, _, p)| p.abs_line == last_line)
-        .max_by_key(|(_, _, p)| p.column)
-        .map(|(c, r, _)| (*c, *r))
-        .expect("screen cell for wrap end");
+        .map(|(_, _, p)| p.column)
+        .max()
+        .expect("last wrapped line has hit-testable cells");
+    let end = cell_at_or_after_point(&points, last_line, last_line_width);
 
-    let copied = drag_copy(&mut app, start, end);
-    // A soft wrap is a rendering artifact: the copied text must be the
-    // original logical line with no injected newline.
-    assert_eq!(copied, text);
-    assert!(!copied.contains('\n'));
+    let selected = drag_select(&mut app, start, end);
+    assert_eq!(selected, text);
+    assert!(!selected.contains('\n'));
 }
 
 #[test]
@@ -236,7 +253,6 @@ fn test_chat_drag_into_composer_clamps_to_chat_pane() {
     let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
     render_and_snap(&app, &mut terminal);
 
-    // Anchor on a chat transcript cell.
     let (chat_col, chat_row, chat_point) = (0..24u16)
         .flat_map(|row| (0..80u16).map(move |col| (col, row)))
         .find_map(|(col, row)| {
@@ -245,10 +261,7 @@ fn test_chat_drag_into_composer_clamps_to_chat_pane() {
                 .map(|p| (col, row, p))
         })
         .expect("a chat cell to anchor on");
-    // A second chat cell that resolves to a *different* logical point: the
-    // same-cell drag-jitter guard keeps the press armed (dragging never
-    // starts) while press and motion map to the identical point, so the
-    // in-pane motion must genuinely move the selection cursor.
+
     let (chat_col2, chat_row2, _) = (0..24u16)
         .flat_map(|row| (0..80u16).map(move |col| (col, row)))
         .find_map(|(col, row)| {
@@ -258,7 +271,6 @@ fn test_chat_drag_into_composer_clamps_to_chat_pane() {
         })
         .expect("a second distinct chat cell");
 
-    // Composer row to drag into.
     let input_points = input_pane_screen_points(80, 24);
     let (input_col, input_row) = input_points
         .iter()
@@ -266,8 +278,9 @@ fn test_chat_drag_into_composer_clamps_to_chat_pane() {
         .next()
         .expect("composer cell");
 
-    let copied = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
-    let copied_for_closure = copied.clone();
+    let copy_was_called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let copy_was_called_clone = copy_was_called.clone();
+
     app.handle_copy_selection_mouse_with(
         MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
@@ -275,10 +288,13 @@ fn test_chat_drag_into_composer_clamps_to_chat_pane() {
             row: chat_row,
             modifiers: KeyModifiers::empty(),
         },
-        |_| true,
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        },
     );
-    // Move within the chat pane first (real drags pass through cells), then
-    // into the composer.
+
+    // Move within the chat pane, then into the composer.
     app.handle_copy_selection_mouse_with(
         MouseEvent {
             kind: MouseEventKind::Drag(MouseButton::Left),
@@ -286,7 +302,10 @@ fn test_chat_drag_into_composer_clamps_to_chat_pane() {
             row: chat_row2,
             modifiers: KeyModifiers::empty(),
         },
-        |_| true,
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        },
     );
     app.handle_copy_selection_mouse_with(
         MouseEvent {
@@ -295,13 +314,18 @@ fn test_chat_drag_into_composer_clamps_to_chat_pane() {
             row: input_row,
             modifiers: KeyModifiers::empty(),
         },
-        |_| true,
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        },
     );
+
     // The selection must stay clamped to the chat pane.
     assert_eq!(
         app.current_copy_selection_pane(),
         Some(crate::tui::CopySelectionPane::Chat)
     );
+
     app.handle_copy_selection_mouse_with(
         MouseEvent {
             kind: MouseEventKind::Up(MouseButton::Left),
@@ -309,16 +333,23 @@ fn test_chat_drag_into_composer_clamps_to_chat_pane() {
             row: input_row,
             modifiers: KeyModifiers::empty(),
         },
-        |text| {
-            *copied_for_closure.lock().unwrap() = text.to_string();
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
             true
         },
     );
 
-    let copied = copied.lock().unwrap().clone();
+    // No auto-copy should fire.
     assert!(
-        !copied.contains("draft under composition"),
-        "cross-pane drag must not leak composer text into a chat selection, got {copied:?}"
+        !copy_was_called.load(std::sync::atomic::Ordering::SeqCst),
+        "auto-copy must NOT fire on cross-pane chat drag release"
+    );
+
+    // The selected text must not contain composer text.
+    let selected = app.current_copy_selection_text().unwrap_or_default();
+    assert!(
+        !selected.contains("draft under composition"),
+        "cross-pane drag must not leak composer text, got {selected:?}"
     );
 }
 
@@ -333,7 +364,6 @@ fn test_input_composer_click_still_moves_caret() {
     let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
     render_and_snap(&app, &mut terminal);
 
-    // Click (press + release, no drag) in the middle of the typed text.
     let points = input_pane_screen_points(80, 24);
     let (col, row, point) = points
         .iter()
@@ -356,7 +386,7 @@ fn test_input_composer_click_still_moves_caret() {
 
     assert_eq!(
         app.cursor_pos, point.column,
-        "plain click in the composer must reposition the caret"
+        "plain click must reposition the caret"
     );
     // No selection was made or copied by the plain click.
     assert!(app.copy_selection_anchor.is_none());
@@ -364,7 +394,7 @@ fn test_input_composer_click_still_moves_caret() {
 }
 
 #[test]
-fn test_input_composer_drag_then_release_copies_via_full_mouse_path() {
+fn test_input_composer_drag_release_exits_mode_keeps_selection() {
     let _render_lock = scroll_render_test_lock();
     let mut app = create_test_app();
     app.input = "full path check".to_string();
@@ -375,21 +405,11 @@ fn test_input_composer_drag_then_release_copies_via_full_mouse_path() {
     render_and_snap(&app, &mut terminal);
 
     let points = input_pane_screen_points(80, 24);
-    let start = points
-        .iter()
-        .find(|(_, _, p)| p.abs_line == 0 && p.column == 0)
-        .map(|(c, r, _)| (*c, *r))
-        .expect("start cell");
-    let end = points
-        .iter()
-        .filter(|(_, _, p)| p.abs_line == 0)
-        .max_by_key(|(_, _, p)| p.column)
-        .map(|(c, r, _)| (*c, *r))
-        .expect("end cell");
+    let start = cell_for_point(&points, 0, 0);
+    let width = unicode_width::UnicodeWidthStr::width("full path check");
+    let end = cell_at_or_after_point(&points, 0, width);
 
-    // Full handle_mouse_event path: press, drag, release. The release attempts
-    // a real clipboard copy, which may fail in CI, but the selection path must
-    // have run and reported one of the copy outcomes.
+    // Full handle_mouse_event path: press, drag, release.
     app.handle_mouse_event(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
         column: start.0,
@@ -409,12 +429,319 @@ fn test_input_composer_drag_then_release_copies_via_full_mouse_path() {
         modifiers: KeyModifiers::empty(),
     });
 
+    // Editor-style: mode is off, selection persists, no copy notice.
     assert!(
-        matches!(
-            app.status_notice().as_deref(),
-            Some("Copied selection") | Some("Failed to copy selection")
-        ),
-        "drag release over the composer must attempt a copy, got {:?}",
-        app.status_notice()
+        !app.copy_selection_mode,
+        "mode must be off after editor-style drag release"
     );
+    assert!(
+        app.copy_selection_anchor.is_some(),
+        "selection anchor must persist"
+    );
+    assert!(
+        app.copy_selection_cursor.is_some(),
+        "selection cursor must persist"
+    );
+    let selected = app.current_copy_selection_text().unwrap_or_default();
+    assert_eq!(selected, "full path check");
+    assert_ne!(app.status_notice(), Some("Copied selection".to_string()));
+    assert_ne!(
+        app.status_notice(),
+        Some("Failed to copy selection".to_string())
+    );
+}
+
+// ---------------------------------------------------------------------------
+// New regression tests for editor-style selection workflow
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_input_composer_drag_then_ctrl_copies_selection() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "select this draft".to_string();
+    app.cursor_pos = app.input.len();
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+    let start = cell_for_point(&points, 0, 0);
+    let width = unicode_width::UnicodeWidthStr::width("select this draft");
+    let end = cell_at_or_after_point(&points, 0, width);
+
+    // Drag to select.
+    let _ = drag_select(&mut app, start, end);
+
+    // Ctrl+C should copy the selection.
+    let clipboard = CapturedClipboard::new();
+    app.handle_key(KeyCode::Char('c'), KeyModifiers::CONTROL)
+        .unwrap();
+
+    assert_eq!(clipboard.text(), Some("select this draft".to_string()));
+    assert_eq!(app.status_notice(), Some("Copied selection".to_string()));
+    // Ctrl+C also exits copy-selection mode (clears anchor/cursor).
+    assert!(app.copy_selection_anchor.is_none());
+    assert!(app.copy_selection_cursor.is_none());
+}
+
+#[test]
+fn test_input_composer_drag_then_backspace_deletes_selection() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "abc XYZ def".to_string();
+    app.cursor_pos = app.input.len();
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+    // "XYZ" spans columns 4..7 (exclusive). Drag from col 4 to col 7.
+    let start = cell_for_point(&points, 0, 4);
+    let end = cell_for_point(&points, 0, 7);
+
+    let _ = drag_select(&mut app, start, end);
+
+    // Backspace should delete the selection.
+    app.handle_key(KeyCode::Backspace, KeyModifiers::empty())
+        .unwrap();
+
+    assert_eq!(app.input, "abc  def");
+    assert_eq!(app.cursor_pos, 4);
+    assert!(app.copy_selection_anchor.is_none());
+}
+
+#[test]
+fn test_input_composer_drag_then_delete_deletes_selection() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "abc XYZ def".to_string();
+    app.cursor_pos = app.input.len();
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+    let start = cell_for_point(&points, 0, 4);
+    let end = cell_for_point(&points, 0, 7);
+
+    let _ = drag_select(&mut app, start, end);
+
+    // Delete should delete the selection.
+    app.handle_key(KeyCode::Delete, KeyModifiers::empty())
+        .unwrap();
+
+    assert_eq!(app.input, "abc  def");
+    assert_eq!(app.cursor_pos, 4);
+    assert!(app.copy_selection_anchor.is_none());
+}
+
+#[test]
+fn test_input_composer_drag_then_typing_replaces_selection() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "abc XYZ def".to_string();
+    app.cursor_pos = app.input.len();
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+    let start = cell_for_point(&points, 0, 4);
+    let end = cell_for_point(&points, 0, 7);
+
+    let _ = drag_select(&mut app, start, end);
+
+    // Typing should replace the selected text.
+    app.handle_key(KeyCode::Char('Q'), KeyModifiers::empty())
+        .unwrap();
+
+    assert_eq!(app.input, "abc Q def");
+    assert_eq!(app.cursor_pos, 5);
+    assert!(app.copy_selection_anchor.is_none());
+}
+
+#[test]
+fn test_input_composer_drag_then_arrow_clears_selection() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "select this draft".to_string();
+    app.cursor_pos = app.input.len();
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+    let start = cell_for_point(&points, 0, 0);
+    let width = unicode_width::UnicodeWidthStr::width("select this draft");
+    let end = cell_at_or_after_point(&points, 0, width);
+
+    let _ = drag_select(&mut app, start, end);
+
+    // Left arrow should clear the selection and move the cursor.
+    let prev_cursor = app.cursor_pos;
+    app.handle_key(KeyCode::Left, KeyModifiers::empty())
+        .unwrap();
+
+    assert!(
+        app.copy_selection_anchor.is_none(),
+        "arrow must clear selection anchor"
+    );
+    assert!(app.copy_selection_cursor.is_none());
+    assert_eq!(app.cursor_pos, prev_cursor.saturating_sub(1));
+}
+
+#[test]
+fn test_input_composer_drag_select_all_then_backspace_clears_input() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "everything".to_string();
+    app.cursor_pos = app.input.len();
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+    let start = cell_for_point(&points, 0, 0);
+    let width = unicode_width::UnicodeWidthStr::width("everything");
+    let end = cell_at_or_after_point(&points, 0, width);
+
+    let _ = drag_select(&mut app, start, end);
+
+    app.handle_key(KeyCode::Backspace, KeyModifiers::empty())
+        .unwrap();
+
+    assert_eq!(app.input, "");
+    assert_eq!(app.cursor_pos, 0);
+    assert!(app.copy_selection_anchor.is_none());
+}
+
+#[test]
+fn test_input_composer_second_drag_replaces_first_selection() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "abc XYZ def".to_string();
+    app.cursor_pos = app.input.len();
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+
+    // First drag: select "abc" (cols 0..3).
+    let start1 = cell_for_point(&points, 0, 0);
+    let end1 = cell_for_point(&points, 0, 3);
+    let selected1 = drag_select(&mut app, start1, end1);
+    assert_eq!(selected1, "abc");
+
+    // Second drag: select "def" (cols 8..11).
+    let start2 = cell_for_point(&points, 0, 8);
+    let end2 = cell_for_point(&points, 0, 11);
+    let selected2 = drag_select(&mut app, start2, end2);
+    assert_eq!(selected2, "def");
+
+    // Verify no stale selection artifacts.
+    assert!(!app.copy_selection_mode);
+    let text = app.current_copy_selection_text().unwrap_or_default();
+    assert_eq!(text, "def");
+}
+
+#[test]
+fn test_input_composer_drag_on_empty_input_selects_nothing() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "".to_string();
+    app.cursor_pos = 0;
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+    if points.is_empty() {
+        // Empty input may not produce any hit-testable cells.
+        return;
+    }
+
+    let (col, row, _) = points[0];
+    let copy_was_called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let copy_was_called_clone = copy_was_called.clone();
+
+    // Down
+    app.handle_copy_selection_mouse_with(
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: col,
+            row,
+            modifiers: KeyModifiers::empty(),
+        },
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        },
+    );
+    // Drag (same cell or adjacent)
+    app.handle_copy_selection_mouse_with(
+        MouseEvent {
+            kind: MouseEventKind::Drag(MouseButton::Left),
+            column: col + 1,
+            row,
+            modifiers: KeyModifiers::empty(),
+        },
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        },
+    );
+    app.handle_copy_selection_mouse_with(
+        MouseEvent {
+            kind: MouseEventKind::Up(MouseButton::Left),
+            column: col + 1,
+            row,
+            modifiers: KeyModifiers::empty(),
+        },
+        |_| {
+            copy_was_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        },
+    );
+
+    assert!(
+        !copy_was_called.load(std::sync::atomic::Ordering::SeqCst),
+        "auto-copy must NOT fire on drag over empty input"
+    );
+    // No selection should be present.
+    assert!(app.copy_selection_anchor.is_none() || {
+        app.current_copy_selection_text()
+            .map_or(true, |t| t.is_empty())
+    });
+}
+
+#[test]
+fn test_input_composer_drag_to_cell_past_end_selects_full_text() {
+    let _render_lock = scroll_render_test_lock();
+    let mut app = create_test_app();
+    app.input = "short".to_string();
+    app.cursor_pos = app.input.len();
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    render_and_snap(&app, &mut terminal);
+
+    let points = input_pane_screen_points(80, 24);
+    let start = cell_for_point(&points, 0, 0);
+
+    // A cell at/after the text end (width=5) clamps to column 5.
+    let width = unicode_width::UnicodeWidthStr::width("short");
+    let end = cell_at_or_after_point(&points, 0, width);
+
+    let selected = drag_select(&mut app, start, end);
+    assert_eq!(selected, "short");
 }
