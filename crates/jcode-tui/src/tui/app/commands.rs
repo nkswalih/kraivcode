@@ -3107,7 +3107,10 @@ fn resume_terminal_after_editor() {
     if policy.enable_mouse_capture {
         let _ = crossterm::execute!(std::io::stdout(), EnableMouseCapture);
     }
-    if policy.enable_keyboard_enhancement {
+    // Only re-enable Kitty if it was actually active before the editor
+    // suspended it. On Windows it is disabled by default so a stale enable
+    // would leak raw CSI sequences as Char events.
+    if crate::tui::is_actual_keyboard_enhanced() {
         crate::tui::enable_keyboard_enhancement();
     }
 }

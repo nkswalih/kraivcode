@@ -127,7 +127,14 @@ fn keyboard_enhancement_flags() -> crossterm::event::KeyboardEnhancementFlags {
 ///
 /// Returns true if successfully enabled, false if the terminal doesn't support it.
 pub fn enable_keyboard_enhancement() -> bool {
-    use crossterm::event::PushKeyboardEnhancementFlags;
+    use crossterm::event::{PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
+
+    // Clear any stale Kitty state left behind by a previous session that exited
+    // abnormally (crash, force-kill, terminal close) without popping the flags.
+    // Without this, a stacked push confuses the parser and leaks individual
+    // bytes as KeyCode::Char events.
+    let _ = crossterm::execute!(std::io::stdout(), PopKeyboardEnhancementFlags);
+
     let result = crossterm::execute!(
         std::io::stdout(),
         PushKeyboardEnhancementFlags(keyboard_enhancement_flags())
@@ -141,11 +148,50 @@ pub fn enable_keyboard_enhancement() -> bool {
 }
 
 /// Disable Kitty keyboard protocol, restoring default key reporting.
+///
+/// Does not reset the "was enabled at startup" flag so a subsequent
+/// `resume_terminal_after_editor` can re-enable it. Only a fresh startup
+/// (re)initializes `set_actual_keyboard_enhanced`.
 pub fn disable_keyboard_enhancement() {
     let _ = crossterm::execute!(
         std::io::stdout(),
         crossterm::event::PopKeyboardEnhancementFlags
     );
+}
+
+// ---------------------------------------------------------------------------
+// Track whether Kitty was *actually* enabled at startup so the reapply path
+// (FocusGained) does not re-enable a mode the terminal cannot handle.
+// ---------------------------------------------------------------------------
+
+use std::cell::Cell;
+
+thread_local! {
+    static ACTUAL_KITTY_ENABLED: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Clear any stale Kitty keyboard-enhancement state left behind by a previous
+/// session that exited abnormally without popping the flags. Call once at TUI
+/// startup before deciding whether to (re)enable the protocol, so a terminal
+/// left in Kitty mode from a crash/force-kill is reset even if this session
+/// does not enable it (e.g. the Windows default).
+pub fn clear_stale_keyboard_enhancement() {
+    let _ = crossterm::execute!(
+        std::io::stdout(),
+        crossterm::event::PopKeyboardEnhancementFlags
+    );
+}
+
+/// Record whether Kitty keyboard enhancement was successfully enabled.
+/// Must be called after [`enable_keyboard_enhancement`] with its result.
+pub fn set_actual_keyboard_enhanced(enabled: bool) {
+    ACTUAL_KITTY_ENABLED.with(|cell| cell.set(enabled));
+}
+
+/// Whether Kitty keyboard enhancement is currently active (was enabled at
+/// startup and has not been disabled).
+pub(crate) fn is_actual_keyboard_enhanced() -> bool {
+    ACTUAL_KITTY_ENABLED.with(Cell::get)
 }
 
 /// Reassert terminal modes that terminals may clear while the TUI remains alive.
@@ -173,6 +219,9 @@ pub(crate) fn reapply_terminal_modes_to(
         writer.write_all(b"\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1015h\x1b[?1006h")?;
     }
     if keyboard_enhanced {
+        // Use the idempotent "set" form so repeated reapplies (multiple focus
+        // changes) never grow the keyboard-enhancement stack. A single shutdown
+        // Pop stays balanced with the single startup Push.
         write!(writer, "\x1b[={}u", keyboard_enhancement_flags().bits())?;
     }
     writer.flush()
@@ -183,7 +232,7 @@ pub(crate) fn reapply_configured_terminal_modes() {
     if let Err(error) = reapply_terminal_modes_to(
         &mut std::io::stdout(),
         policy.enable_mouse_capture,
-        policy.enable_keyboard_enhancement,
+        is_actual_keyboard_enhanced(),
         policy.enable_focus_change,
     ) {
         crate::logging::warn(&format!("failed to reapply terminal modes: {error}"));

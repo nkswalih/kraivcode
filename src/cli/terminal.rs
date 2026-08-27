@@ -382,6 +382,9 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
     crate::tui::mermaid::init_picker();
 
     let perf_policy = crate::perf::tui_policy();
+    // Clear any stale Kitty keyboard-enhancement state from a previous
+    // session that may have left the terminal in Kitty mode (crash/force-kill).
+    tui::clear_stale_keyboard_enhancement();
     // These private handoff values apply only to this exec boundary. Avoid
     // leaking them into tools or unrelated child jcode processes.
     crate::env::remove_var(INHERITED_MODES_ENV);
@@ -399,6 +402,7 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         // stack-based keyboard enhancement flags again. A later normal exit must
         // still disable every inherited mode, so retain them in the guard.
         let modes = inherited_modes.unwrap_or(fallback_modes);
+        tui::set_actual_keyboard_enhanced(modes.keyboard_enhanced);
         crossterm::execute!(std::io::stdout(), crossterm::event::EnableBracketedPaste)?;
         if modes.focus_change {
             crossterm::execute!(std::io::stdout(), crossterm::event::EnableFocusChange)?;
@@ -414,10 +418,54 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         modes
     } else {
         let keyboard_enhanced = if perf_policy.enable_keyboard_enhancement {
-            tui::enable_keyboard_enhancement()
+            // On Windows, the Kitty keyboard protocol frequently leaks raw CSI
+            // sequences as individual Char events because crossterm's Windows
+            // parser cannot reconstruct them.  The terminal capability query
+            // (`supports_keyboard_enhancement`) often returns true even when the
+            // parser fails, so we cannot rely on it alone.
+            //
+            // Disable Kitty on Windows by default.  Set JCODE_KITTY=1 to force
+            // enable it on terminals that do work (e.g. WezTerm, kitty.app).
+            #[cfg(windows)]
+            let force = std::env::var("JCODE_KITTY")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false);
+            #[cfg(not(windows))]
+            let force = false;
+
+            if force {
+                tui::enable_keyboard_enhancement()
+            } else {
+                #[cfg(windows)]
+                {
+                    crate::logging::info(
+                        "Kitty keyboard protocol: skipped (Windows default; set JCODE_KITTY=1 to force)",
+                    );
+                    false
+                }
+                #[cfg(not(windows))]
+                {
+                    match crossterm::terminal::supports_keyboard_enhancement() {
+                        Ok(true) => tui::enable_keyboard_enhancement(),
+                        Ok(false) => {
+                            crate::logging::info(
+                                "Kitty keyboard protocol: skipped (terminal reports unsupported)",
+                            );
+                            false
+                        }
+                        Err(err) => {
+                            crate::logging::info(&format!(
+                                "Kitty keyboard protocol: skipped (query inconclusive: {err})"
+                            ));
+                            false
+                        }
+                    }
+                }
+            }
         } else {
             false
         };
+        tui::set_actual_keyboard_enhanced(keyboard_enhanced);
         let modes = InheritedTerminalModes {
             mouse_capture: perf_policy.enable_mouse_capture,
             keyboard_enhanced,
