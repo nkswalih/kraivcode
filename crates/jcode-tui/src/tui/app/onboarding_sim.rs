@@ -101,6 +101,7 @@ impl App {
         self.copy_selection_cursor = None;
         self.copy_selection_pending_anchor = None;
         self.copy_selection_dragging = false;
+        self.copy_selection_auto_entered = false;
         self.copy_selection_goal_column = None;
         self.copy_selection_edge_autoscroll = None;
         self.onboarding_sim = Some(0);

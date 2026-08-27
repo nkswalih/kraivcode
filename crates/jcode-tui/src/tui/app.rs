@@ -1139,6 +1139,7 @@ pub struct App {
     copy_selection_cursor: Option<crate::tui::CopySelectionPoint>,
     copy_selection_pending_anchor: Option<crate::tui::CopySelectionPoint>,
     copy_selection_dragging: bool,
+    copy_selection_auto_entered: bool,
     copy_selection_goal_column: Option<usize>,
     /// While drag-selecting with the mouse held at the top/bottom edge of a pane,
     /// keep auto-scrolling on every tick (browser-style) until the drag leaves the

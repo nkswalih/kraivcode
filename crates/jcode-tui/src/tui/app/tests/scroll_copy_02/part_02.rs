@@ -948,6 +948,10 @@ fn test_kitty_jitter_click_on_image_label_still_cycles_level() {
     let _render_lock = scroll_render_test_lock();
     let mut app = create_test_app();
 
+    // This scenario only exists on Kitty-style terminals (pixel-granularity
+    // mouse motion), so enable the flag that the same-cell jitter guard keys on.
+    crate::tui::set_actual_keyboard_enhanced(true);
+
     const IMAGE_ID: u64 = 0xF00D;
     let chat_width: u16 = 80;
     let items = vec![InlineImageItem {

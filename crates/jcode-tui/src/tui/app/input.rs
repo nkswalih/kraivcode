@@ -1147,9 +1147,10 @@ pub(super) fn insert_input_text(app: &mut App, text: &str) {
         return;
     }
 
-    // Any edit intentionally replaces a composer selection: collapse it so
-    // stale highlights never linger over changed text.
-    app.clear_composer_selection();
+    // Editor-style: any text insertion replaces an active composer selection
+    // (delete the selected range in one step, cursor lands at its start).
+    // No-op when nothing is selected (no-input-pane-selection returns false).
+    app.delete_selected_input();
 
     // Drop terminal escape remnants before they can land in the draft (#540).
     let sanitized = strip_terminal_control_sequences(text);
