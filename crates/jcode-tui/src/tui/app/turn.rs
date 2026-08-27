@@ -166,7 +166,9 @@ impl App {
                                 super::run_shell::reset_status_spinner_interval(&mut status_spinner_interval, self);
                             }
                             Some(Ok(Event::Mouse(mouse))) => {
-                                if !matches!(mouse.kind, MouseEventKind::Moved) {
+                                if !matches!(mouse.kind, MouseEventKind::Moved)
+                                    || self.copy_selection_mouse_drag_active()
+                                {
                                     let scroll_only = self.handle_mouse_event(mouse);
                                     if !scroll_only {
                                         status_spinner_renderer.draw_full(self, terminal)?;
@@ -469,7 +471,9 @@ impl App {
                                 status_spinner_renderer.draw_full(self, terminal)?;
                             }
                             Some(Ok(Event::Mouse(mouse))) => {
-                                if !matches!(mouse.kind, MouseEventKind::Moved) {
+                                if !matches!(mouse.kind, MouseEventKind::Moved)
+                                    || self.copy_selection_mouse_drag_active()
+                                {
                                     let scroll_only = self.handle_mouse_event(mouse);
                                     if !scroll_only {
                                         status_spinner_renderer.draw_full(self, terminal)?;
@@ -1424,7 +1428,9 @@ impl App {
                                     status_spinner_renderer.draw_full(self, terminal)?;
                                 }
                                 Some(Ok(Event::Mouse(mouse))) => {
-                                    if !matches!(mouse.kind, MouseEventKind::Moved) {
+                                    if !matches!(mouse.kind, MouseEventKind::Moved)
+                                    || self.copy_selection_mouse_drag_active()
+                                {
                                         let scroll_only = self.handle_mouse_event(mouse);
                                         if !scroll_only {
                                             status_spinner_renderer.draw_full(self, terminal)?;
