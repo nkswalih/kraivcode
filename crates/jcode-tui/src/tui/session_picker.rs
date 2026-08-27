@@ -2362,12 +2362,53 @@ impl SessionPicker {
             })?;
         // Initialize mermaid image picker (fast default, optional probe via env)
         super::mermaid::init_picker();
+        // Clear any stale Kitty keyboard-enhancement state from a previous
+        // session that may have left the terminal in Kitty mode.
+        super::clear_stale_keyboard_enhancement();
         let perf_policy = crate::perf::tui_policy();
         let keyboard_enhanced = if perf_policy.enable_keyboard_enhancement {
-            super::enable_keyboard_enhancement()
+            // Windows crossterm cannot reliably parse Kitty sequences; disable
+            // by default unless JCODE_KITTY=1 forces it (WezTerm, kitty.app).
+            #[cfg(windows)]
+            let force = std::env::var("JCODE_KITTY")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false);
+            #[cfg(not(windows))]
+            let force = false;
+
+            if force {
+                super::enable_keyboard_enhancement()
+            } else {
+                #[cfg(windows)]
+                {
+                    crate::logging::info(
+                        "Kitty keyboard protocol: skipped (Windows default; set JCODE_KITTY=1 to force)",
+                    );
+                    false
+                }
+                #[cfg(not(windows))]
+                {
+                    match crossterm::terminal::supports_keyboard_enhancement() {
+                        Ok(true) => super::enable_keyboard_enhancement(),
+                        Ok(false) => {
+                            crate::logging::info(
+                                "Kitty keyboard protocol: skipped (terminal reports unsupported)",
+                            );
+                            false
+                        }
+                        Err(err) => {
+                            crate::logging::info(&format!(
+                                "Kitty keyboard protocol: skipped (query inconclusive: {err})"
+                            ));
+                            false
+                        }
+                    }
+                }
+            }
         } else {
             false
         };
+        super::set_actual_keyboard_enhanced(keyboard_enhanced);
         let mouse_capture = perf_policy.enable_mouse_capture;
         crossterm::execute!(std::io::stdout(), crossterm::event::EnableBracketedPaste)?;
         if mouse_capture {
