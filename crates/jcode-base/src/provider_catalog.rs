@@ -1022,7 +1022,11 @@ pub fn openai_compatible_profile_is_configured(profile: OpenAiCompatibleProfile)
         return false;
     }
 
-    if profile.id == OPENAI_COMPAT_PROFILE.id && api_base_uses_localhost(&resolved.api_base) {
+    // Any profile that does not require an API key and points at localhost is
+    // always usable without credentials (e.g. Omniroute, LM Studio, Ollama, the
+    // generic OpenAI-compatible profile). Treat it as configured so its live
+    // model catalog gets fetched and shown in /model.
+    if !resolved.requires_api_key && api_base_uses_localhost(&resolved.api_base) {
         return true;
     }
 

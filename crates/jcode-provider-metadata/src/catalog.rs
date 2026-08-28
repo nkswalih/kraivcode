@@ -363,7 +363,7 @@ pub const OLLAMA_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
 pub const OMNIROUTE_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
     id: "omniroute",
     display_name: "Omniroute",
-    api_base: "http://localhost:20128",
+    api_base: "http://localhost:20128/v1",
     api_key_env: "OMNIROUTE_API_KEY",
     env_file: "omniroute.env",
     setup_url: "https://github.com/1jehuang/jcode#openai-compatible-providers",
