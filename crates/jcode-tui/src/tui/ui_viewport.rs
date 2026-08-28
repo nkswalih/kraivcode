@@ -904,40 +904,6 @@ pub(super) fn draw_messages(
     }
     set_visible_copy_targets(visible_copy_targets);
 
-    if let Some(range) = app.copy_selection_range().filter(|range| {
-        range.start.pane == crate::tui::CopySelectionPane::Chat
-            && range.end.pane == crate::tui::CopySelectionPane::Chat
-    }) {
-        let (start, end) = if (range.start.abs_line, range.start.column)
-            <= (range.end.abs_line, range.end.column)
-        {
-            (range.start, range.end)
-        } else {
-            (range.end, range.start)
-        };
-
-        for abs_idx in start.abs_line.max(scroll)..=end.abs_line.min(visible_end.saturating_sub(1))
-        {
-            let rel_idx = abs_idx.saturating_sub(scroll);
-            if let Some(line) = visible_lines.get_mut(rel_idx) {
-                let copy_start = prepared.wrapped_copy_offset(abs_idx).unwrap_or(0);
-                let start_col = if abs_idx == start.abs_line {
-                    start.column.max(copy_start)
-                } else {
-                    copy_start
-                };
-                let end_col = if abs_idx == end.abs_line {
-                    end.column.max(copy_start)
-                } else {
-                    copy_viewport_line_text(abs_idx)
-                        .map(|text| UnicodeWidthStr::width(text.as_str()))
-                        .unwrap_or_else(|| line.width())
-                };
-                *line = highlight_line_selection(line, start_col, end_col);
-            }
-        }
-    }
-
     // Never draw image-placeholder marker text to the terminal. The marker
     // row only exists to carry `(hash, rows, cols)` into the prepare step,
     // which has already turned it into `prepared.image_regions`. Historically
@@ -997,6 +963,42 @@ pub(super) fn draw_messages(
                         ));
                     }
                 }
+            }
+        }
+    }
+
+    // Apply copy-selection highlight LAST so it cannot be overwritten by
+    // image-marker blanking or user-message bg fills above.
+    if let Some(range) = app.copy_selection_range().filter(|range| {
+        range.start.pane == crate::tui::CopySelectionPane::Chat
+            && range.end.pane == crate::tui::CopySelectionPane::Chat
+    }) {
+        let (start, end) = if (range.start.abs_line, range.start.column)
+            <= (range.end.abs_line, range.end.column)
+        {
+            (range.start, range.end)
+        } else {
+            (range.end, range.start)
+        };
+
+        for abs_idx in start.abs_line.max(scroll)..=end.abs_line.min(visible_end.saturating_sub(1))
+        {
+            let rel_idx = abs_idx.saturating_sub(scroll);
+            if let Some(line) = visible_lines.get_mut(rel_idx) {
+                let copy_start = prepared.wrapped_copy_offset(abs_idx).unwrap_or(0);
+                let start_col = if abs_idx == start.abs_line {
+                    start.column.max(copy_start)
+                } else {
+                    copy_start
+                };
+                let end_col = if abs_idx == end.abs_line {
+                    end.column.max(copy_start)
+                } else {
+                    copy_viewport_line_text(abs_idx)
+                        .map(|text| UnicodeWidthStr::width(text.as_str()))
+                        .unwrap_or_else(|| line.width())
+                };
+                *line = highlight_line_selection(line, start_col, end_col);
             }
         }
     }
@@ -1403,7 +1405,7 @@ fn windowed_min(widths: &[u16], window: usize) -> Vec<u16> {
 /// Lines for the pinned status band: optional todos followed by exactly one
 /// compact row per relevant background task. Completed tasks are shown briefly
 /// as confirmation, while running and failed tasks remain actionable.
-fn pinned_todo_band_lines(
+pub(crate) fn pinned_todo_band_lines(
     app: &dyn TuiState,
     width: u16,
     viewport_height: u16,
