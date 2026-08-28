@@ -3048,6 +3048,18 @@ impl App {
         let before_routes = provider.model_routes();
         self.provider.on_auth_changed();
 
+        // Also schedule this specific profile's /v1/models catalog refresh so
+        // its models appear in /model even when the profile is not the active
+        // runtime (the scheduler sweep may not run before the user checks).
+        if let Some(profile) =
+            crate::provider_catalog::openai_compatible_profile_by_id(&provider_id)
+        {
+            crate::provider::openrouter::maybe_schedule_openai_compatible_profile_catalog_refresh(
+                profile,
+                "post-login activation",
+            );
+        }
+
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.spawn(async move {
                 let result = provider.refresh_model_catalog().await;

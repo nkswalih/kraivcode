@@ -42,7 +42,7 @@ pub fn standard_catalog_lists_model(model_id: &str) -> Option<bool> {
 /// Schedule a background catalog refresh for a direct OpenAI-compatible
 /// profile through the composition-root hook (implemented by the runtime
 /// crate). Kept at its historical path for callers.
-pub(crate) fn maybe_schedule_openai_compatible_profile_catalog_refresh(
+pub fn maybe_schedule_openai_compatible_profile_catalog_refresh(
     profile: crate::provider_catalog::OpenAiCompatibleProfile,
     context: &'static str,
 ) -> bool {
