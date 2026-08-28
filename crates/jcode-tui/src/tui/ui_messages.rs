@@ -930,31 +930,31 @@ enum TodoCardPayload {
 // `dim_color()` (RGB 80) is too faint for meaningful metadata. Keep a compact
 // semantic palette here: cool colors describe structure/state, while amber is
 // reserved for priority and blocked work.
-fn todo_group_color() -> Color {
+pub(crate) fn todo_group_color() -> Color {
     rgb(190, 165, 235)
 }
 
-fn todo_label_color() -> Color {
+pub(crate) fn todo_label_color() -> Color {
     rgb(145, 155, 175)
 }
 
-fn todo_meta_color() -> Color {
+pub(crate) fn todo_meta_color() -> Color {
     rgb(155, 165, 180)
 }
 
-fn todo_score_color() -> Color {
+pub(crate) fn todo_score_color() -> Color {
     rgb(105, 205, 165)
 }
 
-fn todo_warning_color() -> Color {
+pub(crate) fn todo_warning_color() -> Color {
     rgb(225, 180, 80)
 }
 
-fn todo_failure_color() -> Color {
+pub(crate) fn todo_failure_color() -> Color {
     rgb(225, 105, 105)
 }
 
-fn todo_confidence_color() -> Color {
+pub(crate) fn todo_confidence_color() -> Color {
     rgb(135, 155, 180)
 }
 
@@ -971,6 +971,17 @@ impl TodoCardPayload {
             Self::Legacy(todos) => (todos, crate::todo::TodoPlan::default(), Vec::new()),
         }
     }
+}
+
+pub(crate) fn todos_payload_parts(
+    content: &str,
+) -> Option<(
+    Vec<crate::todo::TodoItem>,
+    crate::todo::TodoPlan,
+    Vec<crate::todo::TodoGoal>,
+)> {
+    let payload = serde_json::from_str::<TodoCardPayload>(content).ok()?;
+    Some(payload.into_parts())
 }
 
 struct ParsedTodoToolOutput {
