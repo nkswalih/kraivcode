@@ -83,6 +83,8 @@ pub(crate) use overlays::{
 };
 #[path = "ui_pinned.rs"]
 mod pinned_ui;
+#[path = "ui_intent_panel.rs"]
+mod intent_panel;
 #[path = "ui_prepare.rs"]
 pub(crate) mod prepare;
 #[path = "ui_smoothness.rs"]
@@ -2852,8 +2854,12 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     };
     let has_file_diff_edits =
         !swarm_page_active && diff_mode.is_file() && app.has_display_edit_tool_messages();
+    // The sticky Intent/Todo/Workers panel opens the right side pane whenever
+    // the session has todos or background workers, even with no pinned diff.
+    let has_intent_panel = !swarm_page_active
+        && (app.pinned_todos_payload().is_some() || !app.background_task_rows().is_empty());
     let has_right_side_pane_content =
-        has_side_panel_content || has_pinned_content || has_file_diff_edits;
+        has_side_panel_content || has_pinned_content || has_file_diff_edits || has_intent_panel;
     // The side panel is itself a single right-hand auxiliary surface and can render
     // visual content such as Mermaid diagrams inline. Pinned image/file-diff content
     // also uses that same right-hand surface. Do not also open the global pinned
@@ -3541,6 +3547,13 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 app.diff_line_wrap(),
                 app.diff_pane_focus(),
             );
+        } else if has_intent_panel {
+            if let Some(ref mut capture) = debug_capture {
+                capture
+                    .render_order
+                    .push("draw_intent_todo_workers".to_string());
+            }
+            intent_panel::draw_intent_panel(frame, diff_area, app);
         }
     }
 
