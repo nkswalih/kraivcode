@@ -541,6 +541,28 @@ pub fn openai_compatible_profile_static_models(profile: OpenAiCompatibleProfile)
             push("gemini-2.0-flash");
             push("gemini-2.0-flash-lite");
         }
+        "omniroute" => {
+            // Router "auto/*" aliases — omniroute picks the best backend per intent.
+            push("auto/best-coding");
+            push("auto/coding");
+            push("auto/best-reasoning");
+            push("auto/reasoning");
+            push("auto/best-chat");
+            push("auto/best-fast");
+            push("auto/claude-sonnet");
+            push("auto/claude-opus");
+            // A few concrete backends worth surfacing directly.
+            push("antigravity/claude-sonnet-4-6");
+            push("aug/sonnet4.6");
+            push("aug/opus4.8");
+        }
+        "agentrouter" => {
+            push("gpt-5.6-sol");
+            push("claude-opus-4-8");
+            push("claude-opus-5");
+            push("deepseek-v4-flash");
+            push("glm-5.3");
+        }
         _ => {}
     }
 
