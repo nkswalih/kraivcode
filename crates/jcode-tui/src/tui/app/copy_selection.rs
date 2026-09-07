@@ -554,13 +554,34 @@ impl App {
     pub(super) fn handle_copy_selection_mouse_with<F>(
         &mut self,
         mouse: MouseEvent,
-        _copy_text: F,
+        copy_text: F,
     ) -> Option<bool>
     where
         F: FnOnce(&str) -> bool,
     {
         let point = crate::tui::ui::copy_point_from_screen(mouse.column, mouse.row);
         match mouse.kind {
+            MouseEventKind::Up(MouseButton::Left) if self.copy_selection_auto_entered => {
+                self.copy_selection_pending_anchor = None;
+                self.copy_selection_edge_autoscroll = None;
+                if !self.copy_selection_dragging {
+                    return None;
+                }
+                self.copy_selection_dragging = false;
+                self.copy_selection_auto_entered = false;
+                self.copy_selection_mode = false;
+                let release_pane = self.current_copy_selection_pane();
+                let resolved = release_pane.and_then(|pane| {
+                    crate::tui::ui::copy_pane_drag_point(pane, mouse.column, mouse.row)
+                });
+                if let Some(point) = resolved.filter(|point| Some(point.pane) == release_pane) {
+                    self.update_selection_with_point(point, true);
+                }
+                if !self.copy_current_selection_to_clipboard_with(copy_text) {
+                    self.exit_copy_selection_mode();
+                }
+                Some(false)
+            }
             MouseEventKind::Down(MouseButton::Left) => {
                 let point = point?;
                 self.copy_selection_auto_entered = false;
@@ -724,20 +745,6 @@ impl App {
                     self.update_selection_with_point(point, true);
                 }
                 if self.copy_selection_mode {
-                    if self.copy_selection_auto_entered {
-                        self.copy_selection_auto_entered = false;
-                        // Editor-style mouse drag: releasing must NOT auto-copy
-                        // the selection. Exit the mode so normal key handling
-                        // (Ctrl+C copy, Backspace/Delete delete, typing replace)
-                        // resumes, but keep the selection range so the highlight
-                        // persists for the user to act on.
-                        self.copy_selection_mode = false;
-                        self.copy_selection_dragging = false;
-                        self.copy_selection_pending_anchor = None;
-                        self.copy_selection_goal_column = None;
-                        self.diff_pane_focus = false;
-                        self.diagram_focus = false;
-                    }
                     return Some(false);
                 }
                 // Defensive: a drag that armed without the mode. Never
