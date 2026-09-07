@@ -1,13 +1,12 @@
-//! Compact floating Intent/Todo/Workers overlay in the top-right of the chat
-//! viewport.
+//! Compact floating todo/worker overlay in the top-right of the chat viewport.
 //!
-//! Reuses the existing pinned todo band renderer (`viewport::pinned_todo_band_lines`)
-//! so the todo card and background-worker rows look exactly like the established
-//! kraivcode design — no new headings, no transcript changes, no layout split.
-//! The chat keeps its full width; the panel floats on top at half height.
+//! Reuses the existing pinned todo band renderer so the todo card and
+//! background-worker rows look exactly like the established kraivcode design.
+//! No border, no gutter — just the content overlaid at half height, keeping the
+//! chat full width. Hides automatically when no todos or workers exist.
 
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::widgets::Paragraph;
 
 use super::*;
 
@@ -21,6 +20,21 @@ pub(crate) fn draw_compact_panel(frame: &mut Frame, area: Rect, app: &dyn TuiSta
     if area.width < 40 || area.height < 4 {
         return;
     }
+    // Hide once everything is finished: no incomplete todos and no running or
+    // failed workers. Completed-only state collapses to nothing.
+    let has_active_todos = app
+        .pinned_todos_payload()
+        .and_then(|c| super::messages::todos_payload_parts(c))
+        .map(|(todos, _, _)| todos.iter().any(|t| t.status != "completed"))
+        .unwrap_or(false);
+    let has_active_workers = app
+        .background_task_rows()
+        .iter()
+        .any(|w| w.status != crate::tui::BackgroundTaskRowStatus::Completed);
+    if !has_active_todos && !has_active_workers {
+        return;
+    }
+
     let panel_width = (area.width * PANEL_WIDTH_FRACTION / PANEL_WIDTH_DENOM)
         .clamp(24, 60);
     let (mut lines, _) =
@@ -48,9 +62,7 @@ pub(crate) fn draw_compact_panel(frame: &mut Frame, area: Rect, app: &dyn TuiSta
         height: panel_height,
     };
 
-    let border_style = Style::default().fg(dim_color());
-    let block = Block::default().borders(Borders::LEFT).border_style(border_style);
-    let inner = block.inner(panel_area);
-    let paragraph = Paragraph::new(lines).block(block);
-    frame.render_widget(paragraph, inner);
+    // No border, no gutter — just the content.
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, panel_area);
 }
