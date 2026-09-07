@@ -42,11 +42,33 @@ struct RawSelectionPoint {
     column: usize,
 }
 
+/// Returns `(start, end)` in document order regardless of which point the
+/// caller treats as the drag anchor.
+///
+/// A selection is defined by an anchor point and a live cursor point, and
+/// the anchor can legitimately come *after* the cursor in the document (the
+/// user dragged upward, or right-to-left on a single line). Every helper
+/// below iterates `start.raw_line..=end.raw_line`, which silently becomes an
+/// empty range if `start` is actually after `end` in the buffer -- that was
+/// producing an empty copy for any "backwards" drag. Normalizing here once,
+/// at both public entry points, fixes that for every downstream helper.
+fn ordered_points(
+    a: crate::tui::CopySelectionPoint,
+    b: crate::tui::CopySelectionPoint,
+) -> (crate::tui::CopySelectionPoint, crate::tui::CopySelectionPoint) {
+    if (a.abs_line, a.column) <= (b.abs_line, b.column) {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
 pub(super) fn copy_selection_text_from_raw_lines(
     snapshot: &CopyViewportSnapshot,
     start: crate::tui::CopySelectionPoint,
     end: crate::tui::CopySelectionPoint,
 ) -> Option<String> {
+    let (start, end) = ordered_points(start, end);
     if let Some(text) = copy_selection_text_with_math_targets(snapshot, start, end) {
         return Some(text);
     }
@@ -116,6 +138,8 @@ fn copy_selection_text_from_raw_lines_base(
 /// Replace selected terminal-image placeholder rows with their semantic LaTeX
 /// source. Normal spans on either side still use the raw logical-line path, so
 /// wrapped prose retains the same copy behavior it has without an image.
+///
+/// Callers must pass `start <= end` in document order (see [`ordered_points`]).
 fn copy_selection_text_with_math_targets(
     snapshot: &CopyViewportSnapshot,
     start: crate::tui::CopySelectionPoint,
@@ -170,7 +194,11 @@ fn copy_selection_text_with_math_targets(
         };
     }
 
-    if (cursor.abs_line, cursor.column) <= (end.abs_line, end.column)
+    // Strict `<`: when the selection ends exactly at `cursor` (a zero-width
+    // remainder after the last replaced target), there is nothing left to
+    // copy. Using `<=` here used to push an empty string onto `parts`, which
+    // `parts.join("\n")` turned into a spurious trailing blank line.
+    if (cursor.abs_line, cursor.column) < (end.abs_line, end.column)
         && cursor.abs_line < snapshot.wrapped_plain_line_count()
     {
         parts.push(copy_selection_text_from_raw_lines_base(
@@ -189,6 +217,7 @@ pub(super) fn copy_selection_metrics_from_raw_lines(
     start: crate::tui::CopySelectionPoint,
     end: crate::tui::CopySelectionPoint,
 ) -> Option<(usize, usize)> {
+    let (start, end) = ordered_points(start, end);
     if let Some(text) = copy_selection_text_with_math_targets(snapshot, start, end) {
         return Some((text.chars().count(), text.split('\n').count().max(1)));
     }
@@ -355,5 +384,30 @@ mod tests {
             copy_selection_text_from_raw_lines(&snapshot, point(1, 0), point(3, 0)),
             Some("$$\nx^2 + \\alpha\n$$".to_string())
         );
+    }
+
+    #[test]
+    fn selection_dragged_backwards_still_copies_the_same_text() {
+        // Regression test: dragging the mouse upward (or right-to-left on one
+        // line) means `start` arrives after `end` in document order. Before
+        // the `ordered_points` fix, `start.raw_line..=end.raw_line` was an
+        // empty range in this case and copy silently returned "".
+        let snapshot = math_snapshot();
+        let forward = copy_selection_text_from_raw_lines(&snapshot, point(0, 0), point(4, 5));
+        let backward = copy_selection_text_from_raw_lines(&snapshot, point(4, 5), point(0, 0));
+        assert_eq!(forward, backward);
+        assert_eq!(forward.unwrap(), "before\n$$\nx^2 + \\alpha\n$$\nafter");
+    }
+
+    #[test]
+    fn selection_ending_exactly_at_target_boundary_has_no_trailing_newline() {
+        // Regression test: selecting the image block and stopping exactly at
+        // column 0 of the following line used to leave a spurious "\n" from
+        // an empty trailing part.
+        let snapshot = math_snapshot();
+        let copied = copy_selection_text_from_raw_lines(&snapshot, point(1, 0), point(4, 0))
+            .expect("selection should resolve");
+        assert_eq!(copied, "$$\nx^2 + \\alpha\n$$");
+        assert!(!copied.ends_with('\n'));
     }
 }
