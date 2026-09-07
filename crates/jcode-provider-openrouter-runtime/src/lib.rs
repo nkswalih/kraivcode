@@ -724,7 +724,7 @@ pub fn maybe_schedule_openai_compatible_profile_catalog_refresh(
         let models_cache = Arc::new(RwLock::new(ModelsCache::default()));
         let result = fetch_models_from_api(
             jcode_provider_core::shared_http_client(),
-            api_base,
+            api_base.clone(),
             auth,
             models_cache,
             Some(profile_id.clone()),
@@ -751,10 +751,24 @@ pub fn maybe_schedule_openai_compatible_profile_catalog_refresh(
                     ));
                 }
             }
-            Err(error) => jcode_base::logging::info(&format!(
-                "Failed to refresh OpenAI-compatible profile model catalog in background ({}): {} ({})",
-                context, display_name, error
-            )),
+            Err(error) => {
+                jcode_base::logging::info(&format!(
+                    "Failed to refresh OpenAI-compatible profile model catalog in background ({}): {} ({})",
+                    context, display_name, error
+                ));
+                jcode_base::bus::Bus::global().publish(jcode_base::bus::BusEvent::UiActivity(
+                    jcode_base::bus::UiActivity::catalog(
+                        None,
+                        format!(
+                            "{} model discovery failed\n\nJcode could not fetch the live model catalog from {}.\n\n{}\n\nVerify the endpoint is reachable and your API key is valid, then run /refresh-model-list.",
+                            display_name,
+                            api_base.clone(),
+                            error
+                        ),
+                        Some(format!("{}: model fetch failed", display_name)),
+                    ),
+                ));
+            }
         }
         finish_profile_catalog_refresh_with_outcome(&profile_id, succeeded);
     });
