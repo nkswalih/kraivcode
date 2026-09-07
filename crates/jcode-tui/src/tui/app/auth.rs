@@ -3302,11 +3302,10 @@ impl App {
                 // publishing LoginCompleted. The generic auth refresh still
                 // needs to rebuild routes and release the picker loading state,
                 // but must not race it with a second model selection.
+               // in handle_login_completed, before the profile_activation_owns_selection check:
                 let profile_activation_owns_selection =
-                    crate::provider_catalog::resolve_openai_compatible_profile_selection(
-                        &login.provider,
-                    )
-                    .is_some();
+                    crate::provider_catalog::openai_compatible_profile_id_for_display_name(&login.provider)
+                        .is_some();
                 self.trigger_provider_auth_changed(
                     Some(&login.provider),
                     prefer_strongest,
