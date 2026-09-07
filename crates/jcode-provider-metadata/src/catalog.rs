@@ -366,8 +366,8 @@ pub const OMNIROUTE_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
     api_base: "http://localhost:20128/v1",
     api_key_env: "OMNIROUTE_API_KEY",
     env_file: "omniroute.env",
-    setup_url: "https://github.com/1jehuang/jcode#openai-compatible-providers",
-    default_model: None,
+    setup_url: "http://localhost:20128/docs",
+    default_model: Some("auto/best-coding"),
     requires_api_key: false,
 };
 
