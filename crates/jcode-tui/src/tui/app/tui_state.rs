@@ -1920,6 +1920,10 @@ impl crate::tui::TuiState for App {
         self.account_picker_overlay.as_ref()
     }
 
+    fn skills_picker_overlay(&self) -> Option<&RefCell<crate::tui::skill_picker::SkillPicker>> {
+        self.skills_picker_overlay.as_ref()
+    }
+
     fn usage_overlay(&self) -> Option<&RefCell<crate::tui::usage_overlay::UsageOverlay>> {
         self.usage_overlay.as_ref()
     }
@@ -1954,6 +1958,10 @@ impl crate::tui::TuiState for App {
 
     fn permission_panel(&self) -> Option<crate::tui::PermissionPanelState> {
         self.permission_panel.as_ref().map(|(state, _)| state.clone())
+    }
+
+    fn pending_ask_user(&self) -> Option<&crate::tui::app::agent_persona::PendingAskUser> {
+        self.pending_ask_user.as_ref()
     }
 
     fn copy_selection_status(&self) -> Option<crate::tui::CopySelectionStatus> {

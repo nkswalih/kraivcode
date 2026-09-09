@@ -55,6 +55,7 @@ include!("tests/spinner_slash_commands.rs");
 include!("tests/command_suggestions_cache.rs");
 include!("tests/skill_invocation_multi_word.rs");
 include!("tests/prompt_history_cross_session.rs");
+include!("tests/skill_picker.rs");
 #[test]
 fn kv_cache_signature_prefix_match_allows_appended_messages() {
     let baseline_messages = vec![
@@ -857,7 +858,7 @@ fn version_command_shows_remote_server_identity_and_update_status() {
 fn skills_command_lists_loaded_and_endorsed_skills() {
     let mut app = create_test_app();
 
-    assert!(super::state_ui::handle_info_command(&mut app, "/skills"));
+    assert!(super::state_ui::handle_info_command(&mut app, "/skills-text"));
     let content = app.display_messages().last().unwrap().content.clone();
 
     assert!(content.contains("Loaded skills"), "{content}");
@@ -904,7 +905,7 @@ fn skills_command_marks_active_skill_in_remote_mode() {
     app.remote_skills = vec!["optimization".to_string(), "firefox-browser".to_string()];
     app.active_skill = Some("optimization".to_string());
 
-    assert!(super::state_ui::handle_info_command(&mut app, "/skills"));
+    assert!(super::state_ui::handle_info_command(&mut app, "/skills-text"));
     let content = app.display_messages().last().unwrap().content.clone();
 
     assert!(content.contains("- /optimization (active)"), "{content}");
@@ -943,7 +944,7 @@ fn skills_command_refreshes_registry_from_disk_before_listing() {
         "project-local skill must be visible immediately without reload"
     );
 
-    assert!(super::state_ui::handle_info_command(&mut app, "/skills"));
+    assert!(super::state_ui::handle_info_command(&mut app, "/skills-text"));
     let content = app.display_messages().last().unwrap().content.clone();
 
     assert!(
