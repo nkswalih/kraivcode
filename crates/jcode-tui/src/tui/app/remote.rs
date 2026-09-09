@@ -106,6 +106,10 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
     app.progress_mouse_scroll_animation();
     needs_redraw |= app.update_chat_overscroll();
     needs_redraw |= app.update_pinned_images_auto_hide();
+    // Progress the remote cross-provider failover countdown (arm -> resend).
+    needs_redraw |= app
+        .maybe_progress_remote_provider_failover_countdown(remote)
+        .await;
     // Dissolve stale (off-screen) reasoning traces with zero visible motion.
     needs_redraw |= app.gc_offscreen_reasoning_traces();
     needs_redraw |= dispatch_compacted_history_load(app, remote).await;
