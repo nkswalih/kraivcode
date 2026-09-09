@@ -396,6 +396,7 @@ impl App {
             && self.session_picker_overlay.is_none()
             && self.login_picker_overlay.is_none()
             && self.account_picker_overlay.is_none()
+            && self.skills_picker_overlay.is_none()
             && matches!(
                 self.onboarding_phase(),
                 Some(

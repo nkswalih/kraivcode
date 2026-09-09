@@ -94,6 +94,7 @@ impl App {
         self.pending_session_picker_load = None;
         self.login_picker_overlay = None;
         self.account_picker_overlay = None;
+        self.skills_picker_overlay = None;
         self.usage_overlay = None;
         self.inline_interactive_state = None;
         self.copy_selection_mode = false;
@@ -123,6 +124,7 @@ impl App {
         self.onboarding_flow = None;
         self.session_picker_overlay = None;
         self.session_picker_mode = SessionPickerMode::Resume;
+        self.skills_picker_overlay = None;
         self.onboarding_preview_mode = false;
         self.force_full_redraw = true;
         self.set_status_notice("Onboarding simulator: off");
@@ -250,6 +252,7 @@ impl App {
         let is_start_choice = matches!(&screen.phase, OnboardingPhase::StartChoice { .. });
         self.session_picker_overlay = None;
         self.session_picker_mode = SessionPickerMode::Resume;
+        self.skills_picker_overlay = None;
         self.onboarding_flow = Some(OnboardingFlow {
             phase: screen.phase,
         });
