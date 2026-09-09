@@ -306,6 +306,48 @@ async fn handle_remote_key_internal(
         return Ok(());
     }
 
+    // Plan-mode `ask_user` popup claims all keys while an agent question is
+    // open (the agent's turn is parked waiting for the answer).
+    if app.pending_ask_user().is_some() {
+        match app.handle_pending_ask_user_key(code, modifiers, text_input) {
+            super::super::agent_persona::AskUserAction::None => {}
+            super::super::agent_persona::AskUserAction::Submitted(value) => {
+                if let Some(pending) = app.take_pending_ask_user() {
+                    remote
+                        .send_ask_user_response(&pending.request_id, value.clone(), false)
+                        .await?;
+                    // Synthesized Plan-followup popup: a free-text answer (any
+                    // value that isn't the Continue sentinel) becomes the next
+                    // user turn so the answer reaches the agent.
+                    if pending.plan_followup
+                        && let Some(text) = value
+                        && text != jcode_app_core::agent::persona::PLAN_FOLLOWUP_CONTINUE_VALUE
+                    {
+                        super::input_dispatch::begin_remote_send(
+                            app,
+                            remote,
+                            text,
+                            Vec::new(),
+                            false,
+                            None,
+                            false,
+                            0,
+                        )
+                        .await?;
+                    }
+                }
+            }
+            super::super::agent_persona::AskUserAction::Cancelled => {
+                if let Some(pending) = app.take_pending_ask_user() {
+                    remote
+                        .send_ask_user_response(&pending.request_id, None, true)
+                        .await?;
+                }
+            }
+        }
+        return Ok(());
+    }
+
     // Alt+5 always resets the simulator before modal routing, including in the
     // remote/client mode used by self-dev sessions.
     if app.handle_onboarding_sim_reset_shortcut(code, modifiers) {
@@ -346,6 +388,13 @@ async fn handle_remote_key_internal(
         if let Some(command) = app.next_account_picker_action(code, modifiers)? {
             app.handle_account_picker_command_remote(remote, command)
                 .await?;
+        }
+        return Ok(());
+    }
+
+    if app.skills_picker_overlay.is_some() {
+        if let Some(command) = app.next_skills_picker_action(code, modifiers)? {
+            app.handle_skills_picker_command(command);
         }
         return Ok(());
     }
