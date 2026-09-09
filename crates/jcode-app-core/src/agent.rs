@@ -5,6 +5,7 @@ mod environment;
 mod inline_tail;
 mod interrupts;
 mod messages;
+pub mod persona;
 mod prompting;
 mod provider;
 mod response_recovery;
@@ -246,6 +247,11 @@ pub struct Agent {
     rewind_undo_snapshot: Option<RewindUndoSnapshot>,
     /// Channel for tools to request stdin input from the user
     stdin_request_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::tool::StdinInputRequest>>,
+    /// Channel for the `ask_user` tool to raise an interactive Plan-mode popup.
+    ask_user_request_tx:
+        Option<tokio::sync::mpsc::UnboundedSender<crate::tool::AskUserQuestion>>,
+    /// Active session persona (set per message from the client; defaults to Build).
+    persona: crate::agent::persona::AgentPersona,
     /// Canonical reducer-backed view of runtime provider/model selection.
     provider_runtime_state: ProviderRuntimeState,
     /// When true, this session is an inline swarm worker: stream a throttled
@@ -324,6 +330,8 @@ impl Agent {
             memory_enabled: crate::config::config().features.memory,
             rewind_undo_snapshot: None,
             stdin_request_tx: None,
+            ask_user_request_tx: None,
+            persona: crate::agent::persona::AgentPersona::Build,
             provider_runtime_state: ProviderRuntimeState::observed(initial_provider_model),
             inline_output_tap: false,
             inline_tail: inline_tail::InlineTailBuffer::default(),

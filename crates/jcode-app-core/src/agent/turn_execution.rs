@@ -379,6 +379,37 @@ impl Agent {
         self.stdin_request_tx = Some(tx);
     }
 
+    /// Set the channel that forwards `ask_user` questions to the connected client.
+    pub fn set_ask_user_request_tx(
+        &mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::tool::AskUserQuestion>,
+    ) {
+        self.ask_user_request_tx = Some(tx);
+    }
+
+    /// Set the active session persona.
+    pub fn set_persona(&mut self, persona: crate::agent::persona::AgentPersona) {
+        if self.persona != persona {
+            crate::logging::info(&format!(
+                "Persona switched to '{}' for session {}",
+                persona.key(),
+                self.session.id
+            ));
+            // The locked tool snapshot was built under the previous persona. Clear
+            // it so the next turn rebuilds the provider tool list under the new
+            // persona's allowlist (one deliberate provider cache miss).
+            self.locked_tools = None;
+            self.mcp_late_register_resolved = false;
+            self.cache_tracker.reset();
+        }
+        self.persona = persona;
+    }
+
+    /// The currently active session persona.
+    pub fn persona(&self) -> crate::agent::persona::AgentPersona {
+        self.persona
+    }
+
     pub(super) async fn tool_definitions(&mut self) -> Vec<ToolDefinition> {
         if self.session.is_canary {
             self.registry.register_selfdev_tools().await;
@@ -457,13 +488,31 @@ impl Agent {
     }
 
     /// Build the agent's tool definitions from the registry, applying the
-    /// session's `allowed_tools`, `disabled_tools`, and self-dev filters.
+    /// session's `allowed_tools`, `disabled_tools`, persona, and self-dev filters.
     async fn build_filtered_tool_definitions(&self) -> Vec<ToolDefinition> {
         let mut tools = self.registry.definitions(self.allowed_tools.as_ref()).await;
         if !self.disabled_tools.is_empty() {
             tools.retain(|tool| {
                 !crate::tool::tool_name_is_disabled(&self.disabled_tools, &tool.name)
             });
+        }
+        if let Some(allowlist) =
+            crate::agent::persona::persona_tool_policy(self.persona).allowed_tools
+        {
+            let blocked = tools
+                .iter()
+                .filter(|tool| !allowlist.contains(&tool.name))
+                .map(|tool| tool.name.clone())
+                .collect::<Vec<_>>();
+            if !blocked.is_empty() {
+                crate::logging::info(&format!(
+                    "Persona '{}' hides {} tool(s) from the model: {}",
+                    self.persona.key(),
+                    blocked.len(),
+                    blocked.join(", ")
+                ));
+            }
+            tools.retain(|tool| allowlist.contains(&tool.name));
         }
         Self::apply_selfdev_tool_surface(&mut tools, self.session.is_canary);
         self.apply_mcp_tool_exposure(&mut tools);
@@ -561,6 +610,7 @@ impl Agent {
             tool_call_id: call_id,
             working_dir: self.working_dir().map(PathBuf::from),
             stdin_request_tx: self.stdin_request_tx.clone(),
+            ask_user_request_tx: self.ask_user_request_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
             execution_mode: ToolExecutionMode::Direct,
         };
@@ -618,6 +668,15 @@ impl Agent {
     }
 
     pub(super) fn validate_tool_allowed(&self, name: &str) -> Result<()> {
+        if let Some(allowlist) =
+            crate::agent::persona::persona_tool_policy(self.persona).allowed_tools
+            && !allowlist.contains(name)
+        {
+            return Err(anyhow::anyhow!(
+                "Tool '{name}' is not allowed in {} mode",
+                self.persona.label()
+            ));
+        }
         if let Some(allowed) = self.allowed_tools.as_ref()
             && !crate::tool::tool_name_is_allowed(allowed, name)
         {
