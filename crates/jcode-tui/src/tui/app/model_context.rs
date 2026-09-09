@@ -26,6 +26,19 @@ impl App {
         "To turn this off, set [provider].cross_provider_failover = \"manual\" in ~/.jcode/config.toml or export JCODE_CROSS_PROVIDER_FAILOVER=manual."
     }
 
+    /// Shorten a provider failure reason so the one-line status notice stays
+    /// scannable while retaining the "why" the user asked for.
+    fn format_failover_reason(reason: &str) -> String {
+        const MAX: usize = 48;
+        let trimmed = reason.trim();
+        if trimmed.chars().count() <= MAX {
+            return trimmed.to_string();
+        }
+        let mut truncated: String = trimmed.chars().take(MAX).collect();
+        truncated.push('…');
+        truncated
+    }
+
     /// Shared post-switch bookkeeping for every local model/provider switch
     /// path (/model, model cycling, failover, post-login activation).
     ///
@@ -89,8 +102,11 @@ impl App {
         if now < pending.deadline {
             let remaining = pending.deadline.saturating_duration_since(now).as_secs() + 1;
             self.set_status_notice(format!(
-                "Provider auto-switch → {} in {}s (Esc to cancel)",
-                pending.prompt.to_label, remaining
+                "{} failed - auto-switch → {} in {}s - {} (Esc to cancel)",
+                pending.prompt.from_label,
+                pending.prompt.to_label,
+                remaining,
+                Self::format_failover_reason(&pending.prompt.reason)
             ));
             return true;
         }
@@ -124,6 +140,94 @@ impl App {
         }
     }
 
+    /// Remote-session equivalent of the local auto-switch countdown. On expiry
+    /// the failed payload is re-sent to the server; the daemon's failover
+    /// sequence routes it to the candidate provider (the failing one is marked
+    /// unavailable, so a bare re-send naturally lands elsewhere).
+    pub(super) async fn maybe_progress_remote_provider_failover_countdown(
+        &mut self,
+        remote: &mut crate::tui::backend::RemoteConnection,
+    ) -> bool {
+        let Some(pending) = self.pending_provider_failover.clone() else {
+            return false;
+        };
+        if self.is_processing {
+            return false;
+        }
+        let now = Instant::now();
+        if now < pending.deadline {
+            let remaining = pending.deadline.saturating_duration_since(now).as_secs() + 1;
+            self.set_status_notice(format!(
+                "{} failed - auto-switch → {} in {}s - {} (Esc to cancel)",
+                pending.prompt.from_label,
+                pending.prompt.to_label,
+                remaining,
+                Self::format_failover_reason(&pending.prompt.reason)
+            ));
+            return true;
+        }
+
+        self.pending_provider_failover = None;
+        let Some(payload) = pending.resend else {
+            return false;
+        };
+        let from = pending.prompt.from_label.clone();
+        let to = pending.prompt.to_label.clone();
+        self.push_display_message(DisplayMessage::system(format!(
+            "⚡ Auto-switched provider after countdown: {} → {}.\n\nResending your message on model {}.\n\n{}",
+            from,
+            to,
+            to,
+            Self::failover_config_hint(),
+        )));
+        self.set_status_notice(format!("Provider → {} (retrying)", to));
+        let _ = super::remote::begin_remote_send(
+            self,
+            remote,
+            payload.content,
+            payload.images,
+            payload.is_system,
+            payload.system_reminder,
+            payload.auto_retry,
+            0,
+        )
+        .await;
+        true
+    }
+
+    /// Arm the 3-second auto-switch countdown for a remote session that just
+    /// received a provider failover prompt, staging the failed payload for
+    /// re-send on expiry.
+    pub(super) fn arm_remote_provider_failover_countdown(
+        &mut self,
+        prompt: crate::provider::ProviderFailoverPrompt,
+        payload: super::FallbackResendPayload,
+    ) {
+        let input_summary = Self::format_failover_input_summary(&prompt);
+        let to_label = prompt.to_label.clone();
+        let from_label = prompt.from_label.clone();
+        let reason = prompt.reason.clone();
+        self.pending_provider_failover = Some(super::PendingProviderFailover {
+            prompt,
+            deadline: Instant::now() + Duration::from_secs(3),
+            resend: Some(payload),
+        });
+        self.push_display_message(DisplayMessage::system(format!(
+            "⚠ {} became unavailable - jcode will switch to {} in 3 seconds unless you cancel.\n\nReason: {}\n\nRetrying would send {}. Press Esc to cancel.\n\n{}",
+            from_label,
+            to_label,
+            reason,
+            input_summary,
+            Self::failover_config_hint(),
+        )));
+        self.set_status_notice(format!(
+            "{} failed - auto-switch → {} in 3s - {}",
+            from_label,
+            to_label,
+            Self::format_failover_reason(&reason)
+        ));
+    }
+
     fn handle_provider_failover_prompt(&mut self, prompt: crate::provider::ProviderFailoverPrompt) {
         let input_summary = Self::format_failover_input_summary(&prompt);
         let manual_message = format!(
@@ -148,9 +252,13 @@ impl App {
                 ));
             }
             crate::config::CrossProviderFailoverMode::Countdown if !self.is_remote => {
+                let to_label = prompt.to_label.clone();
+                let from_label = prompt.from_label.clone();
+                let reason = prompt.reason.clone();
                 self.pending_provider_failover = Some(super::PendingProviderFailover {
                     prompt: prompt.clone(),
                     deadline: Instant::now() + Duration::from_secs(3),
+                    resend: None,
                 });
                 self.push_display_message(DisplayMessage::system(format!(
                     "⚠ {} became unavailable - jcode will switch to {} in 3 seconds unless you cancel.\n\nReason: {}\n\nRetrying would send {}. Press Esc to cancel.\n\n{}",
@@ -161,8 +269,10 @@ impl App {
                     Self::failover_config_hint(),
                 )));
                 self.set_status_notice(format!(
-                    "Provider auto-switch → {} in 3s (Esc to cancel)",
-                    prompt.to_label
+                    "{} failed - auto-switch → {} in 3s - {} (Esc to cancel)",
+                    from_label,
+                    to_label,
+                    Self::format_failover_reason(&reason)
                 ));
             }
             _ => {
