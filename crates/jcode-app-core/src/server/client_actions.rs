@@ -320,6 +320,7 @@ pub(super) fn handle_run_subagent(
             tool_call_id: tool_call_id.clone(),
             working_dir,
             stdin_request_tx: None,
+            ask_user_request_tx: None,
             graceful_shutdown_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
         };
@@ -1077,6 +1078,24 @@ pub(super) async fn handle_stdin_response(
 ) {
     if let Some(tx) = stdin_responses.lock().await.remove(&request_id) {
         let _ = tx.send(input);
+    }
+    let _ = client_event_tx.send(ServerEvent::Done { id });
+}
+
+/// Resolve a parked `ask_user` oneshot, unblocking the agent turn that asked
+/// the question.
+pub(super) async fn handle_ask_user_response(
+    id: u64,
+    request_id: String,
+    value: Option<String>,
+    cancelled: bool,
+    ask_user_responses: &Arc<
+        Mutex<HashMap<String, tokio::sync::oneshot::Sender<crate::tool::AskUserAnswer>>>,
+    >,
+    client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
+) {
+    if let Some(tx) = ask_user_responses.lock().await.remove(&request_id) {
+        let _ = tx.send(crate::tool::AskUserAnswer { value, cancelled });
     }
     let _ = client_event_tx.send(ServerEvent::Done { id });
 }

@@ -2,8 +2,8 @@ use super::available_models_dedup::available_models_dedup_key;
 use super::client_actions::{
     AgentTaskContext, NotifySessionContext, handle_agent_task, handle_compact, handle_input_shell,
     handle_notify_session, handle_rename_session, handle_run_subagent, handle_set_feature,
-    handle_set_subagent_model, handle_split, handle_stdin_response, handle_transfer,
-    handle_trigger_memory_extraction,
+    handle_set_subagent_model, handle_split, handle_ask_user_response, handle_stdin_response,
+    handle_transfer, handle_trigger_memory_extraction,
 };
 use super::client_comm::{
     handle_comm_channel_members, handle_comm_list, handle_comm_list_channels, handle_comm_message,
@@ -112,6 +112,8 @@ struct ProcessingMessage {
     images: Vec<(String, String)>,
     system_reminder: Option<String>,
     active_skill: Option<String>,
+    /// Persona key ("build", "plan", …) supplied by the client for this message.
+    persona: Option<crate::agent::persona::AgentPersona>,
 }
 
 struct ProcessingState<'a> {
@@ -658,6 +660,9 @@ pub(super) async fn handle_client(
 
     let stdin_responses: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<String>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let ask_user_responses: Arc<
+        Mutex<HashMap<String, tokio::sync::oneshot::Sender<crate::tool::AskUserAnswer>>>,
+    > = Arc::new(Mutex::new(HashMap::new()));
 
     // Subscribe to bus events so we can forward ModelsUpdated to this client
     // (e.g. when Copilot finishes async init after the initial History was sent)
@@ -685,6 +690,40 @@ pub(super) async fn handle_client(
                     request_id,
                     prompt: req.prompt,
                     is_password: req.is_password,
+                    tool_call_id: tool_call_id.clone(),
+                });
+            }
+        })
+    };
+
+    // Set up ask_user request forwarding: the tool raises a question, we send
+    // AskUserRequest to the TUI and park the oneshot until AskUserResponse.
+    let (ask_user_req_tx, mut ask_user_req_rx) =
+        tokio::sync::mpsc::unbounded_channel::<crate::tool::AskUserQuestion>();
+    {
+        let mut agent_guard = agent.lock().await;
+        agent_guard.set_ask_user_request_tx(ask_user_req_tx);
+    }
+    let _ask_user_forwarder = {
+        let client_event_tx = client_event_tx.clone();
+        let ask_user_responses = ask_user_responses.clone();
+        let tool_call_id = String::new();
+        tokio::spawn(async move {
+            while let Some(req) = ask_user_req_rx.recv().await {
+                let request_id = req.request_id.clone();
+                ask_user_responses
+                    .lock()
+                    .await
+                    .insert(request_id.clone(), req.response_tx);
+                let _ = client_event_tx.send(ServerEvent::AskUserRequest {
+                    request_id,
+                    question: req.question,
+                    options: req
+                        .options
+                        .into_iter()
+                        .map(|opt| (opt.label, opt.value))
+                        .collect(),
+                    free_text: req.free_text,
                     tool_call_id: tool_call_id.clone(),
                 });
             }
@@ -1108,6 +1147,7 @@ pub(super) async fn handle_client(
                 system_reminder,
                 active_skill,
                 no_reply,
+                persona,
             } => {
                 if no_reply {
                     append_context_message(
@@ -1136,6 +1176,9 @@ pub(super) async fn handle_client(
                         images,
                         system_reminder,
                         active_skill,
+                        persona: persona
+                            .as_deref()
+                            .and_then(|key| crate::agent::persona::AgentPersona::from_key(key)),
                     },
                     &client_session_id,
                     &mut ProcessingState {
@@ -1144,6 +1187,7 @@ pub(super) async fn handle_client(
                         session_id: &mut processing_session_id,
                         task: &mut processing_task,
                     },
+                    &ask_user_responses,
                     &agent,
                     &client_event_tx,
                     &processing_done_tx,
@@ -1963,6 +2007,23 @@ pub(super) async fn handle_client(
             } => {
                 handle_stdin_response(id, request_id, input, &stdin_responses, &client_event_tx)
                     .await;
+            }
+
+            Request::AskUserResponse {
+                id,
+                request_id,
+                value,
+                cancelled,
+            } => {
+                handle_ask_user_response(
+                    id,
+                    request_id,
+                    value,
+                    cancelled,
+                    &ask_user_responses,
+                    &client_event_tx,
+                )
+                .await;
             }
 
             Request::AgentTask { id, task, .. } => {
@@ -2842,6 +2903,9 @@ async fn start_processing_message(
     message: ProcessingMessage,
     client_session_id: &str,
     state: &mut ProcessingState<'_>,
+    ask_user_responses: &Arc<
+        Mutex<HashMap<String, tokio::sync::oneshot::Sender<crate::tool::AskUserAnswer>>>,
+    >,
     agent: &Arc<Mutex<Agent>>,
     client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
     processing_done_tx: &mpsc::UnboundedSender<(u64, Result<()>, Option<String>)>,
@@ -2854,6 +2918,7 @@ async fn start_processing_message(
         images,
         system_reminder,
         active_skill,
+        persona,
     } = message;
     if server_reload_starting() {
         crate::logging::info(&format!(
@@ -2885,6 +2950,10 @@ async fn start_processing_message(
             retry_after_secs: None,
         });
         return;
+    }
+
+    if let Some(persona) = persona {
+        agent.lock().await.set_persona(persona);
     }
 
     *state.client_is_processing = true;
@@ -2922,6 +2991,7 @@ async fn start_processing_message(
     };
     let agent = Arc::clone(agent);
     let report_agent = Arc::clone(&agent);
+    let ask_user_responses = Arc::clone(ask_user_responses);
     let tx = super::state::session_event_fanout_sender_with_fallback(
         client_session_id.to_string(),
         Arc::clone(swarm.members),
@@ -2931,6 +3001,9 @@ async fn start_processing_message(
     crate::logging::info(&format!("Processing message id={} spawning task", id));
     *state.task = Some(tokio::spawn(async move {
         let event_tx = tx.clone();
+        // Persona is fixed at message start (set_persona never changes mid-turn),
+        // so one lock here is enough; `agent` is moved into streaming below.
+        let was_plan_turn = agent.lock().await.persona().is_plan();
         let result = match std::panic::AssertUnwindSafe(crate::hooks::with_client_terminal_env(
             client_terminal_env,
             process_message_streaming_mpsc(agent, &content, images, system_reminder, event_tx),
@@ -2970,6 +3043,8 @@ async fn start_processing_message(
         } else {
             None
         };
+        let turn_ok = result.is_ok();
+        let followup_text = completion_report.clone();
         // Keep the terminal event on the same ordered fanout channel as the
         // stream. Sending it later from the owning client's event loop could
         // race ahead of the final MessageEnd for newly attached clients.
@@ -2985,6 +3060,44 @@ async fn start_processing_message(
         };
         let _ = tx.send(terminal_event);
         let _ = done_tx.send((id, result, completion_report));
+
+        // Plan-mode prose-question fallback. If a Plan turn finished with a `?`
+        // in text instead of calling ask_user, synthesize a popup so the human
+        // still has a way to answer. The TUI recognizes the marker tool_call_id
+        // and re-submits a free-text answer to the session as the next user turn.
+        if turn_ok
+            && was_plan_turn
+            && let Some(question) = crate::agent::persona::extract_trailing_question(
+                followup_text.as_deref().unwrap_or(""),
+                crate::agent::persona::PLAN_FOLLOWUP_MAX_CHARS,
+            )
+        {
+            let request_id = crate::id::new_id("plan_followup");
+            let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+            let question_for_popup = format!(
+                "The agent finished in text with an open question. Type an \
+                 answer to continue, or choose Continue to stop.\n\n{question}"
+            );
+            ask_user_responses
+                .lock()
+                .await
+                .insert(request_id.clone(), response_tx);
+            let _ = tx.send(ServerEvent::AskUserRequest {
+                request_id: request_id.clone(),
+                question: question_for_popup,
+                options: crate::agent::persona::plan_followup_options(),
+                free_text: true,
+                tool_call_id: crate::agent::persona::PLAN_FOLLOWUP_TOOL_CALL_ID.to_string(),
+            });
+            // The client answers via AskUserResponse, which resolves the oneshot
+            // and sends the Done for that request. Nothing further daemon-side:
+            // free-text answers are re-submitted by the client as a new message.
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(600), response_rx)
+                .await;
+            // Drop any stale parked sender (e.g. the client disconnected) so the
+            // shared map never accumulates dead entries.
+            ask_user_responses.lock().await.remove(&request_id);
+        }
     }));
 }
 
