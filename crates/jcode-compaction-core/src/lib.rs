@@ -345,6 +345,106 @@ pub fn estimate_compaction_tokens(
     estimate_compaction_tokens_from_chars(summary_chars + active_message_chars, token_budget)
 }
 
+/// Word + punctuation token heuristic, matching `jcode_core::util::estimate_tokens`
+/// (keep in sync). Returns a single-pass approximation that tracks byte-pair
+/// tokenizers better than raw `chars/4`.
+fn estimate_tokens_heuristic(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+    let mut words = 0usize;
+    let mut punct_runs = 0usize;
+    let (mut in_word, mut in_punct) = (false, false);
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            in_word = false;
+            in_punct = false;
+        } else if ch.is_alphanumeric() {
+            if !in_word {
+                words += 1;
+                in_word = true;
+            }
+            in_punct = false;
+        } else {
+            if !in_punct {
+                punct_runs += 1;
+                in_punct = true;
+            }
+            in_word = false;
+        }
+    }
+    (words as f64 * 1.3 + punct_runs as f64 + 1.0) as usize
+}
+
+/// Token estimate for one message using the text heuristic for text-ish blocks
+/// and the flat [`IMAGE_TOKEN_COST`] charge for images (mirroring
+/// [`content_char_count`]'s treatment of images so nothing regresses).
+pub fn message_token_count(msg: &Message) -> usize {
+    msg.content
+        .iter()
+        .map(|block| match block {
+            ContentBlock::Text { text, .. } => estimate_tokens_heuristic(text),
+            ContentBlock::Reasoning { text } => estimate_tokens_heuristic(text),
+            ContentBlock::ReasoningTrace { text } => estimate_tokens_heuristic(text),
+            ContentBlock::AnthropicThinking { thinking, signature } => {
+                estimate_tokens_heuristic(thinking) + estimate_tokens_heuristic(signature)
+            }
+            ContentBlock::OpenAIReasoning {
+                id,
+                summary,
+                encrypted_content,
+                status,
+            } => {
+                estimate_tokens_heuristic(id)
+                    + summary.iter().map(String::as_str).map(estimate_tokens_heuristic).sum::<usize>()
+                    + encrypted_content
+                        .as_ref()
+                        .map(String::as_str)
+                        .map(estimate_tokens_heuristic)
+                        .unwrap_or(0)
+                    + status
+                        .as_ref()
+                        .map(String::as_str)
+                        .map(estimate_tokens_heuristic)
+                        .unwrap_or(0)
+            }
+            // Tool payloads are JSON-ish: the +N addend mirrors content_char_count.
+            ContentBlock::ToolUse { input, .. } => {
+                estimate_tokens_heuristic(&input.to_string()) + 50
+            }
+            ContentBlock::ToolResult { content, .. } => {
+                estimate_tokens_heuristic(content) + 20
+            }
+            ContentBlock::Image { .. } => IMAGE_TOKEN_COST * CHARS_PER_TOKEN,
+            // Encrypted base64: heuristic on it is meaningless, keep the flat ratio.
+            ContentBlock::OpenAICompaction { encrypted_content } => {
+                encrypted_content.len() / CHARS_PER_TOKEN
+            }
+        })
+        .sum()
+}
+
+/// System-prompt + tool-definition overhead applied to production-size token
+/// budgets (tiny test budgets skip it so numbers stay small).
+pub fn compaction_overhead_tokens(token_budget: usize) -> usize {
+    if token_budget >= DEFAULT_TOKEN_BUDGET / 2 {
+        SYSTEM_OVERHEAD_TOKENS
+    } else {
+        0
+    }
+}
+
+/// Token estimate for compaction when the active messages' text is available:
+/// text blocks via the word + punctuation heuristic, images via their flat token
+/// cost (see [`message_token_count`]).
+pub fn estimate_compaction_tokens_from_text(
+    summary_text: &str,
+    message_tokens: usize,
+    token_budget: usize,
+) -> usize {
+    estimate_tokens_heuristic(summary_text) + message_tokens + compaction_overhead_tokens(token_budget)
+}
+
 /// Best-effort context size (tokens) from a provider usage report.
 ///
 /// Providers disagree on what `input_tokens` means:
