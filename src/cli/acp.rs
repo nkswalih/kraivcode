@@ -944,6 +944,7 @@ impl AcpRuntime {
                 images,
                 system_reminder: None,
                 active_skill: None,
+                persona: None,
                 no_reply: false,
             })
             .await;
