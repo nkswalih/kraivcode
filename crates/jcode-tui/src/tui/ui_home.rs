@@ -1,8 +1,45 @@
-use super::{dim_color, header_name_color, TuiState};
-use ratatui::{
-    prelude::*,
-    widgets::Paragraph,
-};
+use super::{dim_color, TuiState};
+use ratatui::{prelude::*, widgets::Paragraph};
+use unicode_width::UnicodeWidthStr;
+
+fn logo_yellow() -> Color {
+    crate::tui::color_support::rgb(255, 210, 0)
+}
+
+/// Full double-line box-drawing wordmark, 6 rows × 69 columns.
+/// Rows 2-3 are padded with trailing spaces to match the 69-col width.
+const WORDMARK: [&str; 6] = [
+    "██╗  ██╗██████╗  █████╗ ██╗██╗   ██╗ ██████╗ ██████╗ ██████╗ ███████╗",
+    "██║ ██╔╝██╔══██╗██╔══██╗██║██║   ██║██╔════╝██╔═══██╗██╔══██╗██╔════╝",
+    "█████╔╝ ██████╔╝███████║██║██║   ██║██║     ██║   ██║██║  ██║█████╗  ",
+    "██╔═██╗ ██╔══██╗██╔══██║██║╚██╗ ██╔╝██║     ██║   ██║██║  ██║██╔══╝  ",
+    "██║  ██╗██║  ██║██║  ██║██║ ╚████╔╝ ╚██████╗╚██████╔╝██████╔╝███████╗",
+    "╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝",
+];
+
+/// Subtitle below the wordmark.
+const SUBTITLE: &str = "CODE \u{25AA} THINK \u{25AA} PLAN \u{25AA} BUILD";
+
+/// Build the logo lines. Falls back to plain "KRAIVCODE" when too narrow/short.
+fn build_logo_lines(width: u16, height: u16) -> Vec<Line<'static>> {
+    let wordmark_w = WORDMARK
+        .iter()
+        .map(|r| UnicodeWidthStr::width(*r))
+        .max()
+        .unwrap_or(0);
+    if (width as usize) < (wordmark_w + 4) || height < (WORDMARK.len() as u16 + 3) {
+        return vec![Line::from(Span::styled(
+            "KRAIVCODE",
+            Style::default().fg(logo_yellow()).bold(),
+        ))];
+    }
+
+    let yellow = Style::default().fg(logo_yellow()).bold();
+    WORDMARK
+        .iter()
+        .map(|row| Line::from(Span::styled(*row, yellow)))
+        .collect()
+}
 
 pub(super) fn draw_home(
     frame: &mut Frame,
@@ -11,19 +48,20 @@ pub(super) fn draw_home(
     input_height: u16,
 ) -> Rect {
     let input_height = input_height.max(1);
-    // input_height already includes the 2 border rows (top + bottom)
-    // computed by draw_input's .block() geometry; do not double-count.
     let composer_height = input_height;
-
     let composer_width = area.width.clamp(40, 88);
 
-    let used_height = 1 + 1 + composer_height + 1;
+    let logo_lines = build_logo_lines(area.width, area.height);
+    let logo_h = logo_lines.len() as u16;
+
+    let used_height = 1 + logo_h + 1 + 1 + composer_height + 1;
     let top_pad = area.height.saturating_sub(used_height) / 2;
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(top_pad),
+            Constraint::Length(logo_h),
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(composer_height),
@@ -33,14 +71,17 @@ pub(super) fn draw_home(
         .split(area);
 
     frame.render_widget(
+        Paragraph::new(logo_lines).alignment(Alignment::Center),
+        chunks[1],
+    );
+
+    frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
-            "KRAIVCODE",
-            Style::default()
-                .fg(header_name_color())
-                .bold(),
+            SUBTITLE,
+            Style::default().fg(logo_yellow()).dim(),
         )))
         .alignment(Alignment::Center),
-        chunks[1],
+        chunks[2],
     );
 
     frame.render_widget(
@@ -49,32 +90,70 @@ pub(super) fn draw_home(
             Style::default().fg(dim_color()),
         )))
         .alignment(Alignment::Center),
-        chunks[2],
+        chunks[3],
     );
 
     let composer_x = area.x + area.width.saturating_sub(composer_width) / 2;
 
-    // The draw_input function renders the single canonical rounded border.
-    // Return the outer rect so draw_input owns the border.
     let outer = Rect::new(
         composer_x,
-        chunks[3].y,
+        chunks[4].y,
         composer_width.min(area.width),
-        chunks[3].height,
+        chunks[4].height,
     );
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled("/models", Style::default().fg(header_name_color())),
-            Span::raw("    "),
-            Span::styled("/agents", Style::default().fg(header_name_color())),
-            Span::raw("    "),
-            Span::styled("/sessions", Style::default().fg(header_name_color())),
-            Span::raw("    "),
-            Span::styled("/help", Style::default().fg(header_name_color())),
+            Span::styled("[", Style::default().fg(dim_color())),
+            Span::raw(" "),
+            Span::styled(
+                "/models",
+                Style::default().fg(logo_yellow()).bold(),
+            ),
+            Span::raw(" "),
+            Span::styled("]", Style::default().fg(dim_color())),
+
+            Span::raw("   "),
+            Span::styled("|", Style::default().fg(dim_color())),
+            Span::raw("   "),
+
+            Span::styled("[", Style::default().fg(dim_color())),
+            Span::raw(" "),
+            Span::styled(
+                "/agents",
+                Style::default().fg(logo_yellow()).bold(),
+            ),
+            Span::raw(" "),
+            Span::styled("]", Style::default().fg(dim_color())),
+
+            Span::raw("   "),
+            Span::styled("|", Style::default().fg(dim_color())),
+            Span::raw("   "),
+
+            Span::styled("[", Style::default().fg(dim_color())),
+            Span::raw(" "),
+            Span::styled(
+                "/sessions",
+                Style::default().fg(logo_yellow()).bold(),
+            ),
+            Span::raw(" "),
+            Span::styled("]", Style::default().fg(dim_color())),
+
+            Span::raw("   "),
+            Span::styled("|", Style::default().fg(dim_color())),
+            Span::raw("   "),
+
+            Span::styled("[", Style::default().fg(dim_color())),
+            Span::raw(" "),
+            Span::styled(
+                "/help",
+                Style::default().fg(logo_yellow()).bold(),
+            ),
+            Span::raw(" "),
+            Span::styled("]", Style::default().fg(dim_color())),
         ]))
         .alignment(Alignment::Center),
-        chunks[4],
+        chunks[5],
     );
 
     outer

@@ -221,6 +221,15 @@ impl Provider for OpenAIProvider {
 
         tokio::spawn(async move {
             let stream_task = async move {
+                // Transient-error retry policy comes from the user's provider
+                // config (default: 8 attempts, 30s backoff cap) — the same
+                // source the OpenRouter runtime reads, so all providers honor
+                // max_retries / retry_backoff_cap_secs consistently.
+                let cfg = jcode_base::config::config();
+                let max_retries = cfg.provider.max_retries.max(1);
+                let retry_backoff_cap = std::time::Duration::from_secs(
+                    cfg.provider.retry_backoff_cap_secs.max(1),
+                );
                 // Attempt persistent WebSocket continuation first
                 if use_websocket_transport {
                     // Track output: a continuation that streams partial output
@@ -292,7 +301,7 @@ impl Provider for OpenAIProvider {
                                 let _ = tx
                                     .send(Ok(StreamEvent::RetryRollback {
                                         attempt: 1,
-                                        max: MAX_RETRIES,
+                                        max: max_retries,
                                     }))
                                     .await;
                             }
@@ -316,13 +325,13 @@ impl Provider for OpenAIProvider {
                 let mut skip_backoff_once = false;
                 let mut next_retry_delay = None;
 
-                for attempt in 0..MAX_RETRIES {
+                for attempt in 0..max_retries {
                     if attempt > 0 {
                         emit_connection_phase(
                             &tx,
                             jcode_message_types::ConnectionPhase::Retrying {
                                 attempt: attempt + 1,
-                                max: MAX_RETRIES,
+                                max: max_retries,
                             },
                         )
                         .await;
@@ -332,12 +341,13 @@ impl Provider for OpenAIProvider {
                             attempt,
                             RETRY_BASE_DELAY_MS,
                             next_retry_delay.take(),
-                        );
+                        )
+                        .min(retry_backoff_cap);
                         tokio::time::sleep(delay).await;
                         jcode_base::logging::info(&format!(
                             "Retrying OpenAI API request (attempt {}/{})",
                             attempt + 1,
-                            MAX_RETRIES
+                            max_retries
                         ));
                     }
                     skip_backoff_once = false;
@@ -386,7 +396,7 @@ impl Provider for OpenAIProvider {
                         vec![
                             ("model", model_for_transport.clone()),
                             ("attempt", (attempt + 1).to_string()),
-                            ("max_attempts", MAX_RETRIES.to_string()),
+                            ("max_attempts", max_retries.to_string()),
                             ("transport", transport_label.to_string()),
                             ("transport_mode", transport_mode.as_str().to_string()),
                             ("forced_https", force_https_for_request.to_string()),
@@ -395,7 +405,7 @@ impl Provider for OpenAIProvider {
                     jcode_base::logging::info(&format!(
                         "OpenAI stream attempt {}/{} using transport '{}'; model='{}'; mode='{}'",
                         attempt + 1,
-                        MAX_RETRIES,
+                        max_retries,
                         transport_label,
                         model_for_transport,
                         transport_mode.as_str()
@@ -514,7 +524,7 @@ impl Provider for OpenAIProvider {
                                 let _ = tx
                                     .send(Ok(StreamEvent::RetryRollback {
                                         attempt: attempt + 2,
-                                        max: MAX_RETRIES,
+                                        max: max_retries,
                                     }))
                                     .await;
                             }
@@ -560,7 +570,7 @@ impl Provider for OpenAIProvider {
                             // request to OpenAI API")` (e.g. TLS BadRecordMac) is
                             // visible to the retry classifier.
                             let error_str = format!("{error:#}").to_lowercase();
-                            if is_retryable_error(&error_str) && attempt + 1 < MAX_RETRIES {
+                            if is_retryable_error(&error_str) && attempt + 1 < max_retries {
                                 if saw_output {
                                     // Partial output already reached the
                                     // consumer; roll it back so the retried
@@ -569,7 +579,7 @@ impl Provider for OpenAIProvider {
                                     let _ = tx
                                         .send(Ok(StreamEvent::RetryRollback {
                                             attempt: attempt + 2,
-                                            max: MAX_RETRIES,
+                                            max: max_retries,
                                         }))
                                         .await;
                                 }
@@ -642,14 +652,14 @@ impl Provider for OpenAIProvider {
                         "retries_exhausted",
                         vec![
                             ("model", model_for_transport.clone()),
-                            ("max_attempts", MAX_RETRIES.to_string()),
+                            ("max_attempts", max_retries.to_string()),
                             ("error", e.to_string()),
                         ],
                     );
                     let _ = tx
                         .send(Err(anyhow::anyhow!(
                             "Failed after {} retries: {}",
-                            MAX_RETRIES,
+                            max_retries,
                             e
                         )))
                         .await;

@@ -50,7 +50,7 @@ pub enum AppRuntimeMode {
     TestHarness,
 }
 
-mod agent_persona;
+pub(crate) mod agent_persona;
 mod auth;
 mod auth_account_picker_saved_accounts;
 mod catchup;
@@ -329,6 +329,10 @@ struct PreparedTransferSession {
 struct PendingProviderFailover {
     prompt: crate::provider::ProviderFailoverPrompt,
     deadline: Instant,
+    /// When set (remote sessions), the failed payload to re-send after the
+    /// countdown completes. Local sessions instead flip `pending_turn` and
+    /// reuse the restored input box.
+    resend: Option<FallbackResendPayload>,
 }
 
 /// An interactive "switch to the next best model/method and resend" offer shown
@@ -1295,6 +1299,8 @@ pub struct App {
     swarm_panel_full_page: bool,
     // Current agent mode for status bar display.
     agent_mode: AgentMode,
+    // A question the agent asked that is awaiting an answer (Plan-mode popup).
+    pending_ask_user: Option<super::app::agent_persona::PendingAskUser>,
     // Whether a swarm plan graph is active.
     plan_active: bool,
     // Plan engine mode ("deep" or "light") when plan_active is true.
@@ -1650,6 +1656,8 @@ pub struct App {
     login_picker_overlay: Option<RefCell<super::login_picker::LoginPicker>>,
     /// Account picker overlay (None = not visible)
     account_picker_overlay: Option<RefCell<super::account_picker::AccountPicker>>,
+    /// Skills picker overlay (None = not visible)
+    skills_picker_overlay: Option<RefCell<super::skill_picker::SkillPicker>>,
     /// Usage overlay (None = not visible)
     usage_overlay: Option<RefCell<super::usage_overlay::UsageOverlay>>,
     /// Whether a usage refresh request is currently in flight.
@@ -1745,6 +1753,21 @@ impl App {
     const KV_CACHE_OPTIMAL_OK_PCT: u8 = 85;
     const KV_CACHE_MIN_MISSED_TOKENS: u64 = 1_024;
     const KV_CACHE_MAX_MISS_SAMPLES: usize = 12;
+
+    /// Access to the pending agent question, if any.
+    pub(super) fn pending_ask_user(&self) -> Option<&agent_persona::PendingAskUser> {
+        self.pending_ask_user.as_ref()
+    }
+
+    /// Install a new pending agent question; replaces any prior unanswered one.
+    pub(super) fn set_pending_ask_user(&mut self, pending: agent_persona::PendingAskUser) {
+        self.pending_ask_user = Some(pending);
+    }
+
+    /// Consume the pending question once answered/cancelled.
+    pub(super) fn take_pending_ask_user(&mut self) -> Option<agent_persona::PendingAskUser> {
+        self.pending_ask_user.take()
+    }
 
     pub(super) fn begin_kv_cache_request(
         &mut self,

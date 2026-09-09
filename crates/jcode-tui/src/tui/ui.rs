@@ -2822,6 +2822,19 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         return;
     }
 
+    if let Some(picker_cell) = app.skills_picker_overlay() {
+        let mut picker = picker_cell.borrow_mut();
+        picker.render(frame);
+        finalize_frame_metrics(
+            app,
+            total_start,
+            Duration::ZERO,
+            total_start.elapsed(),
+            None,
+        );
+        return;
+    }
+
     // Initialize visual debug capture if enabled
     let mut debug_capture = if visual_debug::is_enabled() {
         Some(FrameCaptureBuilder::new(area.width, area.height))
@@ -3704,6 +3717,12 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Right-click model detail popup floats above everything else.
     if let Some(popup) = app.model_detail_popup() {
         overlays::draw_model_detail_popup(frame, area, &popup);
+    }
+
+    // Plan-mode `ask_user` question popup floats above the transcript; it
+    // claims all keys while open so no other overlay can be interacted with.
+    if let Some(popup) = app.pending_ask_user() {
+        overlays::draw_ask_user_popup(frame, area, popup);
     }
 
     if visual_debug::overlay_enabled() {
