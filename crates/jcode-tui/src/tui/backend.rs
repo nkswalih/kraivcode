@@ -552,7 +552,7 @@ impl RemoteConnection {
         images: Vec<(String, String)>,
         system_reminder: Option<String>,
     ) -> Result<u64> {
-        self.send_message_with_images_reminder_and_skill(content, images, system_reminder, None)
+        self.send_message_with_images_reminder_and_skill(content, images, system_reminder, None, None)
             .await
     }
 
@@ -562,6 +562,7 @@ impl RemoteConnection {
         images: Vec<(String, String)>,
         system_reminder: Option<String>,
         active_skill: Option<String>,
+        persona: Option<String>,
     ) -> Result<u64> {
         // Output token usage snapshots are cumulative within a single API call.
         // Reset per-call watermark before sending the next user request.
@@ -574,6 +575,7 @@ impl RemoteConnection {
             images,
             system_reminder,
             active_skill,
+            persona,
             no_reply: false,
         };
         self.next_request_id += 1;
@@ -865,6 +867,23 @@ impl RemoteConnection {
             id: self.next_request_id,
             request_id: request_id.to_string(),
             input: input.to_string(),
+        };
+        self.next_request_id += 1;
+        self.send_request(request).await
+    }
+
+    /// Send the user's answer to an [`ServerEvent::AskUserRequest`] popup.
+    pub async fn send_ask_user_response(
+        &mut self,
+        request_id: &str,
+        value: Option<String>,
+        cancelled: bool,
+    ) -> Result<()> {
+        let request = Request::AskUserResponse {
+            id: self.next_request_id,
+            request_id: request_id.to_string(),
+            value,
+            cancelled,
         };
         self.next_request_id += 1;
         self.send_request(request).await

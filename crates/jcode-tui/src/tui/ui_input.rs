@@ -4,7 +4,7 @@ use super::tools_ui::{get_tool_activity_detail, summarize_batch_running_tools_co
 use super::visual_debug::{self, FrameCaptureBuilder};
 use super::{
     ProcessingStatus, TuiState, accent_color, ai_color, animated_tool_color, asap_color, dim_color,
-    pending_color, queued_color, rainbow_prompt_color, user_color,
+    pending_color, queued_color, rainbow_prompt_color, system_message_color, user_color,
 };
 use crate::message::ConnectionPhase;
 use crate::tui::app;
@@ -1287,11 +1287,19 @@ fn home_idle_status_line(app: &dyn TuiState, width: u16) -> Line<'static> {
 
     let total_width = width as usize;
     if spans.is_empty() {
-        if let Some(tip) = occasional_status_tip(total_width, app.animation_elapsed() as u64) {
-            return Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))]);
-        }
-        return Line::from("");
+        let version = format!("v{}", jcode_build_meta::semver());
+        return Line::from(vec![Span::styled(version, Style::default().fg(dim_color()))]);
     }
+    use unicode_width::UnicodeWidthStr;
+    let left_text: String = spans.iter().map(|s| s.content.as_ref()).collect();
+    let left_width = UnicodeWidthStr::width(left_text.as_str());
+    let version = format!("v{}", jcode_build_meta::semver());
+    let version_width = UnicodeWidthStr::width(version.as_str());
+    let padding = total_width.saturating_sub(left_width + version_width);
+    for _ in 0..padding {
+        spans.push(Span::raw(" "));
+    }
+    spans.push(Span::styled(version, Style::default().fg(dim_color())));
     Line::from(overscroll_truncate_spans(spans, total_width))
 }
 
@@ -1988,11 +1996,13 @@ pub(super) fn build_notification_spans(app: &dyn TuiState) -> Vec<Span<'static>>
 
     // Learned-keybinding nudge: distinct bright color + bold so the user reads
     // it as "the system noticed I'm not using a shortcut", not a normal status.
+    // Rendered with the System role so it follows the palette (and stays
+    // configurable through `/colors`).
     if let Some(hint) = app.learn_hint() {
         push_sep(&mut spans);
         spans.push(Span::styled(
             normalize_repaint_sensitive_notice_text(&hint),
-            Style::default().fg(rgb(214, 122, 255)).bold(),
+            Style::default().fg(system_message_color()).bold(),
         ));
     }
 
@@ -2132,7 +2142,7 @@ pub(super) fn draw_overscroll_status(frame: &mut Frame, app: &dyn TuiState, area
     if !model.is_empty() && !overscroll_is_placeholder(&model) {
         spans.push(Span::styled(
             session_facts::pretty_model(&model),
-            Style::default().fg(rgb(255, 150, 200)).bold(),
+            Style::default().fg(rgb(255, 140, 0)).bold(),
         ));
         // Reasoning level shown inline next to the model, e.g. " high".
         if let Some(effort) = data

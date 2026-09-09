@@ -63,6 +63,7 @@ mod remote_diff;
 pub mod screenshot;
 pub(crate) mod session_facts;
 pub mod session_picker;
+pub mod skill_picker;
 mod stream_buffer;
 pub mod terminal_setup;
 pub mod test_harness;
@@ -749,6 +750,8 @@ pub trait TuiState {
     fn login_picker_overlay(&self) -> Option<&std::cell::RefCell<login_picker::LoginPicker>>;
     /// Account picker overlay for /account command
     fn account_picker_overlay(&self) -> Option<&std::cell::RefCell<account_picker::AccountPicker>>;
+    /// Skills picker overlay for /skills command
+    fn skills_picker_overlay(&self) -> Option<&std::cell::RefCell<skill_picker::SkillPicker>>;
     /// Usage overlay for /usage command
     fn usage_overlay(&self) -> Option<&std::cell::RefCell<usage_overlay::UsageOverlay>>;
     /// Working directory for this session
@@ -775,6 +778,11 @@ pub trait TuiState {
     }
     /// In-chat permission panel state, when a gated tool awaits a decision.
     fn permission_panel(&self) -> Option<PermissionPanelState> {
+        None
+    }
+    /// Plan-mode `ask_user` popup state, when the agent asked the user a
+    /// question that is blocking the turn.
+    fn pending_ask_user(&self) -> Option<&crate::tui::app::agent_persona::PendingAskUser> {
         None
     }
     /// Whether the first-run onboarding empty state is being previewed in this session.

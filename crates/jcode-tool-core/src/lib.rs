@@ -99,6 +99,34 @@ pub struct StdinInputRequest {
     pub response_tx: tokio::sync::oneshot::Sender<String>,
 }
 
+/// An interactive question the agent asks the user (Plan-mode popup).
+///
+/// The running turn blocks on `response_tx` until the client answers, so the
+/// question genuinely pauses the agent until the user responds.
+pub struct AskUserQuestion {
+    pub request_id: String,
+    pub question: String,
+    pub options: Vec<AskUserOption>,
+    /// When true the user may type a free-text answer instead of picking an option.
+    pub free_text: bool,
+    pub response_tx: tokio::sync::oneshot::Sender<AskUserAnswer>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AskUserOption {
+    /// Human-readable label shown in the popup picker.
+    pub label: String,
+    /// Machine value returned to the tool.
+    pub value: String,
+}
+
+/// Answer to an [`AskUserQuestion`].
+pub struct AskUserAnswer {
+    /// Selected option value or free-text input. `None` when the user cancelled.
+    pub value: Option<String>,
+    pub cancelled: bool,
+}
+
 #[derive(Clone)]
 pub struct ToolContext {
     pub session_id: String,
@@ -106,6 +134,8 @@ pub struct ToolContext {
     pub tool_call_id: String,
     pub working_dir: Option<PathBuf>,
     pub stdin_request_tx: Option<tokio::sync::mpsc::UnboundedSender<StdinInputRequest>>,
+    pub ask_user_request_tx:
+        Option<tokio::sync::mpsc::UnboundedSender<AskUserQuestion>>,
     pub graceful_shutdown_signal: Option<InterruptSignal>,
     pub execution_mode: ToolExecutionMode,
 }
@@ -124,6 +154,7 @@ impl ToolContext {
             tool_call_id,
             working_dir: self.working_dir.clone(),
             stdin_request_tx: self.stdin_request_tx.clone(),
+            ask_user_request_tx: self.ask_user_request_tx.clone(),
             graceful_shutdown_signal: self.graceful_shutdown_signal.clone(),
             execution_mode: self.execution_mode,
         }
