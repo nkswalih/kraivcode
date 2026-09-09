@@ -2353,4 +2353,36 @@ impl App {
             }
         }
     }
+
+    /// Open the usage overlay panel (dark themed, matching the skills
+    /// picker). Starts in a loading state; the usage report refresh
+    /// triggered by the caller replaces it with provider rows as data arrives.
+    pub(crate) fn open_usage_overlay(&mut self) {
+        self.usage_overlay = Some(std::cell::RefCell::new(
+            crate::tui::usage_overlay::UsageOverlay::loading(),
+        ));
+        self.set_status_notice("Usage");
+    }
+
+    /// Route one key to the open usage overlay. Returns `true` if the key was
+    /// consumed by the overlay, `false` if no overlay is open.
+    pub(crate) fn handle_usage_overlay_key(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> anyhow::Result<bool> {
+        let action = {
+            let Some(usage_cell) = self.usage_overlay.as_ref() else {
+                return Ok(false);
+            };
+            usage_cell.borrow_mut().handle_overlay_key(code, modifiers)?
+        };
+        match action {
+            crate::tui::usage_overlay::OverlayAction::Continue => Ok(true),
+            crate::tui::usage_overlay::OverlayAction::Close => {
+                self.usage_overlay = None;
+                Ok(true)
+            }
+        }
+    }
 }

@@ -265,44 +265,56 @@ fn test_subscribe_command_shows_hosted_pitch_and_next_step() {
 #[test]
 fn test_usage_report_shows_no_connected_providers_when_results_empty() {
     let mut app = create_test_app();
+    app.open_usage_overlay();
     app.handle_usage_report(Vec::new());
 
-    let msg = app.display_messages().last().expect("missing usage card");
-    assert_eq!(msg.role, "usage");
-    assert!(msg.content.contains("No connected providers"));
-    assert!(msg.content.contains("/login claude"));
-    assert!(msg.content.contains("/login openai"));
+    assert!(app.usage_overlay.is_some(), "usage overlay stays open");
+    let backend = ratatui::backend::TestBackend::new(120, 40);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    terminal
+        .draw(|frame| crate::tui::ui::draw(frame, &app))
+        .expect("usage overlay draw should succeed");
+    let text = buffer_to_text(&terminal);
+    assert!(text.contains("No connected providers"));
+    assert!(text.contains("/login claude"));
+    assert!(text.contains("/login openai"));
 }
 
 #[test]
-fn test_usage_command_requests_usage_report_with_inline_view() {
+fn test_usage_command_opens_usage_overlay_and_requests_report() {
     let mut app = create_test_app();
 
     assert!(super::commands::handle_usage_command(&mut app, "/usage"));
 
     assert!(app.inline_interactive_state.is_none());
-    assert!(app.usage_overlay.is_none());
     assert!(app.inline_view_state.is_none());
-    assert_eq!(
-        app.display_messages().last().map(|m| m.role.as_str()),
-        Some("usage")
+    assert!(
+        app.usage_overlay.is_some(),
+        "/usage should open the usage overlay"
+    );
+    assert!(
+        app.display_messages().iter().all(|m| m.role != "usage"),
+        "usage must render in the overlay panel, not the chat transcript"
     );
     assert!(app.usage_report_refreshing);
 }
 
 #[test]
-fn test_usage_submit_input_requests_usage_report_with_inline_view() {
+fn test_usage_submit_input_opens_usage_overlay_and_requests_report() {
     let mut app = create_test_app();
     app.input = "/usage".to_string();
 
     app.submit_input();
 
     assert!(app.inline_interactive_state.is_none());
-    assert!(app.usage_overlay.is_none());
     assert!(app.inline_view_state.is_none());
-    assert_eq!(
-        app.display_messages().last().map(|m| m.role.as_str()),
-        Some("usage")
+    assert!(
+        app.usage_overlay.is_some(),
+        "submitting /usage should open the usage overlay"
+    );
+    assert!(
+        app.display_messages().iter().all(|m| m.role != "usage"),
+        "usage must render in the overlay panel, not the chat transcript"
     );
     assert!(app.usage_report_refreshing);
 }
@@ -334,12 +346,15 @@ fn test_usage_enter_requests_report_with_inline_view() {
         .expect("submit /usage");
 
     assert!(app.inline_interactive_state.is_none());
-    assert!(app.usage_overlay.is_none());
     assert!(app.inline_view_state.is_none());
+    assert!(
+        app.usage_overlay.is_some(),
+        "pressing Enter on /usage should open the usage overlay"
+    );
     assert_eq!(app.input(), "");
-    assert_eq!(
-        app.display_messages().last().map(|m| m.role.as_str()),
-        Some("usage")
+    assert!(
+        app.display_messages().iter().all(|m| m.role != "usage"),
+        "usage must render in the overlay panel, not the chat transcript"
     );
     assert!(app.usage_report_refreshing);
 }
