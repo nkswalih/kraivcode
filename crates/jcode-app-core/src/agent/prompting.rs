@@ -72,6 +72,16 @@ impl Agent {
         split.dynamic_part.push_str(reminder);
     }
 
+    fn append_persona_directive(&self, split: &mut crate::prompt::SplitSystemPrompt) {
+        let Some(directive) = crate::agent::persona::persona_directive(self.persona) else {
+            return;
+        };
+        if !split.dynamic_part.is_empty() {
+            split.dynamic_part.push_str("\n\n");
+        }
+        split.dynamic_part.push_str(&directive);
+    }
+
     /// Build split system prompt for better caching
     /// Returns static (cacheable) and dynamic (not cached) parts separately
     pub(super) fn build_system_prompt_split(
@@ -117,6 +127,7 @@ impl Agent {
         );
 
         self.append_current_turn_system_reminder(&mut split);
+        self.append_persona_directive(&mut split);
         crate::prompt::append_swarm_effort_directive(
             &mut split,
             self.provider.reasoning_effort().as_deref(),
