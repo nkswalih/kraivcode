@@ -35,8 +35,9 @@ pub use jcode_compaction_core::{
     TOKEN_HISTORY_WINDOW, build_compaction_prompt, build_emergency_summary_text,
     compacted_summary_text_block, content_char_count, effective_context_tokens_from_usage,
     emergency_strip_large_images, emergency_truncate_large_payloads, estimate_compaction_tokens,
-    is_request_payload_too_large_error, mean_embedding, message_char_count, safe_compaction_cutoff,
-    semantic_cache_key, semantic_goal_text, semantic_message_text, strip_large_images_in_contents,
+    estimate_compaction_tokens_from_text, is_request_payload_too_large_error, mean_embedding,
+    message_char_count, message_token_count, safe_compaction_cutoff, semantic_cache_key,
+    semantic_goal_text, semantic_message_text, strip_large_images_in_contents,
     summary_payload_char_count,
 };
 
@@ -787,9 +788,22 @@ impl CompactionManager {
 
     /// Get current token estimate using the caller's message list
     pub fn token_estimate_with(&self, all_messages: &[Message]) -> usize {
-        estimate_compaction_tokens(
-            self.active_summary.as_ref(),
-            self.active_message_chars_with(all_messages),
+        let summary_text = self
+            .active_summary
+            .as_ref()
+            .map(|summary| {
+                summary
+                    .openai_encrypted_content
+                    .as_deref()
+                    .unwrap_or(summary.text.as_str())
+            })
+            .unwrap_or("");
+        estimate_compaction_tokens_from_text(
+            summary_text,
+            self.active_messages(all_messages)
+                .iter()
+                .map(message_token_count)
+                .sum(),
             self.token_budget,
         )
     }

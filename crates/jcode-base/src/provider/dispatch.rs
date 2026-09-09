@@ -33,24 +33,25 @@ impl MultiProvider {
         tools: &[ToolDefinition],
         mode: CompletionMode<'_>,
     ) -> (usize, usize) {
-        let mut chars = serde_json::to_string(messages)
-            .map(|value| value.len())
-            .unwrap_or(0)
-            + serde_json::to_string(tools)
-                .map(|value| value.len())
-                .unwrap_or(0);
+        let mut payload = serde_json::to_string(messages).unwrap_or_default()
+            + &serde_json::to_string(tools).unwrap_or_default();
         match mode {
             CompletionMode::Unified { system } => {
-                chars += system.len();
+                payload.push_str(system);
             }
             CompletionMode::Split {
                 system_static,
                 system_dynamic,
             } => {
-                chars += system_static.len() + system_dynamic.len();
+                payload.push_str(system_static);
+                payload.push_str(system_dynamic);
             }
         }
-        let tokens = chars / 4;
+        let chars = payload.len();
+        // Word + punctuation heuristic (jcode_core::util::estimate_tokens) is a
+        // far closer match to real byte-pair tokenization than chars/4, so split
+        // and budget decisions stop over/under-sizing the request.
+        let tokens = crate::util::estimate_tokens(&payload);
         (chars, tokens)
     }
 
