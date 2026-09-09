@@ -1,6 +1,12 @@
 use super::*;
 use crate::message::ToolDefinition;
 
+/// Upper bound for the transient [`App::thinking_buffer`] accounting copy.
+/// The buffer is only measured for status/debug (never rendered or persisted),
+/// so a marathon reasoning phase must not grow it without bound; the immutable
+/// history trace (`reasoning_content`) is kept in full separately.
+const THINKING_BUFFER_MAX_BYTES: usize = 64 * 1024;
+
 impl App {
     pub(super) fn append_current_turn_system_reminder(
         &self,
@@ -809,7 +815,28 @@ impl App {
                                             self.status = ProcessingStatus::Thinking(thinking_start);
                                         }
                                         // Buffer thinking content for status/debug accounting.
-                                        self.thinking_buffer.push_str(&thinking_text);
+                                        // Cap the transient copy: it is only measured, never
+                                        // rendered or persisted, so very long reasoning phases
+                                        // must not grow it without bound. The byte-length guard
+                                        // keeps the steady-state check O(1) per delta.
+                                        const MIN_REASONING_BUFFER_ROOM: usize = 1024;
+                                        if self.thinking_buffer.len() < THINKING_BUFFER_MAX_BYTES {
+                                            let room = THINKING_BUFFER_MAX_BYTES
+                                                - self.thinking_buffer.len();
+                                            if thinking_text.len() <= room {
+                                                self.thinking_buffer.push_str(&thinking_text);
+                                            } else if room >= MIN_REASONING_BUFFER_ROOM {
+                                                let mut truncated =
+                                                    String::with_capacity(room);
+                                                for ch in thinking_text.chars() {
+                                                    if truncated.len() + ch.len_utf8() > room {
+                                                        break;
+                                                    }
+                                                    truncated.push(ch);
+                                                }
+                                                self.thinking_buffer.push_str(&truncated);
+                                            }
+                                        }
                                         // Only render thinking content if enabled in config. It is
                                         // paced through the same segment-aware StreamBuffer as the
                                         // answer text, so ordering is preserved without flushing
@@ -996,6 +1023,7 @@ impl App {
                                             tool_call_id: request_id.clone(),
                                             working_dir: self.session.working_dir.as_deref().map(PathBuf::from),
                                             stdin_request_tx: None,
+                                            ask_user_request_tx: None,
                                             graceful_shutdown_signal: None,
                                             execution_mode: crate::tool::ToolExecutionMode::AgentTurn,
                                         };
@@ -1283,6 +1311,7 @@ impl App {
                     tool_call_id: tc.id.clone(),
                     working_dir: self.session.working_dir.as_deref().map(PathBuf::from),
                     stdin_request_tx: None,
+                    ask_user_request_tx: None,
                     graceful_shutdown_signal: None,
                     execution_mode: crate::tool::ToolExecutionMode::AgentTurn,
                 };

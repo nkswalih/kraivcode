@@ -1,7 +1,9 @@
 use super::state_ui_storage::infer_spawned_session_startup_hints;
 use super::*;
+use crate::tui::skill_picker::{OverlayAction, SkillItem, SkillPicker, SkillPickerCommand};
 use crate::tui::ui::tools_ui;
 use crate::tui::{TuiState, backend};
+use crossterm::event::{KeyCode, KeyModifiers};
 
 pub(super) struct RestoredReloadInput {
     pub input: String,
@@ -1751,6 +1753,13 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
         // reload_all` (which only updates the server process registry) show up
         // without a restart (issue #431).
         app.refresh_skills_snapshot();
+        app.open_skills_picker();
+        return true;
+    }
+
+    // Hidden fallback: the plain-text report the `/skills` panel replaced.
+    if trimmed == "/skills-text" {
+        app.refresh_skills_snapshot();
         app.push_display_message(
             DisplayMessage::system(build_skills_report(app)).with_title("Skills"),
         );
@@ -2213,4 +2222,135 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
     }
 
     false
+}
+
+impl App {
+    /// Open the interactive `/skills` dialog panel, seeded from the current
+    /// skill snapshot (or remote skill list) plus the jcode-endorsed catalog.
+    pub(crate) fn open_skills_picker(&mut self) {
+        let active = self.active_skill.clone();
+        let mut items: Vec<SkillItem> = Vec::new();
+
+        if self.is_remote && !self.remote_skills.is_empty() {
+            let mut names = self.remote_skills.clone();
+            names.sort();
+            for name in names {
+                items.push(SkillItem {
+                    name: name.clone(),
+                    category: "Loaded".to_string(),
+                    description: String::new(),
+                    source: "remote session".to_string(),
+                    install: None,
+                    installed: true,
+                    active: active.as_deref() == Some(name.as_str()),
+                });
+            }
+        } else {
+            for skill in self.current_skills_snapshot().list() {
+                items.push(SkillItem {
+                    name: skill.name.clone(),
+                    category: "Loaded".to_string(),
+                    description: skill.description.clone(),
+                    source: skill.path.display().to_string(),
+                    install: None,
+                    installed: true,
+                    active: active.as_deref() == Some(skill.name.as_str()),
+                });
+            }
+        }
+
+        let installed: std::collections::HashSet<String> =
+            items.iter().map(|item| item.name.clone()).collect();
+        for endorsed in crate::skill::endorsed_skills() {
+            if installed.contains(endorsed.name) {
+                continue;
+            }
+            items.push(SkillItem {
+                name: endorsed.name.to_string(),
+                category: endorsed.category.to_string(),
+                description: endorsed.description.to_string(),
+                source: endorsed.source.to_string(),
+                install: endorsed.install.map(str::to_string),
+                installed: false,
+                active: false,
+            });
+        }
+
+        let title = if self.is_remote {
+            " Skills (remote) "
+        } else {
+            " Skills "
+        };
+        self.skills_picker_overlay = Some(std::cell::RefCell::new(SkillPicker::new(title, items)));
+        self.set_status_notice("Skills");
+    }
+
+    /// Route one key to the open skills picker; returns the command to run when
+    /// Enter is pressed, or `None` to keep waiting.
+    pub(crate) fn next_skills_picker_action(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> anyhow::Result<Option<SkillPickerCommand>> {
+        let action = {
+            let Some(picker_cell) = self.skills_picker_overlay.as_ref() else {
+                return Ok(None);
+            };
+            let mut picker = picker_cell.borrow_mut();
+            picker.handle_overlay_key(code, modifiers)?
+        };
+
+        match action {
+            OverlayAction::Continue => Ok(None),
+            OverlayAction::Close => {
+                self.skills_picker_overlay = None;
+                Ok(None)
+            }
+            OverlayAction::Execute(command) => {
+                self.skills_picker_overlay = None;
+                Ok(Some(command))
+            }
+        }
+    }
+
+    /// Execute a skills-picker command: activate a loaded skill in the
+    /// foreground, or copy an install command/source to the clipboard.
+    pub(crate) fn handle_skills_picker_command(&mut self, command: SkillPickerCommand) {
+        match command {
+            SkillPickerCommand::Activate { name } => {
+                let description = self
+                    .current_skills_snapshot()
+                    .get(&name)
+                    .map(|skill| skill.description.clone())
+                    .unwrap_or_default();
+                let label = if description.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{} - {}", name, description)
+                };
+                self.active_skill = Some(name.clone());
+                self.push_display_message(DisplayMessage {
+                    role: "system".to_string(),
+                    content: format!("Activated skill: {}", label),
+                    tool_calls: vec![],
+                    duration_secs: None,
+                    title: None,
+                    tool_data: None,
+                    pasted_segments: None,
+                });
+                self.set_status_notice(format!("Activated skill: /{}", name));
+            }
+            SkillPickerCommand::Copy { text } => {
+                let copied = super::helpers::copy_to_clipboard(&text);
+                if copied {
+                    self.set_status_notice("Install command copied to clipboard. Paste it in your shell, then run /skills or skill_manage reload_all.");
+                } else {
+                    self.set_status_notice(format!(
+                        "Clipboard unavailable - install command: {}",
+                        text
+                    ));
+                }
+            }
+        }
+    }
 }
