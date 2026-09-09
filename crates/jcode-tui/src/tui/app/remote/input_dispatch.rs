@@ -21,6 +21,7 @@ pub(in crate::tui::app) async fn begin_remote_send(
             images.clone(),
             system_reminder.clone(),
             app.active_skill.clone(),
+            Some(app.agent_mode.key().to_string()),
         )
         .await?;
     app.current_message_id = Some(msg_id);

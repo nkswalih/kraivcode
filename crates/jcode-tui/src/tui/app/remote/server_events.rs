@@ -1288,6 +1288,30 @@ pub(in crate::tui::app) fn handle_server_event(
                     raw_input: app.last_submitted_input.clone(),
                 }
             });
+            // Cross-provider failover prompt: give remote sessions the same
+            // visible auto-switch countdown local sessions get, staging the
+            // failed payload so no slider is lost when it expires. The daemon
+            // marks the failing provider unavailable, so the re-send routes to
+            // the offered candidate. Manual mode falls through to the raw
+            // error below.
+            if let Some(prompt) = crate::provider::parse_failover_prompt_message(&message) {
+                if matches!(
+                    crate::config::Config::load().provider.cross_provider_failover,
+                    crate::config::CrossProviderFailoverMode::Countdown
+                ) && let Some(payload) = failed_fallback_payload.clone()
+                {
+                    app.arm_remote_provider_failover_countdown(prompt, payload);
+                    app.is_processing = false;
+                    app.status = ProcessingStatus::Idle;
+                    app.stream_message_ended = false;
+                    app.processing_started = None;
+                    app.clear_visible_turn_started();
+                    app.current_message_id = None;
+                    remote.clear_pending();
+                    remote.reset_call_output_tokens_seen();
+                    return false;
+                }
+            }
             app.push_display_message(DisplayMessage {
                 role: "error".to_string(),
                 content: message.clone(),
@@ -1334,6 +1358,29 @@ pub(in crate::tui::app) fn handle_server_event(
             // automatic resend path and tell the user to /login or /model.
             if !is_connectivity_error && app.note_error_for_credential_breaker(&message) {
                 app.trip_credential_failure_breaker(&message);
+                app.offer_fallback_after_error_with_payload(
+                    &message,
+                    failed_fallback_payload.clone(),
+                );
+                return false;
+            }
+            // Console-restricted access (e.g. OpenCode Zen free tier returning
+            // `400 MissingSessionID` - "can only be used in OpenCode"). The
+            // request is structurally guaranteed to 4xx for any model on that
+            // credential, so fail fast with an accurate message instead of the
+            // generic transport hint or a wasted retry budget.
+            if crate::tui::app::commands::is_console_restricted_error(&message) {
+                app.clear_pending_remote_retry();
+                if app.auto_poke_incomplete_todos {
+                    crate::tui::app::commands::stop_auto_poke_for_non_retryable_error(
+                        app, &message,
+                    );
+                }
+                app.push_display_message(DisplayMessage::system(
+                    "🛑 This provider blocked the request: its free tier can only be used inside the OpenCode console (MissingSessionID). Use a paid API key or another provider here, or work in the OpenCode console - resending the identical request cannot succeed.".to_string(),
+                ));
+                app.set_status_notice("Stopped: provider console-restricted");
+                app.restore_failed_input_to_box();
                 app.offer_fallback_after_error_with_payload(
                     &message,
                     failed_fallback_payload.clone(),
@@ -2851,6 +2898,33 @@ pub(in crate::tui::app) fn handle_server_event(
         }
         ServerEvent::StdinRequest { .. } => {
             app.set_status_notice("⌨ Interactive terminal detected (command will timeout)");
+            false
+        }
+        ServerEvent::AskUserRequest {
+            request_id,
+            question,
+            options,
+            free_text,
+            tool_call_id,
+        } => {
+            app.set_pending_ask_user(super::super::agent_persona::PendingAskUser {
+                request_id,
+                question,
+                options,
+                free_text,
+                selected: 0,
+                free_text_buffer: String::new(),
+                cursor: 0,
+                plan_followup: tool_call_id
+                    == jcode_app_core::agent::persona::PLAN_FOLLOWUP_TOOL_CALL_ID,
+            });
+            if tool_call_id.is_empty() {
+                app.set_status_notice("❓ Agent question awaiting answer");
+            } else {
+                app.set_status_notice(format!(
+                    "❓ Agent question awaiting answer (tool {tool_call_id})"
+                ));
+            }
             false
         }
         _ => false,
