@@ -475,6 +475,9 @@ impl crate::tui::TuiState for TestState {
     ) -> Option<&std::cell::RefCell<crate::tui::account_picker::AccountPicker>> {
         None
     }
+    fn skills_picker_overlay(&self) -> Option<&std::cell::RefCell<crate::tui::skill_picker::SkillPicker>> {
+        None
+    }
     fn usage_overlay(
         &self,
     ) -> Option<&std::cell::RefCell<crate::tui::usage_overlay::UsageOverlay>> {
