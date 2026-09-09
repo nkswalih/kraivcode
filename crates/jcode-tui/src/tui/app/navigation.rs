@@ -1556,6 +1556,10 @@ impl App {
             picker_cell.borrow_mut().handle_overlay_mouse(mouse);
             finish_mouse_event!(false, "account_picker_overlay");
         }
+        if let Some(ref picker_cell) = self.skills_picker_overlay {
+            picker_cell.borrow_mut().handle_overlay_mouse(mouse);
+            finish_mouse_event!(false, "skills_picker_overlay");
+        }
         self.normalize_diagram_state();
         let diagram_available = self.diagram_available();
         let layout = super::super::ui::last_layout_snapshot();

@@ -2,6 +2,7 @@
 
 use super::{
     App, ContentBlock, DisplayMessage, Message, ProcessingStatus, Role, SendAction, commands,
+    agent_persona::AskUserAction,
     ctrl_bracket_fallback_to_esc, is_context_limit_error, is_request_payload_too_large_error,
     remote,
 };
@@ -2747,6 +2748,13 @@ pub(super) fn handle_modal_key(
         return Ok(true);
     }
 
+    if app.skills_picker_overlay.is_some() {
+        if let Some(command) = app.next_skills_picker_action(code, modifiers)? {
+            app.handle_skills_picker_command(command);
+        }
+        return Ok(true);
+    }
+
     if app.copy_selection_mode {
         if modifiers.contains(KeyModifiers::CONTROL)
             && matches!(code, KeyCode::Char('c') | KeyCode::Char('d'))
@@ -3114,6 +3122,130 @@ impl App {
     #[cfg(test)]
     pub(super) fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<()> {
         self.handle_key_core(code, modifiers, None)
+    }
+
+    /// Route keys to the pending agent question popup (Plan-mode `ask_user`).
+    /// Consumes every key while a question is open; returns what the key does.
+    pub(super) fn handle_pending_ask_user_key(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+        text_input: Option<String>,
+    ) -> AskUserAction {
+        let Some(pending) = self.pending_ask_user.as_mut() else {
+            return AskUserAction::None;
+        };
+        let chord = modifiers.intersects(
+            KeyModifiers::CONTROL
+                | KeyModifiers::ALT
+                | KeyModifiers::SUPER
+                | KeyModifiers::HYPER
+                | KeyModifiers::META,
+        );
+        match code {
+            KeyCode::Esc if !chord => AskUserAction::Cancelled,
+            KeyCode::Enter if !chord => {
+                let typed = if pending.free_text {
+                    let trimmed = pending.free_text_buffer.trim().to_string();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed)
+                    }
+                } else {
+                    None
+                };
+                let value = match typed {
+                    Some(text) => Some(text),
+                    None if !pending.options.is_empty() => Some(
+                        pending.options[pending.selected.min(pending.options.len() - 1)]
+                            .1
+                            .clone(),
+                    ),
+                    None => None,
+                };
+                AskUserAction::Submitted(value)
+            }
+            KeyCode::Up | KeyCode::Down if !chord && !pending.options.is_empty() => {
+                let n = pending.options.len();
+                pending.selected = match code {
+                    KeyCode::Up => pending.selected.saturating_sub(1),
+                    _ => (pending.selected + 1) % n,
+                };
+                AskUserAction::None
+            }
+            KeyCode::Char('k') if !chord && !pending.options.is_empty() => {
+                pending.selected = pending.selected.saturating_sub(1);
+                AskUserAction::None
+            }
+            KeyCode::Char('j') if !chord && !pending.options.is_empty() => {
+                let n = pending.options.len();
+                pending.selected = (pending.selected + 1) % n;
+                AskUserAction::None
+            }
+            KeyCode::Char(c) if pending.free_text && !chord => {
+                let insert_at = pending
+                    .free_text_buffer
+                    .char_indices()
+                    .nth(pending.cursor)
+                    .map(|(index, _)| index)
+                    .unwrap_or(pending.free_text_buffer.len());
+                if let Some(text) = text_input {
+                    pending.free_text_buffer.insert_str(insert_at, &text);
+                    pending.cursor += text.chars().count();
+                } else {
+                    pending.free_text_buffer.insert(insert_at, c);
+                    pending.cursor += 1;
+                }
+                AskUserAction::None
+            }
+            KeyCode::Backspace if pending.free_text => {
+                if pending.cursor > 0 {
+                    let remove_at = pending
+                        .free_text_buffer
+                        .char_indices()
+                        .nth(pending.cursor - 1)
+                        .map(|(index, _)| index)
+                        .unwrap_or(0);
+                    pending.free_text_buffer.remove(remove_at);
+                    pending.cursor -= 1;
+                }
+                AskUserAction::None
+            }
+            KeyCode::Delete if pending.free_text => {
+                let len = pending.free_text_buffer.chars().count();
+                if pending.cursor < len {
+                    let remove_at = pending
+                        .free_text_buffer
+                        .char_indices()
+                        .nth(pending.cursor)
+                        .map(|(index, _)| index)
+                        .unwrap_or(pending.free_text_buffer.len());
+                    pending.free_text_buffer.remove(remove_at);
+                }
+                AskUserAction::None
+            }
+            KeyCode::Left if pending.free_text && !chord => {
+                pending.cursor = pending.cursor.saturating_sub(1);
+                AskUserAction::None
+            }
+            KeyCode::Right if pending.free_text && !chord => {
+                let len = pending.free_text_buffer.chars().count();
+                if pending.cursor < len {
+                    pending.cursor += 1;
+                }
+                AskUserAction::None
+            }
+            KeyCode::Home if pending.free_text => {
+                pending.cursor = 0;
+                AskUserAction::None
+            }
+            KeyCode::End if pending.free_text => {
+                pending.cursor = pending.free_text_buffer.chars().count();
+                AskUserAction::None
+            }
+            _ => AskUserAction::None,
+        }
     }
 
     fn handle_key_core(
