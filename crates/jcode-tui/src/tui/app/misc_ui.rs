@@ -131,7 +131,7 @@ impl App {
     }
 
     pub(super) fn open_usage_inline_loading(&mut self) {
-        self.push_usage_loading_card();
+        self.open_usage_overlay();
         self.inline_interactive_state = None;
         self.inline_view_state = None;
         self.input.clear();

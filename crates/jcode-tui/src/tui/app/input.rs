@@ -195,6 +195,11 @@ pub(super) struct PreparedInput {
 // low enough to avoid multi-megabyte submit-path hangs while allowing very large logs.
 pub(super) const MAX_SUBMITTED_TEXT_BYTES: usize = 3 * 1024 * 1024;
 
+/// Maximum size of a UTF-8 text file that is inlined into the prompt when its
+/// path is pasted or dropped. Larger files (and binary files) fall back to
+/// inserting their quoted path as text.
+const MAX_INLINE_FILE_BYTES: usize = 200 * 1024;
+
 fn oversized_message_notice(size: usize) -> String {
     format!(
         "Message is too large to send ({} bytes). Save it as a file or attach it instead. Your input was preserved.",
@@ -348,10 +353,19 @@ where
             // expose an empty text target, which previously short-circuited the
             // image path and produced a silent "0 char" paste.
             if let Some(text) = read_text().filter(|t| !t.trim().is_empty()) {
-                if let Some(url) = super::extract_image_url(&text)
-                    && let Some(content) = download_image_url(&url)
-                {
-                    return content;
+                if let Some(url) = super::extract_image_url(&text) {
+                    // Browser "copy image" puts both a URL and the exact image
+                    // on the clipboard. Prefer the in-clipboard image over
+                    // re-downloading (hotlink-protected hosts often fail).
+                    // Reached only when the pasted text is a bare image URL,
+                    // so this cannot misidentify a plain text paste as an
+                    // image (the Wayland multi-MIME bug).
+                    if let Some((media_type, base64_data)) = read_image() {
+                        return image_content(media_type, base64_data);
+                    }
+                    if let Some(content) = download_image_url(&url) {
+                        return content;
+                    }
                 }
                 return ClipboardPasteContent::Text(text);
             }
@@ -388,9 +402,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        ClipboardPasteContent, ClipboardPasteKind, dropped_image_files,
-        is_clipboard_paste_shortcut, parse_dropped_paths, preferred_wayland_text_type,
-        read_clipboard_for_paste_with, shifted_printable_fallback, text_input_for_key,
+        ClipboardPasteContent, ClipboardPasteKind, dropped_image_files, image_chip_count,
+        input_chip_spans, is_clipboard_paste_shortcut, parse_dropped_paths,
+        preferred_wayland_text_type, read_clipboard_for_paste_with, renumber_image_placeholders,
+        shifted_printable_fallback, text_input_for_key,
     };
     use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -409,6 +424,25 @@ mod tests {
         assert_eq!(escaped, vec![first.clone()]);
         let url = url::Url::from_file_path(&second).unwrap();
         assert_eq!(parse_dropped_paths(url.as_str()).unwrap(), vec![second]);
+    }
+
+    #[test]
+    fn multi_file_paste_preserves_drive_backslashes_and_whitespace() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = dir.path().join("first image.png");
+        let second = dir.path().join("second.txt");
+        std::fs::write(&first, b"png").unwrap();
+        std::fs::write(&second, b"txt").unwrap();
+
+        // Windows Terminal / Explorer multi-file drops are newline separated
+        // and, when written as backslashes on Windows, must reach the parser
+        // untouched (a `\` is the path separator, not an escape).
+        let pasted = format!("{}\n{}", first.display(), second.display());
+        assert_eq!(parse_dropped_paths(&pasted).unwrap(), vec![first, second]);
+
+        // Unquoted whitespace splitting must still work for spaced filenames.
+        let spaced = parse_dropped_paths(&format!("'{}'", first.display())).unwrap();
+        assert_eq!(spaced, vec![dir.path().join("first image.png")]);
     }
 
     #[test]
@@ -497,6 +531,139 @@ mod tests {
             }
             other => panic!("expected image paste, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn smart_paste_prefers_in_clipboard_image_over_image_url_download() {
+        // Browser "copy image" puts both a URL and the exact image on the
+        // clipboard; the in-clipboard image must win over re-downloading.
+        let content = read_clipboard_for_paste_with(
+            &ClipboardPasteKind::Smart,
+            || Some("https://example.com/img.png".to_string()),
+            || Some(("image/png".to_string(), "exact-bytes".to_string())),
+            |_| Some(ClipboardPasteContent::Image {
+                media_type: "image/webp".to_string(),
+                base64_data: "downloaded-bytes".to_string(),
+            }),
+        );
+
+        match content {
+            ClipboardPasteContent::Image {
+                media_type,
+                base64_data,
+            } => {
+                assert_eq!(media_type, "image/png");
+                assert_eq!(base64_data, "exact-bytes");
+            }
+            other => panic!("expected clipboard image, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn smart_paste_downloads_image_url_when_no_in_clipboard_image() {
+        let content = read_clipboard_for_paste_with(
+            &ClipboardPasteKind::Smart,
+            || Some("https://example.com/img.png".to_string()),
+            || None,
+            |_| Some(ClipboardPasteContent::Image {
+                media_type: "image/webp".to_string(),
+                base64_data: "downloaded-bytes".to_string(),
+            }),
+        );
+
+        match content {
+            ClipboardPasteContent::Image {
+                media_type,
+                base64_data,
+            } => {
+                assert_eq!(media_type, "image/webp");
+                assert_eq!(base64_data, "downloaded-bytes");
+            }
+            other => panic!("expected downloaded image, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn chip_spans_find_image_and_pasted_placeholders() {
+        let text = "say [image 1] then [Pasted ~3 lines] ok [image 12]";
+        let spans = input_chip_spans(text);
+        assert_eq!(spans.len(), 3);
+        assert_eq!(&text[spans[0].start..spans[0].end], "[image 1]");
+        assert_eq!(&text[spans[1].start..spans[1].end], "[Pasted ~3 lines]");
+        assert_eq!(&text[spans[2].start..spans[2].end], "[image 12]");
+    }
+
+    #[test]
+    fn chip_spans_ignore_plain_bracketed_text() {
+        let text = "a [note] b [img 1] c [Pasted stuff] d [image] e";
+        assert!(input_chip_spans(text).is_empty());
+    }
+
+    #[test]
+    fn backspace_deletes_whole_image_chip_and_renumbers_later_ones() {
+        let mut app = crate::tui::app::tests::create_test_app();
+        app.pending_images.clear();
+        app.pending_images
+            .push(("image/png".to_string(), "aa".to_string()));
+        app.pending_images
+            .push(("image/png".to_string(), "bb".to_string()));
+        app.set_input_for_test("[image 2] [image 1]");
+        app.cursor_pos = app.input().len();
+
+        app.handle_key(KeyCode::Backspace, KeyModifiers::empty())
+            .unwrap();
+
+        assert_eq!(app.input(), "[image 1] ");
+        assert_eq!(app.pending_images.len(), 1);
+        assert_eq!(app.pending_images[0].1, "bb");
+    }
+
+    #[test]
+    fn backspace_inside_pasted_chip_removes_whole_chip() {
+        let mut app = crate::tui::app::tests::create_test_app();
+        app.pasted_contents.clear();
+        app.pasted_contents
+            .push("--- FILE x ---\nnotes\n--- END FILE ---".to_string());
+        app.set_input_for_test("[Pasted ~3 lines]xx");
+        let inside = app.input().find("Pasted").unwrap() + 1;
+        app.cursor_pos = inside;
+
+        app.handle_key(KeyCode::Backspace, KeyModifiers::empty())
+            .unwrap();
+
+        assert_eq!(app.input(), "xx");
+        assert!(app.pasted_contents.is_empty());
+    }
+
+    #[test]
+    fn renumber_image_placeholders_squashes_gaps() {
+        assert_eq!(renumber_image_placeholders("see [image 3]"), "see [image 1]");
+        assert_eq!(
+            renumber_image_placeholders("[image 5] and [image 9]"),
+            "[image 1] and [image 2]"
+        );
+        assert_eq!(image_chip_count("a [image 1] b [image 2]"), 2);
+        assert_eq!(
+            renumber_image_placeholders("[Pasted ~3 lines] then [image 2]"),
+            "[Pasted ~3 lines] then [image 1]"
+        );
+    }
+
+    #[test]
+    fn delete_key_locates_chip_from_its_start() {
+        let mut app = crate::tui::app::tests::create_test_app();
+        app.pending_images.clear();
+        app.pending_images
+            .push(("image/png".to_string(), "aa".to_string()));
+        app.set_input_for_test("hi[image 1]");
+        let at_start = app.input().find("[image").unwrap();
+        app.cursor_pos = at_start;
+
+        app.handle_key(KeyCode::Delete, KeyModifiers::empty())
+            .unwrap();
+
+        assert_eq!(app.input(), "hi");
+        assert!(app.pending_images.is_empty());
     }
 
     #[test]
@@ -637,11 +804,28 @@ use paste_guard::image_media_type;
 
 pub(super) fn handle_paste(app: &mut App, text: String) {
     paste_guard::note_paste();
-    // Note: clipboard_image() is NOT checked here. Bracketed paste events from the
-    // terminal always deliver text. Checking clipboard_image() here caused a bug where
-    // text pastes were misidentified as images when the clipboard also had image data
-    // (common on Wayland where apps advertise multiple MIME types). Image pasting is
-    // handled by explicit clipboard shortcuts instead (Ctrl+V/Alt+V/Cmd+V smart-paste).
+    if text.trim().is_empty() {
+        // Windows Terminal / VS Code deliver an empty (or whitespace-only)
+        // bracketed paste when the clipboard holds an image with no text form.
+        // That is the only in-band signal the app gets that the user pressed
+        // paste for an image, so probe the OS image clipboard. Real text pastes
+        // never reach this branch, which keeps the old Wayland mis-identification
+        // bug (text marked as an image when the clipboard advertised both) closed.
+        spawn_clipboard_paste(app, ClipboardPasteKind::ImageOnly);
+        app.set_status_notice("Reading clipboard...");
+        return;
+    }
+    ingest_paste_text(app, text);
+}
+
+/// Common induction point for pasted text regardless of source: bracketed
+/// paste events, Ctrl+V/Alt+V smart-paste results, and remote/startup
+/// restores. Detects dropped file paths (images attach to the message, UTF-8
+/// text files inline as deferred content) and bare image URLs (asynchronous
+/// download), with plain text as the final fallback. Keeping the two entry
+/// points on one path means a copied file behaves identically whether the
+/// terminal delivered it as a bracket-paste or forwarded Ctrl+V as a key event.
+pub(super) fn ingest_paste_text(app: &mut App, text: String) {
     if let Some(paths) = parse_dropped_paths(&text) {
         let item_count = paths.len();
         let mut image_count = 0;
@@ -661,6 +845,8 @@ pub(super) fn handle_paste(app: &mut App, text: String) {
                     base64::engine::general_purpose::STANDARD.encode(data),
                 );
                 image_count += 1;
+            } else if attach_text_file(app, &path) {
+                file_count += 1;
             } else {
                 insert_input_text(app, &format_dropped_path(&path, item_count > 1));
                 file_count += 1;
@@ -753,7 +939,28 @@ pub(super) fn parse_dropped_paths(text: &str) -> Option<Vec<PathBuf>> {
     if literal_path.is_file() {
         return Some(vec![literal_path]);
     }
+    parse_dropped_path_tokens(trimmed)
+}
 
+fn dropped_paths_from_tokens(tokens: Vec<String>) -> Option<Vec<PathBuf>> {
+    tokens
+        .into_iter()
+        .map(|token| {
+            let path = if token.starts_with("file://") {
+                url::Url::parse(&token).ok()?.to_file_path().ok()?
+            } else {
+                PathBuf::from(token)
+            };
+            path.is_file().then_some(path)
+        })
+        .collect()
+}
+
+/// Unix tokenizer: treats `\` as a shell escape (`first\ image.png`) and
+/// honours single/double quoting. Backslash-escapes have no meaning in paths
+/// on these platforms, so the escaped character is folded into the token.
+#[cfg(not(windows))]
+fn parse_dropped_path_tokens(trimmed: &str) -> Option<Vec<PathBuf>> {
     let mut tokens = Vec::new();
     let mut token = String::new();
     let mut quote = None;
@@ -789,18 +996,45 @@ pub(super) fn parse_dropped_paths(text: &str) -> Option<Vec<PathBuf>> {
     if tokens.is_empty() {
         return None;
     }
+    dropped_paths_from_tokens(tokens)
+}
 
-    tokens
-        .into_iter()
-        .map(|token| {
-            let path = if token.starts_with("file://") {
-                url::Url::parse(&token).ok()?.to_file_path().ok()?
-            } else {
-                PathBuf::from(token)
-            };
-            path.is_file().then_some(path)
-        })
-        .collect()
+/// Windows tokenizer: a backslash is the path separator, never an escape, so
+/// Explorer / Windows Terminal file drops must keep `C:\...` verbatim. Split on
+/// unquoted whitespace only, keep backslashes intact (except the `\ ` shell
+/// escape some drop sources still emit), handle quoted spaced filenames and
+/// multi-file (newline-separated) pastes, and let `file:///C:/...` URLs pass.
+#[cfg(windows)]
+fn parse_dropped_path_tokens(trimmed: &str) -> Option<Vec<PathBuf>> {
+    let mut tokens = Vec::new();
+    let mut token = String::new();
+    let mut quote = None;
+    let mut chars = trimmed.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\'' | '"' if quote == Some(ch) => quote = None,
+            '\'' | '"' if quote.is_none() => quote = Some(ch),
+            '\'' | '"' => token.push(ch),
+            '\\' if quote != Some('\'')
+                && chars.peek().is_some_and(|c| c.is_whitespace()) =>
+            {
+                token.push(chars.next().expect("whitespace after escape"));
+            }
+            _ if ch.is_whitespace() && quote.is_none() => {
+                if !token.is_empty() {
+                    tokens.push(std::mem::take(&mut token));
+                }
+            }
+            _ => token.push(ch),
+        }
+    }
+    if !token.is_empty() {
+        tokens.push(token);
+    }
+    if tokens.is_empty() {
+        return None;
+    }
+    dropped_paths_from_tokens(tokens)
 }
 
 pub(super) fn handle_text_paste(app: &mut App, text: String) {
@@ -964,7 +1198,7 @@ impl App {
                 true
             }
             ClipboardPasteContent::Text(text) => {
-                handle_text_paste(self, text);
+                ingest_paste_text(self, text);
                 true
             }
             ClipboardPasteContent::Empty => {
@@ -2755,6 +2989,10 @@ pub(super) fn handle_modal_key(
         return Ok(true);
     }
 
+    if app.usage_overlay.is_some() {
+        return app.handle_usage_overlay_key(code, modifiers);
+    }
+
     if app.copy_selection_mode {
         if modifiers.contains(KeyModifiers::CONTROL)
             && matches!(code, KeyCode::Char('c') | KeyCode::Char('d'))
@@ -2897,6 +3135,12 @@ pub(super) fn handle_basic_key(app: &mut App, code: KeyCode) -> bool {
             if app.delete_selected_input() {
                 return true;
             }
+            // Placeholder chips (`[image N]`, `[Pasted ~N lines]`) delete as a
+            // single unit, not one character at a time.
+            if let Some(chip) = input_chip_behind_cursor(&app.input, app.cursor_pos) {
+                delete_composer_chip(app, chip);
+                return true;
+            }
             if app.cursor_pos > 0 {
                 let prev = crate::tui::core::prev_char_boundary(&app.input, app.cursor_pos);
                 app.remember_input_undo_state();
@@ -2910,6 +3154,11 @@ pub(super) fn handle_basic_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Delete => {
             // Selection-aware: same whole-range removal as Backspace.
             if app.delete_selected_input() {
+                return true;
+            }
+            // Placeholder chips delete as a single unit.
+            if let Some(chip) = input_chip_at_cursor(&app.input, app.cursor_pos) {
+                delete_composer_chip(app, chip);
                 return true;
             }
             if app.cursor_pos < app.input.len() {
@@ -3012,6 +3261,13 @@ pub(super) fn handle_basic_key(app: &mut App, code: KeyCode) -> bool {
 
 pub(super) fn take_prepared_input(app: &mut App) -> PreparedInput {
     let raw_input = std::mem::take(&mut app.input);
+    // Re-synchronize `[image N]` chips with the attached images before
+    // expansion: drop trailing images that no longer have a placeholder and
+    // renumber by occurrence order (handles hand-edited chips).
+    if image_chip_count(&raw_input) < app.pending_images.len() {
+        app.pending_images.truncate(image_chip_count(&raw_input));
+    }
+    let raw_input = renumber_image_placeholders(&raw_input);
     let expanded = expand_paste_placeholders(app, &raw_input);
     // History recall must restore the full original text, never the compact
     // placeholder representation.
@@ -3053,6 +3309,44 @@ fn attach_image(app: &mut App, media_type: String, base64_data: String) {
     app.set_status_notice(format!("Pasted {} ({} KB)", media_type, size_kb));
 }
 
+/// Inline a UTF-8 text file (≤ `MAX_INLINE_FILE_BYTES`) into the composer as a
+/// deferred paste block so the model receives the full contents behind a clear
+/// path marker. Returns `false` for binary, oversized, or empty files, letting
+/// the caller fall back to path-as-text behaviour.
+fn attach_text_file(app: &mut App, path: &std::path::Path) -> bool {
+    let Ok(data) = std::fs::read(path) else {
+        return false;
+    };
+    if data.is_empty() || data.len() > MAX_INLINE_FILE_BYTES {
+        return false;
+    }
+    let Ok(content) = String::from_utf8(data) else {
+        return false;
+    };
+    if content.trim().is_empty() {
+        return false;
+    }
+    let block = format_file_block(path, content.trim_end());
+
+    // Reuse the paste-placeholder machinery so submit-time expansion and the
+    // transcript's inline "pasted content" cards come for free.
+    let placeholder = paste_placeholder(&block);
+    app.remember_input_undo_state();
+    app.pasted_contents.push(block);
+    app.input.insert_str(app.cursor_pos, &placeholder);
+    app.cursor_pos += placeholder.len();
+    app.sync_model_picker_preview_from_input();
+    true
+}
+
+fn format_file_block(path: &std::path::Path, content: &str) -> String {
+    format!(
+        "--- FILE {} ---\n{}\n--- END FILE ---",
+        path.to_string_lossy(),
+        content
+    )
+}
+
 fn paste_placeholder(content: &str) -> String {
     let mut line_count = 1usize;
     let mut previous_was_cr = false;
@@ -3072,6 +3366,179 @@ fn paste_placeholder(content: &str) -> String {
         line_count,
         if line_count == 1 { "" } else { "s" }
     )
+}
+
+/// A composer placeholder "chip" (`[image N]` or `[Pasted ~N lines]`) located
+/// by its byte span in the input buffer. Chips are deleted atomically with a
+/// single Backspace/Delete press instead of one character at a time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct InputChip {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+}
+
+impl InputChip {
+    pub(crate) fn is_image(&self, input: &str) -> bool {
+        input[self.start..self.end].starts_with("[image ")
+    }
+}
+
+fn digits_span(bytes: &[u8], from: usize) -> Option<(usize, usize)> {
+    let mut end = from;
+    while end < bytes.len() && bytes[end].is_ascii_digit() {
+        end += 1;
+    }
+    (end > from).then_some((from, end))
+}
+
+fn match_image_chip(input: &str, at: usize) -> Option<InputChip> {
+    const PREFIX: &[u8] = b"[image ";
+    let bytes = input.as_bytes();
+    if !bytes.get(at..)?.starts_with(PREFIX) {
+        return None;
+    }
+    let digits = digits_span(bytes, at + PREFIX.len())?;
+    (bytes.get(digits.1) == Some(&b']')).then_some(InputChip {
+        start: at,
+        end: digits.1 + 1,
+    })
+}
+
+fn match_pasted_chip(input: &str, at: usize) -> Option<InputChip> {
+    const PREFIX: &[u8] = b"[Pasted ~";
+    let bytes = input.as_bytes();
+    if !bytes.get(at..)?.starts_with(PREFIX) {
+        return None;
+    }
+    let digits = digits_span(bytes, at + PREFIX.len())?;
+    let tail = bytes.get(digits.1..)?;
+    const SINGULAR: &[u8] = b" line]";
+    const PLURAL: &[u8] = b" lines]";
+    if tail.starts_with(SINGULAR) {
+        Some(InputChip {
+            start: at,
+            end: digits.1 + SINGULAR.len(),
+        })
+    } else if tail.starts_with(PLURAL) {
+        Some(InputChip {
+            start: at,
+            end: digits.1 + PLURAL.len(),
+        })
+    } else {
+        None
+    }
+}
+
+/// Byte spans of every image/pasted placeholder chip in `input`, in order.
+/// The paste paths always emit the exact `[image N]` / `[Pasted ~N lines]`
+/// shapes, so these tokens are unambiguous full-width markers.
+pub(crate) fn input_chip_spans(input: &str) -> Vec<InputChip> {
+    let bytes = input.as_bytes();
+    let mut chips = Vec::new();
+    let mut i = 0;
+    while i < input.len() {
+        if bytes[i] == b'[' {
+            if let Some(chip) =
+                match_image_chip(input, i).or_else(|| match_pasted_chip(input, i))
+            {
+                chips.push(chip);
+                i = chip.end;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    chips
+}
+
+/// Chip immediately before `pos` (or containing `pos`): the Backspace target.
+pub(crate) fn input_chip_behind_cursor(input: &str, pos: usize) -> Option<InputChip> {
+    let pos = pos.min(input.len());
+    input_chip_spans(input)
+        .into_iter()
+        .find(|chip| chip.start < pos && pos <= chip.end)
+}
+
+/// Chip containing `pos` (starting at or inside it): the Delete target.
+pub(crate) fn input_chip_at_cursor(input: &str, pos: usize) -> Option<InputChip> {
+    let pos = pos.min(input.len());
+    input_chip_spans(input)
+        .into_iter()
+        .find(|chip| chip.start <= pos && pos < chip.end)
+}
+
+/// Rewrite every `[image N]` placeholder to sequential 1-based numbering by
+/// occurrence order. Serves as a safety net for hand-edited input: if the user
+/// erased a chip (or part of one) character-by-character, the remaining
+/// attachments are renumbered so they never drift out of sync with
+/// `pending_images` (e.g. `[image 3]` alone becomes `[image 1]`).
+pub(crate) fn renumber_image_placeholders(input: &str) -> String {
+    let chips = input_chip_spans(input);
+    let mut result = String::with_capacity(input.len());
+    let mut last = 0usize;
+    let mut k = 0usize;
+    for chip in chips {
+        if !chip.is_image(input) {
+            continue;
+        }
+        k += 1;
+        result.push_str(&input[last..chip.start]);
+        result.push_str(&format!("[image {k}]"));
+        last = chip.end;
+    }
+    result.push_str(&input[last..]);
+    result
+}
+
+/// Number of `[image N]` placeholder chips present in `input`.
+pub(crate) fn image_chip_count(input: &str) -> usize {
+    input_chip_spans(input)
+        .into_iter()
+        .filter(|chip| chip.is_image(input))
+        .count()
+}
+
+fn delete_composer_chip(app: &mut App, chip: InputChip) {
+    let removed_text = app.input[chip.start..chip.end].to_string();
+    app.remember_input_undo_state();
+    app.input.drain(chip.start..chip.end);
+    app.cursor_pos = chip.start;
+    app.reset_tab_completion();
+    cleanup_removed_chip(app, chip.start, &removed_text);
+    app.sync_model_picker_preview_from_input();
+}
+
+fn cleanup_removed_chip(app: &mut App, chip_start: usize, removed_text: &str) {
+    if let Some(index_text) = removed_text.strip_prefix("[image ") {
+        let Some(k) = index_text
+            .strip_suffix(']')
+            .and_then(|t| t.parse::<usize>().ok())
+        else {
+            return;
+        };
+        if k == 0 || k - 1 >= app.pending_images.len() {
+            return;
+        }
+        app.pending_images.remove(k - 1);
+        // Renumber the surviving `[image N]` chips so they stay aligned with
+        // the shifted `pending_images` indices.
+        let old_len = app.pending_images.len() + 1;
+        for n in (k + 1)..=old_len {
+            let from = format!("[image {n}]");
+            let to = format!("[image {}]", n - 1);
+            app.input = app.input.replacen(&from, &to, 1);
+        }
+    } else if removed_text.starts_with("[Pasted ~") {
+        // Chips appear in the buffer in the same order as `pasted_contents`;
+        // the removed chip's index is the count of pasted chips before it.
+        let index = input_chip_spans(&app.input[..chip_start])
+            .into_iter()
+            .filter(|chip| app.input[chip.start..chip.end].starts_with("[Pasted ~"))
+            .count();
+        if index < app.pasted_contents.len() {
+            app.pasted_contents.remove(index);
+        }
+    }
 }
 
 impl App {
@@ -4048,6 +4515,13 @@ impl App {
         }
 
         let raw_input = std::mem::take(&mut self.input);
+        // Re-synchronize `[image N]` chips with the attached images before
+        // expansion: drop trailing images that no longer have a placeholder and
+        // renumber by occurrence order (handles hand-edited chips).
+        if image_chip_count(&raw_input) < self.pending_images.len() {
+            self.pending_images.truncate(image_chip_count(&raw_input));
+        }
+        let raw_input = renumber_image_placeholders(&raw_input);
         let mut input = self.expand_paste_placeholders(&raw_input);
         let segments = paste_segments_for_expanded(self, &input);
         // Persist to cross-session prompt history (no-op for slash/shell
