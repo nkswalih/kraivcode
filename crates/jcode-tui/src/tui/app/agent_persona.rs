@@ -20,6 +20,40 @@ use std::path::PathBuf;
 const AGENT_PERSONA_FILE: &str = "agent_persona.json";
 const AGENT_PERSONA_VERSION: u8 = 1;
 
+/// An agent question awaiting an answer from the user (Plan-mode popup).
+///
+/// Rendered as a modal overlay; while present, the app's normal prompt input
+/// is suppressed and keys control this dialog until the user answers or
+/// cancels.
+pub struct PendingAskUser {
+    pub request_id: String,
+    pub question: String,
+    /// (label, value) pairs shown in the picker.
+    pub options: Vec<(String, String)>,
+    /// Whether the user may type a free-text answer.
+    pub free_text: bool,
+    /// Currently highlighted option index.
+    pub selected: usize,
+    /// In-progress free-text answer.
+    pub free_text_buffer: String,
+    /// Cursor position within `free_text_buffer`.
+    pub cursor: usize,
+    /// Synthesized post-turn Plan-followup popup (a prose question the daemon
+    /// caught in the finished Plan text). A free-text answer is re-submitted to
+    /// the session as the next user turn.
+    pub plan_followup: bool,
+}
+
+/// What a key press did to a pending agent question popup.
+pub(in crate::tui::app) enum AskUserAction {
+    /// Key was consumed without answering (e.g. moving the selection).
+    None,
+    /// The user answered; carries the submitted value (None = empty answer).
+    Submitted(Option<String>),
+    /// The user dismissed the question.
+    Cancelled,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct AgentPersonaStore {
     version: u8,
@@ -97,47 +131,16 @@ pub struct PersonaToolPolicy {
 /// - **Build** (default): full tool access (`None` allowlist).
 /// - **Plan**: read-only tools only; write/edit/bash/browser/… are hidden.
 /// - All other personas: full access (future work may restrict these).
+///
+/// Delegates to the shared `jcode_app_core::agent::persona` module so the TUI
+/// and the daemon always agree on the same allowlist.
 pub fn persona_tool_policy(mode: AgentMode) -> PersonaToolPolicy {
-    match mode {
-        AgentMode::Build => PersonaToolPolicy {
-            allowed_tools: None,
-            disabled_tools: HashSet::new(),
-        },
-        AgentMode::Plan => {
-            let mut allowed = HashSet::<String>::new();
-            // File / code reading
-            allowed.insert("read".into());
-            allowed.insert("glob".into());
-            allowed.insert("ls".into());
-            // Code search
-            allowed.insert("agentgrep".into());
-            allowed.insert("session_search".into());
-            allowed.insert("conversation_search".into());
-            // Memory / knowledge
-            allowed.insert("memory".into());
-            // UI / scratchpad
-            allowed.insert("side_panel".into());
-            allowed.insert("todo".into());
-            // Docs
-            allowed.insert("jcode_docs".into());
-            // Web (read-only research)
-            allowed.insert("webfetch".into());
-            allowed.insert("websearch".into());
-            // Background / scheduling (non-mutating)
-            allowed.insert("bg".into());
-            allowed.insert("initiative".into());
-            allowed.insert("schedule".into());
-            // MCP tools (filtered further by MCP server permissions)
-            allowed.insert("mcp".into());
-            PersonaToolPolicy {
-                allowed_tools: Some(allowed),
-                disabled_tools: HashSet::new(),
-            }
-        }
-        _ => PersonaToolPolicy {
-            allowed_tools: None,
-            disabled_tools: HashSet::new(),
-        },
+    let persona =
+        jcode_app_core::agent::persona::AgentPersona::from_key(mode.key()).unwrap_or_default();
+    let shared = jcode_app_core::agent::persona::persona_tool_policy(persona);
+    PersonaToolPolicy {
+        allowed_tools: shared.allowed_tools,
+        disabled_tools: HashSet::new(),
     }
 }
 
@@ -185,14 +188,21 @@ pub(in crate::tui::app) fn persona_directive(mode: AgentMode) -> &'static str {
 
 /// Merge an optional base reminder with the active persona directive.
 ///
-/// Under the zero-token permission-based approach, persona directives are
-/// **not** injected into the system prompt — tool gating handles enforcement.
-/// This function simply passes through the base reminder unchanged.
+/// The persona directive (from the shared `jcode_app_core` module) is appended
+/// so local turns and daemon turns inject the same behavioral guidance.
 pub(in crate::tui::app) fn merge_turn_reminder(
     base: Option<String>,
-    _mode: AgentMode,
+    mode: AgentMode,
 ) -> Option<String> {
-    base
+    let persona =
+        jcode_app_core::agent::persona::AgentPersona::from_key(mode.key()).unwrap_or_default();
+    let directive = jcode_app_core::agent::persona::persona_directive(persona);
+    match (base, directive) {
+        (Some(base), Some(directive)) => Some(format!("{base}\n\n{directive}")),
+        (Some(base), None) => Some(base),
+        (None, Some(directive)) => Some(directive),
+        (None, None) => None,
+    }
 }
 
 // ---------------------------------------------------------------------------

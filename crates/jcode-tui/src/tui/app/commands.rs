@@ -178,6 +178,29 @@ pub(super) fn is_fatal_model_endpoint_error(error: &str) -> bool {
         .any(|marker| lower.contains(marker))
 }
 
+/// Whether `error` is a provider-controlled access restriction that the OpenCode
+/// console only lifts for its own session (e.g. OpenCode Zen's free tier
+/// returning `400 MissingSessionID` with "can only be used in OpenCode"). Like
+/// [`is_fatal_model_endpoint_error`] this can never succeed by resending the
+/// identical request, but the root cause is the console session, not the model,
+/// so the message and remedy differ (use the console / a paid key / another
+/// provider), hence the dedicated classifier.
+pub(super) fn is_console_restricted_error(error: &str) -> bool {
+    let lower = error.to_ascii_lowercase();
+
+    let console_restricted_markers = [
+        "missingsessionid",
+        "free tier can only be used in",
+        "only be used in opencode",
+        "requires an opencode console",
+        "console-only",
+    ];
+
+    console_restricted_markers
+        .iter()
+        .any(|marker| lower.contains(marker))
+}
+
 pub(super) fn stop_auto_poke_for_non_retryable_error(app: &mut App, error: &str) -> bool {
     if !app.auto_poke_incomplete_todos || !is_non_retryable_auto_poke_error(error) {
         return false;
@@ -702,6 +725,7 @@ fn launch_manual_subagent(app: &mut App, spec: ManualSubagentSpec) {
             tool_call_id: tool_call_for_task.id.clone(),
             working_dir: working_dir.as_deref().map(PathBuf::from),
             stdin_request_tx: None,
+            ask_user_request_tx: None,
             graceful_shutdown_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
         };
