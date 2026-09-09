@@ -157,21 +157,25 @@ fn test_handle_paste_single_line() {
 }
 
 #[test]
-fn test_terminal_file_drop_submits_as_user_input_instead_of_a_skill() {
+fn test_terminal_file_drop_submits_as_attached_text_file() {
     let mut app = create_test_app();
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("dropped notes.txt");
     std::fs::write(&file, b"notes").unwrap();
-    let dropped = file.display().to_string();
+    app.handle_paste(file.display().to_string());
 
-    app.handle_paste(dropped.clone());
-    assert_eq!(app.input(), dropped);
+    let block = format!(
+        "--- FILE {} ---\nnotes\n--- END FILE ---",
+        file.display()
+    );
+    assert_eq!(app.input(), "[Pasted ~3 lines]");
+    assert_eq!(app.pasted_contents, vec![block.clone()]);
 
     app.submit_input();
 
     assert!(
         app.is_processing,
-        "the dropped file path should start a turn"
+        "the dropped file should start a turn"
     );
     assert!(
         app.display_messages()
@@ -186,12 +190,12 @@ fn test_terminal_file_drop_submits_as_user_input_instead_of_a_skill() {
         .expect("submitted file path message");
     assert!(matches!(
         submitted.content.as_slice(),
-        [ContentBlock::Text { text, .. }] if text == &file.display().to_string()
+        [ContentBlock::Text { text, .. }] if text == &block
     ));
 }
 
 #[test]
-fn test_terminal_escaped_file_drop_normalizes_the_path() {
+fn test_terminal_escaped_file_drop_inlines_normalized_path() {
     let mut app = create_test_app();
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("dropped notes.txt");
@@ -200,7 +204,38 @@ fn test_terminal_escaped_file_drop_normalizes_the_path() {
 
     app.handle_paste(escaped);
 
+    let block = format!(
+        "--- FILE {} ---\nnotes\n--- END FILE ---",
+        file.display()
+    );
+    assert_eq!(app.input(), "[Pasted ~3 lines]");
+    assert_eq!(app.pasted_contents, vec![block]);
+}
+
+#[test]
+fn test_binary_file_drop_falls_back_to_path_text() {
+    let mut app = create_test_app();
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("notes.bin");
+    std::fs::write(&file, [0xFF, 0x00, 0xFE]).unwrap();
+
+    app.handle_paste(file.display().to_string());
+
     assert_eq!(app.input(), file.display().to_string());
+    assert!(app.pasted_contents.is_empty());
+}
+
+#[test]
+fn test_oversized_text_file_drop_falls_back_to_path_text() {
+    let mut app = create_test_app();
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("big.txt");
+    std::fs::write(&file, vec![b'x'; 200 * 1024 + 1]).unwrap();
+
+    app.handle_paste(file.display().to_string());
+
+    assert_eq!(app.input(), file.display().to_string());
+    assert!(app.pasted_contents.is_empty());
 }
 
 #[test]
@@ -233,7 +268,7 @@ fn test_terminal_file_drop_with_followup_text_stays_normal_input() {
 }
 
 #[test]
-fn test_mixed_file_and_image_drop_keeps_file_and_attaches_image() {
+fn test_mixed_text_file_and_image_drop_attaches_both() {
     let mut app = create_test_app();
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("notes with spaces.txt");
@@ -248,7 +283,11 @@ fn test_mixed_file_and_image_drop_keeps_file_and_attaches_image() {
 
     app.handle_paste(dropped);
 
-    assert_eq!(app.input(), format!("\"{}\" [image 1]", file.display()));
+    let block = format!(
+        "--- FILE {} ---\nnotes\n--- END FILE ---",
+        file.display()
+    );
+    assert_eq!(app.input(), format!("[Pasted ~3 lines] [image 1]"));
     assert_eq!(app.pending_images.len(), 1);
     assert_eq!(app.pending_images[0].0, "image/png");
 }

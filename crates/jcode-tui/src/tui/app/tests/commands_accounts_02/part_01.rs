@@ -1,5 +1,5 @@
 #[test]
-fn test_usage_card_renders_when_loading() {
+fn test_usage_overlay_renders_when_loading() {
     let mut app = create_test_app();
     app.open_usage_inline_loading();
 
@@ -7,40 +7,34 @@ fn test_usage_card_renders_when_loading() {
     let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
     terminal
         .draw(|frame| crate::tui::ui::draw(frame, &app))
-        .expect("usage card draw should succeed");
+        .expect("usage overlay draw should succeed");
 
+    assert!(app.usage_overlay.is_some(), "/usage should open the overlay");
     let text = buffer_to_text(&terminal);
     assert!(
-        text.contains("╭"),
-        "usage card should render as rounded box, got:\n{text}"
-    );
-    assert!(
         text.contains("Refreshing usage"),
-        "usage card should be visible while loading, got:\n{text}"
-    );
-    assert!(
-        text.contains("Checking connected provider limits"),
-        "usage card should include loading details, got:\n{text}"
+        "usage overlay should be visible while loading, got:\n{text}"
     );
 }
 
 #[test]
-fn test_usage_card_does_not_capture_typing() {
+fn test_usage_overlay_captures_typing_into_filter() {
     let mut app = create_test_app();
     app.open_usage_inline_loading();
-    assert!(app.usage_overlay.is_none());
+    assert!(app.usage_overlay.is_some());
 
     app.handle_key(KeyCode::Char('h'), KeyModifiers::empty())
-        .expect("type after usage card");
+        .expect("type while usage overlay open");
 
-    assert!(app.usage_overlay.is_none());
-    assert_eq!(app.input(), "h");
+    assert!(app.usage_overlay.is_some(), "overlay stays open");
+    assert_eq!(app.input(), "", "typing filters the overlay, not the main input");
 }
 
 #[test]
-fn test_usage_report_updates_display_only_card_without_system_message() {
+fn test_usage_report_updates_overlay_without_system_message() {
     let mut app = create_test_app();
     app.usage_report_refreshing = true;
+    app.open_usage_overlay();
     // App::new seeds the provider transcript with the immutable session-context
     // reminder, so assert the usage report adds nothing on top of it rather
     // than expecting an empty transcript.
@@ -60,13 +54,22 @@ fn test_usage_report_updates_display_only_card_without_system_message() {
 
     assert!(!app.usage_report_refreshing);
     assert!(app.inline_view_state.is_none());
-    assert!(app.usage_overlay.is_none());
-    let msg = app.display_messages().last().expect("missing usage card");
-    assert_eq!(msg.role, "usage");
-    assert!(msg.content.contains("OpenAI (ChatGPT)"));
-    assert!(msg.content.contains("5h"));
-    assert!(msg.content.contains("82%"));
-    assert!(msg.content.contains("plan: pro"));
+    assert!(app.usage_overlay.is_some(), "usage overlay stays open");
+
+    let backend = ratatui::backend::TestBackend::new(120, 40);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    terminal
+        .draw(|frame| crate::tui::ui::draw(frame, &app))
+        .expect("usage overlay draw should succeed");
+    let text = buffer_to_text(&terminal);
+    assert!(text.contains("OpenAI (ChatGPT)"));
+    assert!(text.contains("5h"));
+    assert!(text.contains("plan: pro"));
+
+    assert!(
+        app.display_messages().iter().all(|m| m.role != "usage"),
+        "usage must render in the overlay panel, not the chat transcript"
+    );
     let leaked = app.materialized_provider_messages();
     assert_eq!(
         leaked.len(),
@@ -76,7 +79,7 @@ fn test_usage_report_updates_display_only_card_without_system_message() {
 }
 
 #[test]
-fn test_usage_progress_updates_card_incrementally() {
+fn test_usage_progress_updates_overlay_incrementally() {
     let mut app = create_test_app();
     app.open_usage_inline_loading();
 
@@ -100,19 +103,22 @@ fn test_usage_progress_updates_card_incrementally() {
     });
 
     assert!(app.usage_report_refreshing);
-    assert_eq!(
-        app.display_messages()
-            .iter()
-            .filter(|message| message.role == "usage")
-            .count(),
-        1
+    assert!(app.usage_overlay.is_some());
+
+    let backend = ratatui::backend::TestBackend::new(120, 40);
+    let mut terminal = ratatui::Terminal::new(backend).expect("failed to create test terminal");
+    terminal
+        .draw(|frame| crate::tui::ui::draw(frame, &app))
+        .expect("usage overlay draw should succeed");
+    let text = buffer_to_text(&terminal);
+    assert!(
+        text.contains("Anthropic (Claude)") || text.contains("Refreshing providers"),
+        "usage overlay should show progress or provider rows, got:\n{text}"
     );
-    let detail = &app
-        .display_messages()
-        .last()
-        .expect("missing usage card")
-        .content;
-    assert!(detail.contains("5-hour window") || detail.contains("Refreshing usage (1/2)"));
+    assert!(
+        app.display_messages().iter().all(|m| m.role != "usage"),
+        "usage must render in the overlay panel, not the chat transcript"
+    );
 }
 
 #[test]
