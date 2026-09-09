@@ -2708,6 +2708,53 @@ struct WrappedInputSegment {
     display_width: usize,
 }
 
+/// Text style of composer placeholder chips (`[image N]`, `[Pasted ~N lines]`).
+/// The glowing yellow-orange pill makes each attachment read as a removable
+/// block inline in the composer rather than ordinary typed text.
+fn input_chip_style() -> Style {
+    Style::default()
+        .fg(Color::Rgb(45, 28, 0))
+        .bg(Color::Rgb(255, 178, 32))
+}
+
+/// Split one wrapped segment into spans, highlighting any placeholder chip
+/// tokens that fall inside it with `input_chip_style()`.
+fn segment_with_chip_spans(
+    segment: &WrappedInputSegment,
+    input: &str,
+    chips: &[crate::tui::app::input::InputChip],
+) -> Vec<Span<'static>> {
+    let seg_byte_start = crate::tui::core::char_index_to_byte_offset(input, segment.start_char);
+    let seg_byte_end = (seg_byte_start + segment.text.len()).min(input.len());
+
+    let mut spans = Vec::new();
+    let mut cursor = 0usize;
+    for chip in chips {
+        if chip.end <= seg_byte_start || chip.start >= seg_byte_end {
+            continue;
+        }
+        let local_start = chip.start.saturating_sub(seg_byte_start);
+        let local_end = chip.end.saturating_sub(seg_byte_start).min(segment.text.len());
+        if local_start > cursor {
+            spans.push(Span::raw(segment.text[cursor..local_start].to_string()));
+        }
+        if local_start < local_end {
+            spans.push(Span::styled(
+                segment.text[local_start..local_end].to_string(),
+                input_chip_style(),
+            ));
+        }
+        cursor = local_end;
+    }
+    if cursor < segment.text.len() {
+        spans.push(Span::raw(segment.text[cursor..].to_string()));
+    }
+    if spans.is_empty() {
+        spans.push(Span::raw(segment.text.clone()));
+    }
+    spans
+}
+
 /// Wrapped/raw text plus the wrapped-to-raw line map for the composer's
 /// copy-selection snapshot. Wrapped rows mirror `wrap_input_segments` exactly
 /// (the same function that lays out the rendered rows), while raw lines are
@@ -2956,6 +3003,7 @@ pub(crate) fn wrap_input_text<'a>(
 ) -> (Vec<Line<'a>>, usize, usize) {
     let cursor_char_pos = crate::tui::core::byte_offset_to_char_index(input, cursor_pos);
     let wrapped_segments = wrap_input_segments(input, line_width);
+    let chip_spans = crate::tui::app::input::input_chip_spans(input);
     let mut lines: Vec<Line> = Vec::new();
     let mut cursor_line = 0;
     let mut cursor_col = 0;
@@ -2973,16 +3021,16 @@ pub(crate) fn wrap_input_text<'a>(
 
         if idx == 0 {
             let num_color = rainbow_prompt_color(0);
-            lines.push(Line::from(vec![
+            let mut spans = vec![
                 Span::styled(num_str.to_string(), Style::default().fg(num_color)),
                 Span::styled(prompt_char.to_string(), Style::default().fg(caret_color)),
-                Span::raw(segment.text.clone()),
-            ]));
+            ];
+            spans.extend(segment_with_chip_spans(segment, input, &chip_spans));
+            lines.push(Line::from(spans));
         } else {
-            lines.push(Line::from(vec![
-                Span::raw(" ".repeat(prompt_len)),
-                Span::raw(segment.text.clone()),
-            ]));
+            let mut spans = vec![Span::raw(" ".repeat(prompt_len))];
+            spans.extend(segment_with_chip_spans(segment, input, &chip_spans));
+            lines.push(Line::from(spans));
         }
     }
 
