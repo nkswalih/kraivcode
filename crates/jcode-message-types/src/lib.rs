@@ -67,8 +67,31 @@ impl ToolDefinition {
 }
 
 fn estimate_tokens(s: &str) -> usize {
-    const APPROX_CHARS_PER_TOKEN: usize = 4;
-    s.len() / APPROX_CHARS_PER_TOKEN
+    if s.is_empty() {
+        return 0;
+    }
+    let mut words = 0usize;
+    let mut punct_runs = 0usize;
+    let (mut in_word, mut in_punct) = (false, false);
+    for ch in s.chars() {
+        if ch.is_whitespace() {
+            in_word = false;
+            in_punct = false;
+        } else if ch.is_alphanumeric() {
+            if !in_word {
+                words += 1;
+                in_word = true;
+            }
+            in_punct = false;
+        } else {
+            if !in_punct {
+                punct_runs += 1;
+                in_punct = true;
+            }
+            in_word = false;
+        }
+    }
+    (words as f64 * 1.3 + punct_runs as f64 + 1.0) as usize
 }
 
 /// Role in conversation

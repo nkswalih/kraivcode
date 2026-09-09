@@ -53,6 +53,11 @@ pub enum Request {
         /// acknowledges it without starting a model turn.
         #[serde(default, skip_serializing_if = "is_false")]
         no_reply: bool,
+        /// Active session persona key ("build", "plan", …). When the client
+        /// supplies a persona on a message, the daemon adopts it for that and
+        /// all subsequent turns of the session (not just the current message).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        persona: Option<String>,
     },
 
     /// Cancel current generation
@@ -360,6 +365,20 @@ pub enum Request {
         request_id: String,
         /// The user's input (line of text)
         input: String,
+    },
+
+    /// Answer an interactive question the agent asked (Plan-mode popup).
+    #[serde(rename = "ask_user_response")]
+    AskUserResponse {
+        id: u64,
+        /// Matches the request_id from AskUserRequest
+        request_id: String,
+        /// Selected option value or the user's free-text answer. Absent when
+        /// cancelled (Esc).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        cancelled: bool,
     },
 
     // === Agent-to-agent communication ===
@@ -1459,6 +1478,25 @@ pub enum ServerEvent {
         #[serde(default)]
         is_password: bool,
         /// Tool call ID this is associated with
+        tool_call_id: String,
+    },
+
+    /// The agent is asking the user an interactive question. The current turn
+    /// is paused until the client sends [`crate::Request::AskUserResponse`].
+    #[serde(rename = "ask_user_request")]
+    AskUserRequest {
+        /// Unique request ID for matching the response
+        request_id: String,
+        /// The question text displayed in the popup
+        question: String,
+        /// Optional selectable answers shown in the picker as (label, value)
+        /// pairs.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        options: Vec<(String, String)>,
+        /// Whether the user may type a free-text answer instead of picking
+        #[serde(default)]
+        free_text: bool,
+        /// The tool call awaiting the answer
         tool_call_id: String,
     },
 }

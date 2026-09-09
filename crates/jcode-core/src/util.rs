@@ -23,9 +23,44 @@ pub enum ApproxTokenSeverity {
     Danger,
 }
 
-/// Estimate token count using jcode's existing chars-per-token heuristic.
+/// Estimate token count using the classic words + punctuation heuristic rather
+/// than a flat `chars/4`.
+///
+/// Byte-pair tokenizers average roughly 1.3 tokens per word plus ~1 token per
+/// punctuation run for mixed English + code input. That tracks real tokenizers
+/// notably better than `len / 4` (which over-counts short words and
+/// under-counts dense symbol runs) while still costing a single pass with no
+/// allocation. Estimates run on the conservative side, so callers using this
+/// for budget guards will compact / split slightly earlier rather than later.
+///
+/// NOTE: keep in sync with the same helper in `jcode-message-types` and
+/// `jcode-compaction-core` so every estimate shares one shape.
 pub fn estimate_tokens(s: &str) -> usize {
-    s.len() / APPROX_CHARS_PER_TOKEN
+    if s.is_empty() {
+        return 0;
+    }
+    let mut words = 0usize;
+    let mut punct_runs = 0usize;
+    let (mut in_word, mut in_punct) = (false, false);
+    for ch in s.chars() {
+        if ch.is_whitespace() {
+            in_word = false;
+            in_punct = false;
+        } else if ch.is_alphanumeric() {
+            if !in_word {
+                words += 1;
+                in_word = true;
+            }
+            in_punct = false;
+        } else {
+            if !in_punct {
+                punct_runs += 1;
+                in_punct = true;
+            }
+            in_word = false;
+        }
+    }
+    ((words as f64 * 1.3) + punct_runs as f64 + 1.0) as usize
 }
 
 /// Format a number with ASCII thousands separators.
