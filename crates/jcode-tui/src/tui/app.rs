@@ -73,7 +73,7 @@ mod hotkey_feedback;
 pub(crate) mod idle_animation_repaint;
 mod idle_heap_release;
 mod inline_interactive;
-mod input;
+pub(crate) mod input;
 mod input_help;
 mod local;
 mod misc_ui;

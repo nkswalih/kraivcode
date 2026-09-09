@@ -14,6 +14,19 @@ use ratatui::{
 
 use super::selection_highlight::highlight_line_selection;
 
+// ── Ask-user popup palette (matches skills picker theme) ──────────────
+const PANEL_BG: Color = Color::Rgb(16, 16, 14);
+const PANEL_BORDER: Color = Color::Rgb(84, 64, 40);
+const SELECTED_BG: Color = Color::Rgb(46, 32, 16);
+const MUTED: Color = Color::Rgb(172, 152, 112);
+const MUTED_DARK: Color = Color::Rgb(118, 100, 74);
+const ACCENT: Color = Color::Rgb(255, 140, 0);
+const HINT: Color = Color::Rgb(170, 210, 255);
+
+fn hotkey(text: &'static str) -> Span<'static> {
+    Span::styled(text, Style::default().fg(Color::White).bg(Color::DarkGray))
+}
+
 pub(super) fn draw_changelog_overlay(
     frame: &mut Frame,
     area: Rect,
@@ -1168,119 +1181,144 @@ pub(super) fn draw_model_detail_popup(frame: &mut Frame, area: Rect, popup: &cra
 }
 
 /// Plan-mode `ask_user` popup: question, selectable options, and an optional
-/// free-text field. Draws as a centered card that sits just above the composer.
+/// free-text field. Draws as a centered dark panel matching the skills picker theme.
 pub(super) fn draw_ask_user_popup(
     frame: &mut Frame,
     area: Rect,
     popup: &crate::tui::app::agent_persona::PendingAskUser,
 ) {
-    let dim_style = Style::default().fg(dim_color());
-    let value_style = Style::default().fg(user_text());
-    let accent_style = Style::default()
-        .fg(user_color())
-        .add_modifier(Modifier::BOLD);
+    // Center: 60% width, ~50% height
+    let panel_w = (area.width * 60 / 100).max(40).min(area.width);
+    let panel_h = (area.height * 50 / 100).max(10).min(area.height);
+    let panel_x = area.x + (area.width.saturating_sub(panel_w)) / 2;
+    let panel_y = area.y + (area.height.saturating_sub(panel_h)) / 2;
+    let panel = Rect::new(panel_x, panel_y, panel_w, panel_h);
 
-    // Interior box target width; text is wrapped to fit.
-    let box_target = (area.width.saturating_sub(10) as usize).clamp(40, 90);
-    let inner_width = box_target.saturating_sub(4);
+    // Clear the area, then fill with dark background using space characters.
+    // Clear blanks the rect; styled spaces ensure every cell gets PANEL_BG.
+    frame.render_widget(ratatui::widgets::Clear, panel);
+    let fill_lines: Vec<Line> = (0..panel.height)
+        .map(|_| Line::from(Span::styled(" ".repeat(panel.width as usize), Style::default().bg(PANEL_BG))))
+        .collect();
+    frame.render_widget(Paragraph::new(fill_lines), panel);
 
-    let mut lines: Vec<Line<'static>> = Vec::new();
+    // Outer block: brown border, dark background, hotkey chips in bottom border
+    let block = Block::default()
+        .title(Span::styled(
+            " Agent question ",
+            Style::default().fg(Color::White).bold(),
+        ))
+        .title_bottom(Line::from(vec![
+            hotkey(" ↑/↓ "),
+            Span::styled(" select  ", Style::default().fg(MUTED_DARK)),
+            hotkey(" j/k "),
+            Span::styled(" navigate  ", Style::default().fg(MUTED_DARK)),
+            hotkey(" Enter "),
+            Span::styled(" submit  ", Style::default().fg(MUTED_DARK)),
+            hotkey(" Esc "),
+            Span::styled(" cancel ", Style::default().fg(MUTED_DARK)),
+        ]))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(PANEL_BORDER))
+        .style(Style::default().bg(PANEL_BG));
 
-    lines.push(Line::from(Span::styled(
-        "The agent asked you before continuing:",
-        dim_style,
-    )));
-    lines.push(Line::from(""));
-    for wrapped in wrap_plain(&popup.question, inner_width) {
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled(wrapped, value_style),
-        ]));
-    }
+    let inner = block.inner(panel);
+    frame.render_widget(block, panel);
 
-    if !popup.options.is_empty() {
-        lines.push(Line::from(Span::styled("Choose an answer:", dim_style)));
-        for (index, (label, _value)) in popup.options.iter().enumerate() {
-            let selected = index == popup.selected;
-            let marker = if selected { "❯ " } else { "  " };
-            let bullet = if selected { "● " } else { "○ " };
-            let style = if selected {
-                accent_style
-            } else {
-                dim_style
-            };
-            lines.push(Line::from(vec![
-                Span::styled(marker, style),
-                Span::styled(bullet, style),
-                Span::styled(label.clone(), style),
-            ]));
-        }
-    }
-
-    if popup.free_text {
-        if !popup.options.is_empty() {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                "…or type your own answer:",
-                dim_style,
-            )));
-        } else {
-            lines.push(Line::from(Span::styled(
-                "Type your answer:",
-                dim_style,
-            )));
-        }
-        lines.push(free_text_line(popup, inner_width));
-        lines.push(Line::from(""));
-    }
-
-    lines.push(Line::from(Span::styled(
-        "↑/↓ or j/k select · Enter submit · Esc cancel",
-        dim_style,
-    )));
-
-    let content_width = lines
-        .iter()
-        .map(|line| line.width())
-        .max()
-        .unwrap_or(0)
-        .clamp(36, area.width.saturating_sub(4) as usize);
-    let boxed = render_rounded_box(
-        "Agent question",
-        lines,
-        content_width + 6,
-        Style::default().fg(user_color()),
-    );
-
-    let box_width = boxed.iter().map(|l| l.width()).max().unwrap_or(0) as u16;
-    let box_height = boxed.len() as u16;
-    if box_width == 0 || box_width > area.width || box_height > area.height {
+    if inner.height == 0 || inner.width == 0 {
         return;
     }
 
-    // Anchor the bottom of the card just above the composer, like the
-    // permission panel, so the popup never covers the input.
-    let anchor_y = crate::tui::ui::composer_anchor_rect()
-        .map(|rect| rect.y.saturating_sub(box_height + 1))
-        .unwrap_or_else(|| area.y + area.height.saturating_sub(box_height + 2));
-    let anchor_y = anchor_y.max(area.y);
-    let card = Rect {
-        x: area.x + (area.width.saturating_sub(box_width)) / 2,
-        y: anchor_y,
-        width: box_width,
-        height: box_height,
+    let inner_width = inner.width as usize;
+
+    // ── Build content lines ──────────────────────────────────────────
+    let mut lines: Vec<Line<'static>> = Vec::new();
+
+    // Question label + text
+    lines.push(Line::from(vec![
+        Span::styled("Question ", Style::default().fg(MUTED_DARK).bold()),
+        Span::styled(
+            "— the agent asked before continuing:".to_string(),
+            Style::default().fg(MUTED),
+        ),
+    ]));
+    lines.push(Line::from(""));
+    for wrapped in wrap_plain(&popup.question, inner_width.saturating_sub(2)) {
+        lines.push(Line::from(vec![
+            Span::raw(" "),
+            Span::styled(wrapped, Style::default().fg(Color::White)),
+        ]));
+    }
+
+    // Options
+    if !popup.options.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            " Choose an answer:",
+            Style::default().fg(MUTED_DARK).bold(),
+        )));
+        for (index, (label, _value)) in popup.options.iter().enumerate() {
+            let selected = index == popup.selected;
+            if selected {
+                let mut spans: Vec<Span> = Vec::new();
+                spans.push(Span::styled("  ", Style::default().bg(SELECTED_BG)));
+                spans.push(Span::styled(
+                    "❯ ",
+                    Style::default()
+                        .fg(ACCENT)
+                        .bg(SELECTED_BG)
+                        .add_modifier(Modifier::BOLD),
+                ));
+                spans.push(Span::styled(
+                    label.clone(),
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(SELECTED_BG)
+                        .add_modifier(Modifier::BOLD),
+                ));
+                lines.push(Line::from(spans));
+            } else {
+                lines.push(Line::from(vec![
+                    Span::raw("   "),
+                    Span::styled("○ ", Style::default().fg(MUTED_DARK)),
+                    Span::styled(label.clone(), Style::default().fg(MUTED)),
+                ]));
+            }
+        }
+    }
+
+    // Free-text input
+    if popup.free_text {
+        lines.push(Line::from(""));
+        if popup.options.is_empty() {
+            lines.push(Line::from(Span::styled(
+                " Type your answer:",
+                Style::default().fg(MUTED_DARK).bold(),
+            )));
+        } else {
+            lines.push(Line::from(Span::styled(
+                " …or type your own answer:",
+                Style::default().fg(MUTED_DARK).italic(),
+            )));
+        }
+        lines.push(Line::from(""));
+        lines.push(free_text_line(popup, inner_width.saturating_sub(2)));
+    }
+
+    // ── Render content into the inner area ───────────────────────────
+    // We need to handle overflow: if content is taller than inner, show bottom.
+    let total_lines = lines.len();
+    let visible_height = inner.height as usize;
+    let scroll = if total_lines > visible_height {
+        (total_lines - visible_height) as u16
+    } else {
+        0
     };
 
-    frame.render_widget(ratatui::widgets::Clear, card);
-    for (index, line) in boxed.iter().enumerate() {
-        let row = Rect {
-            x: card.x,
-            y: card.y + index as u16,
-            width: card.width,
-            height: 1,
-        };
-        frame.render_widget(Paragraph::new(line.clone()), row);
-    }
+    let paragraph = Paragraph::new(lines)
+        .style(Style::default().bg(PANEL_BG))
+        .scroll((scroll, 0));
+    frame.render_widget(paragraph, inner);
 }
 
 /// Build the free-text field line: a windowed slice of the buffer with the
@@ -1334,18 +1372,18 @@ fn free_text_line(
     }
 
     Line::from(vec![
-        Span::styled("❯ ", Style::default().fg(user_color())),
+        Span::styled("❯ ", Style::default().fg(ACCENT)),
         Span::styled(
             visible[..split].to_string(),
-            Style::default().fg(user_text()),
+            Style::default().fg(Color::White),
         ),
         Span::styled(
             "▊",
-            Style::default().bg(user_color()).add_modifier(Modifier::BOLD),
+            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             visible[split..].to_string(),
-            Style::default().fg(dim_color()),
+            Style::default().fg(MUTED),
         ),
     ])
 }
