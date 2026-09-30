@@ -23,7 +23,11 @@ fn main() {
         }
         match live_cache_for(&resolved) {
             Some((models, stale)) => {
-                println!("       -> LIVE catalog ({} models, stale={})", models.len(), stale);
+                println!(
+                    "       -> LIVE catalog ({} models, stale={})",
+                    models.len(),
+                    stale
+                );
                 for m in models.iter().take(8) {
                     println!("           - {}", m);
                 }
@@ -47,7 +51,9 @@ fn main() {
 fn live_cache_for(
     resolved: &jcode_base::provider_catalog::ResolvedOpenAiCompatibleProfile,
 ) -> Option<(Vec<String>, bool)> {
-    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).ok()?;
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()?;
     let path = std::path::Path::new(&home)
         .join(".jcode")
         .join("cache")

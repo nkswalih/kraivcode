@@ -21,23 +21,30 @@ pub fn wrap_line(
         }
     });
 
-    let seed_repeated_prefix =
-        |current_spans: &mut Vec<Span<'static>>,
-         current_width: &mut usize,
-         current_has_content: &mut bool,
-         pending: &mut bool| {
-            if *pending {
-                if let Some((prefix_spans, prefix_width)) = &repeated_prefix {
-                    current_spans.extend(prefix_spans.iter().cloned());
-                    *current_width = *prefix_width;
-                    // The gutter prefix itself counts as content so trailing
-                    // spaces (part of the prefix token) are not dropped on
-                    // blank lines like "┃ ".
-                    *current_has_content = true;
-                }
-                *pending = false;
+    // A gutter-only source line is intentional spacing inside a quote/code
+    // block, not an empty continuation produced by wrapping.
+    if let Some((_, prefix_width)) = &repeated_prefix
+        && line.width() <= *prefix_width
+    {
+        return vec![line];
+    }
+
+    let seed_repeated_prefix = |current_spans: &mut Vec<Span<'static>>,
+                                current_width: &mut usize,
+                                current_has_content: &mut bool,
+                                pending: &mut bool| {
+        if *pending {
+            if let Some((prefix_spans, prefix_width)) = &repeated_prefix {
+                current_spans.extend(prefix_spans.iter().cloned());
+                *current_width = *prefix_width;
+                // The gutter prefix itself counts as content so trailing
+                // spaces (part of the prefix token) are not dropped on
+                // blank lines like "┃ ".
+                *current_has_content = true;
             }
-        };
+            *pending = false;
+        }
+    };
 
     // Skip balanced wrapping when a repeated gutter prefix is present
     // (e.g. ┃ for user borders, │ for blockquotes). Balanced wrapping

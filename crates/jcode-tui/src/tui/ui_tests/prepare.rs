@@ -76,6 +76,7 @@ fn test_prepare_messages_places_live_swarm_card_beneath_matching_spawn_tool_call
     let session_id = "spawned-session-123";
     let state = TestState {
         display_messages: vec![DisplayMessage {
+            pasted_segments: None,
             role: "tool".to_string(),
             content: format!("Spawned new agent: {session_id}"),
             tool_calls: Vec::new(),
@@ -173,6 +174,7 @@ fn test_prepare_messages_keeps_transcript_card_stable_with_nested_descendants() 
     );
     let state = TestState {
         display_messages: vec![DisplayMessage {
+            pasted_segments: None,
             role: "tool".to_string(),
             content: format!("Spawned new agent: {root_id}"),
             tool_calls: Vec::new(),
@@ -231,6 +233,7 @@ fn test_prepare_messages_uses_exact_spawn_member_outside_gallery_subtree() {
     let session_id = "spawned-session-outside-filter";
     let state = TestState {
         display_messages: vec![DisplayMessage {
+            pasted_segments: None,
             role: "tool".to_string(),
             content: format!("Spawned new agent: {session_id}"),
             tool_calls: Vec::new(),
@@ -268,6 +271,7 @@ fn test_prepare_messages_matches_real_prefixed_spawn_result_without_input_metada
     let session_id = "spawned-session-123";
     let state = TestState {
         display_messages: vec![DisplayMessage {
+            pasted_segments: None,
             role: "tool".to_string(),
             content: format!("[swarm] Spawned new agent: {session_id}"),
             tool_calls: Vec::new(),
@@ -301,6 +305,7 @@ fn test_prepare_messages_matches_real_prefixed_spawn_result_without_input_metada
 fn test_prepare_messages_does_not_attach_member_to_unmatched_spawn_result() {
     let state = TestState {
         display_messages: vec![DisplayMessage {
+            pasted_segments: None,
             role: "tool".to_string(),
             content: "Spawned new agent: another-session".to_string(),
             tool_calls: Vec::new(),
@@ -336,6 +341,7 @@ fn test_prepare_messages_matches_spawn_member_by_unique_label_when_result_is_ref
     member.task_label = Some("API reviewer".to_string());
     let state = TestState {
         display_messages: vec![DisplayMessage {
+            pasted_segments: None,
             role: "tool".to_string(),
             content: "Agent created successfully".to_string(),
             tool_calls: Vec::new(),
@@ -373,6 +379,7 @@ fn test_prepare_messages_does_not_guess_when_spawn_label_is_ambiguous() {
     second.task_label = Some("reviewer".to_string());
     let state = TestState {
         display_messages: vec![DisplayMessage {
+            pasted_segments: None,
             role: "tool".to_string(),
             content: "Agent created successfully".to_string(),
             tool_calls: Vec::new(),
@@ -529,6 +536,7 @@ fn test_prepare_messages_centered_live_batch_rows_keep_dedicated_padding_span() 
 
 #[test]
 fn test_prepare_messages_shows_live_batch_progress_in_chat_history() {
+    let _lock = viewport_snapshot_test_lock();
     let state = TestState {
         display_messages: vec![DisplayMessage {
             role: "user".to_string(),
@@ -582,6 +590,9 @@ fn test_prepare_messages_shows_live_batch_progress_in_chat_history() {
         ..Default::default()
     };
 
+    // The Updates box lists recent commit subjects ("… PR #1440"); they trip the #N check below.
+    let _fixture =
+        crate::tui::ui::header::scoped_unseen_changelog_entries_override_for_tests(Vec::new());
     let prepared = prepare::prepare_messages(&state, 100, 30);
     let rendered: Vec<String> = prepared
         .materialize_all_lines()
@@ -897,6 +908,7 @@ fn test_prepare_messages_tool_row_refreshes_after_message_version_bump() {
     };
 
     let placeholder = DisplayMessage {
+        pasted_segments: None,
         role: "tool".to_string(),
         content: "pending".to_string(),
         tool_calls: vec![],
@@ -905,6 +917,7 @@ fn test_prepare_messages_tool_row_refreshes_after_message_version_bump() {
         tool_data: Some(tool_call.clone()),
     };
     let final_message = DisplayMessage {
+        pasted_segments: None,
         role: "tool".to_string(),
         content: "x".repeat(7_600),
         tool_calls: vec![],
@@ -1056,6 +1069,7 @@ fn test_prepare_messages_centered_streaming_recenters_structured_markdown_like_f
 #[test]
 fn test_render_tool_message_batch_nested_subcall_params_still_render() {
     let msg = DisplayMessage {
+        pasted_segments: None,
         role: "tool".to_string(),
         content: "--- [1] grep ---\nok\n\nCompleted: 1 succeeded, 0 failed".to_string(),
         tool_calls: vec![],
@@ -1093,6 +1107,7 @@ fn test_render_tool_message_batch_nested_subcall_params_still_render() {
 #[test]
 fn test_render_tool_message_batch_flat_grep_subcall_uses_pattern_and_path() {
     let msg = DisplayMessage {
+        pasted_segments: None,
         role: "tool".to_string(),
         content: "--- [1] grep ---\nok\n\nCompleted: 1 succeeded, 0 failed".to_string(),
         tool_calls: vec![],
@@ -1130,6 +1145,7 @@ fn test_render_tool_message_batch_flat_grep_subcall_uses_pattern_and_path() {
 #[test]
 fn test_render_tool_message_batch_subcall_lines_alignment_unset() {
     let msg = DisplayMessage {
+        pasted_segments: None,
         role: "tool".to_string(),
         content: "--- [1] read ---\nok\n\n--- [2] grep ---\nok\n\nCompleted: 2 succeeded, 0 failed"
             .to_string(),

@@ -95,8 +95,12 @@ pub struct PersonaToolPolicy {
 /// - All other personas: full access (future work may restrict these).
 pub fn persona_tool_policy(persona: AgentPersona) -> PersonaToolPolicy {
     match persona {
-        AgentPersona::Build | AgentPersona::Swarm | AgentPersona::Review | AgentPersona::Judge
-        | AgentPersona::Memory | AgentPersona::Ambient => PersonaToolPolicy {
+        AgentPersona::Build
+        | AgentPersona::Swarm
+        | AgentPersona::Review
+        | AgentPersona::Judge
+        | AgentPersona::Memory
+        | AgentPersona::Ambient => PersonaToolPolicy {
             allowed_tools: None,
         },
         AgentPersona::Plan => {
@@ -206,7 +210,10 @@ pub fn persona_directive(persona: AgentPersona) -> Option<String> {
              then implement in small verified phases and summarize what changed."
                 .to_string(),
         ),
-        AgentPersona::Swarm | AgentPersona::Review | AgentPersona::Judge | AgentPersona::Memory
+        AgentPersona::Swarm
+        | AgentPersona::Review
+        | AgentPersona::Judge
+        | AgentPersona::Memory
         | AgentPersona::Ambient => None,
     }
 }
@@ -234,19 +241,50 @@ mod tests {
 
     #[test]
     fn build_persona_has_no_tool_restrictions() {
-        assert!(persona_tool_policy(AgentPersona::Build).allowed_tools.is_none());
+        assert!(
+            persona_tool_policy(AgentPersona::Build)
+                .allowed_tools
+                .is_none()
+        );
     }
 
     #[test]
     fn plan_persona_is_read_only_plus_ask_user() {
-        let allowed = persona_tool_policy(AgentPersona::Plan).allowed_tools.unwrap();
-        for write_tool in ["write", "edit", "multiedit", "patch", "apply_patch", "bash", "browser", "open"] {
-            assert!(!allowed.contains(write_tool), "{write_tool} must be blocked");
+        let allowed = persona_tool_policy(AgentPersona::Plan)
+            .allowed_tools
+            .unwrap();
+        for write_tool in [
+            "write",
+            "edit",
+            "multiedit",
+            "patch",
+            "apply_patch",
+            "bash",
+            "browser",
+            "open",
+        ] {
+            assert!(
+                !allowed.contains(write_tool),
+                "{write_tool} must be blocked"
+            );
         }
         for read_tool in [
-            "read", "ls", "agentgrep", "session_search", "conversation_search", "memory",
-            "side_panel", "todo", "jcode_docs", "webfetch", "websearch", "bg", "initiative",
-            "schedule", "mcp", "ask_user",
+            "read",
+            "ls",
+            "agentgrep",
+            "session_search",
+            "conversation_search",
+            "memory",
+            "side_panel",
+            "todo",
+            "jcode_docs",
+            "webfetch",
+            "websearch",
+            "bg",
+            "initiative",
+            "schedule",
+            "mcp",
+            "ask_user",
         ] {
             assert!(allowed.contains(read_tool), "{read_tool} must be allowed");
         }

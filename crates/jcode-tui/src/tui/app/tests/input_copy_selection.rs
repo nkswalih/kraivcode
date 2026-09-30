@@ -137,14 +137,20 @@ fn test_input_composer_drag_selects_typed_text_without_auto_copy() {
     let points = input_pane_screen_points(80, 24);
     assert!(!points.is_empty(), "composer must be hit-testable");
 
-    let start = cell_for_point(&points, 0, 0);
+let start = cell_for_point(&points, 0, 0);
     let width = unicode_width::UnicodeWidthStr::width("select this draft");
     // Drag to a cell past the text end to select the full line.
     let end = cell_at_or_after_point(&points, 0, width);
 
+    // Kraivcode keeps editor-style drag selection: release selects without
+    // copying. Upstream's copy-on-release does not apply to this path.
     let selected = drag_select(&mut app, start, end);
     assert_eq!(selected, "select this draft");
     assert_ne!(app.status_notice(), Some("Copied selection".to_string()));
+    assert_ne!(
+        app.status_notice(),
+        Some("Copied selection · highlight remains visible".to_string())
+    );
 }
 
 #[test]
@@ -445,6 +451,10 @@ fn test_input_composer_drag_release_exits_mode_keeps_selection() {
     let selected = app.current_copy_selection_text().unwrap_or_default();
     assert_eq!(selected, "full path check");
     assert_ne!(app.status_notice(), Some("Copied selection".to_string()));
+    assert_ne!(
+        app.status_notice(),
+        Some("Copied selection · highlight remains visible".to_string())
+    );
     assert_ne!(
         app.status_notice(),
         Some("Failed to copy selection".to_string())

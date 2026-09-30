@@ -55,7 +55,10 @@ struct RawSelectionPoint {
 fn ordered_points(
     a: crate::tui::CopySelectionPoint,
     b: crate::tui::CopySelectionPoint,
-) -> (crate::tui::CopySelectionPoint, crate::tui::CopySelectionPoint) {
+) -> (
+    crate::tui::CopySelectionPoint,
+    crate::tui::CopySelectionPoint,
+) {
     if (a.abs_line, a.column) <= (b.abs_line, b.column) {
         (a, b)
     } else {

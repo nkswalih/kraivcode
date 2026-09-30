@@ -160,6 +160,7 @@ fn test_initial_history_bootstrap_preserves_restored_interleave_state() {
                 compaction_mode: crate::config::CompactionMode::Reactive,
                 activity: None,
                 side_panel: crate::side_panel::SidePanelSnapshot::default(),
+                applets: Default::default(),
             },
             &mut remote,
         );
@@ -216,11 +217,11 @@ fn test_initial_history_bootstrap_skips_resubmit_when_prompt_already_in_history(
                 id: 1,
                 session_id: session_id.to_string(),
                 messages: vec![crate::protocol::HistoryMessage {
+                    response_stats: None,
                     role: "user".to_string(),
                     content: "continue implementing the fix".to_string(),
                     tool_calls: None,
                     tool_data: None,
-                    pasted_segments: None,
                 }],
                 images: vec![],
                 provider_name: Some("claude".to_string()),
@@ -252,6 +253,7 @@ fn test_initial_history_bootstrap_skips_resubmit_when_prompt_already_in_history(
                 compaction_mode: crate::config::CompactionMode::Reactive,
                 activity: None,
                 side_panel: crate::side_panel::SidePanelSnapshot::default(),
+                applets: Default::default(),
             },
             &mut remote,
         );

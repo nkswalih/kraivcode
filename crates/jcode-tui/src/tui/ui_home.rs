@@ -1,4 +1,4 @@
-use super::{dim_color, TuiState};
+use super::{TuiState, dim_color};
 use ratatui::{prelude::*, widgets::Paragraph};
 use unicode_width::UnicodeWidthStr;
 
@@ -106,49 +106,31 @@ pub(super) fn draw_home(
         Paragraph::new(Line::from(vec![
             Span::styled("[", Style::default().fg(dim_color())),
             Span::raw(" "),
-            Span::styled(
-                "/models",
-                Style::default().fg(logo_yellow()).bold(),
-            ),
+            Span::styled("/models", Style::default().fg(logo_yellow()).bold()),
             Span::raw(" "),
             Span::styled("]", Style::default().fg(dim_color())),
-
             Span::raw("   "),
             Span::styled("|", Style::default().fg(dim_color())),
             Span::raw("   "),
-
             Span::styled("[", Style::default().fg(dim_color())),
             Span::raw(" "),
-            Span::styled(
-                "/agents",
-                Style::default().fg(logo_yellow()).bold(),
-            ),
+            Span::styled("/agents", Style::default().fg(logo_yellow()).bold()),
             Span::raw(" "),
             Span::styled("]", Style::default().fg(dim_color())),
-
             Span::raw("   "),
             Span::styled("|", Style::default().fg(dim_color())),
             Span::raw("   "),
-
             Span::styled("[", Style::default().fg(dim_color())),
             Span::raw(" "),
-            Span::styled(
-                "/sessions",
-                Style::default().fg(logo_yellow()).bold(),
-            ),
+            Span::styled("/sessions", Style::default().fg(logo_yellow()).bold()),
             Span::raw(" "),
             Span::styled("]", Style::default().fg(dim_color())),
-
             Span::raw("   "),
             Span::styled("|", Style::default().fg(dim_color())),
             Span::raw("   "),
-
             Span::styled("[", Style::default().fg(dim_color())),
             Span::raw(" "),
-            Span::styled(
-                "/help",
-                Style::default().fg(logo_yellow()).bold(),
-            ),
+            Span::styled("/help", Style::default().fg(logo_yellow()).bold()),
             Span::raw(" "),
             Span::styled("]", Style::default().fg(dim_color())),
         ]))

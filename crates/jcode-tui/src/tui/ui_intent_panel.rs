@@ -5,7 +5,6 @@
 //! No border, no gutter — just the content overlaid at half height, keeping the
 //! chat full width. Hides automatically when no todos or workers exist.
 
-use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
 use super::*;
@@ -35,10 +34,8 @@ pub(crate) fn draw_compact_panel(frame: &mut Frame, area: Rect, app: &dyn TuiSta
         return;
     }
 
-    let panel_width = (area.width * PANEL_WIDTH_FRACTION / PANEL_WIDTH_DENOM)
-        .clamp(24, 60);
-    let (mut lines, _) =
-        super::viewport::pinned_todo_band_lines(app, panel_width, area.height);
+    let panel_width = (area.width * PANEL_WIDTH_FRACTION / PANEL_WIDTH_DENOM).clamp(24, 60);
+    let (mut lines, _) = super::viewport::pinned_todo_band_lines(app, panel_width, area.height);
     if lines.is_empty() {
         return;
     }
@@ -54,7 +51,9 @@ pub(crate) fn draw_compact_panel(frame: &mut Frame, area: Rect, app: &dyn TuiSta
     }
     let panel_height = lines.len() as u16;
 
-    let panel_x = area.x.saturating_add(area.width.saturating_sub(panel_width));
+    let panel_x = area
+        .x
+        .saturating_add(area.width.saturating_sub(panel_width));
     let panel_area = Rect {
         x: panel_x,
         y: area.y,

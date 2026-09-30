@@ -263,11 +263,10 @@ impl SkillPicker {
                             name: item.name.clone(),
                         }));
                     }
-                    let copy_text = item
-                        .install
-                        .clone()
-                        .unwrap_or_else(|| item.source.clone());
-                    return Ok(OverlayAction::Execute(SkillPickerCommand::Copy { text: copy_text }));
+                    let copy_text = item.install.clone().unwrap_or_else(|| item.source.clone());
+                    return Ok(OverlayAction::Execute(SkillPickerCommand::Copy {
+                        text: copy_text,
+                    }));
                 }
                 return Ok(OverlayAction::Close);
             }
@@ -341,10 +340,7 @@ impl SkillPicker {
             .title(format!(" {} ", self.title))
             .title_bottom(Line::from(vec![
                 hotkey(" Enter "),
-                Span::styled(
-                    " activate / copy  ",
-                    Style::default().fg(MUTED_DARK),
-                ),
+                Span::styled(" activate / copy  ", Style::default().fg(MUTED_DARK)),
                 hotkey(" Left/Right "),
                 Span::styled(" jump group  ", Style::default().fg(MUTED_DARK)),
                 hotkey(" Click "),
@@ -474,11 +470,7 @@ impl SkillPicker {
         let title = if self.filtered.is_empty() {
             " Skills ".to_string()
         } else {
-            format!(
-                " Skills ({}/{}) ",
-                self.selected + 1,
-                self.filtered.len()
-            )
+            format!(" Skills ({}/{}) ", self.selected + 1, self.filtered.len())
         };
         let block = Block::default()
             .title(Span::styled(
@@ -539,16 +531,10 @@ impl SkillPicker {
                     ),
                 ];
                 if item.active {
-                    row.push(Span::styled(
-                        "  [active]",
-                        row_style.fg(INSTALLED).bold(),
-                    ));
+                    row.push(Span::styled("  [active]", row_style.fg(INSTALLED).bold()));
                 }
                 if !item.installed {
-                    row.push(Span::styled(
-                        "  [install]",
-                        row_style.fg(ACCENT),
-                    ));
+                    row.push(Span::styled("  [install]", row_style.fg(ACCENT)));
                 }
                 lines.push(Line::from(row));
             }
@@ -597,21 +583,24 @@ impl SkillPicker {
 
         let mut lines = vec![
             Line::from(vec![
-                Span::styled(format!("{} ", glyph), Style::default().fg(glyph_color).bold()),
+                Span::styled(
+                    format!("{} ", glyph),
+                    Style::default().fg(glyph_color).bold(),
+                ),
                 Span::styled(status_label, Style::default().fg(status_color).bold()),
                 Span::styled("  -  ", Style::default().fg(MUTED_DARK)),
                 Span::styled(item.category.clone(), Style::default().fg(GOLD)),
             ]),
             Line::from(""),
             Line::from(vec![Span::styled(
-                truncate_with_ellipsis(
-                    &item.description,
-                    inner.width.saturating_sub(2) as usize,
-                ),
+                truncate_with_ellipsis(&item.description, inner.width.saturating_sub(2) as usize),
                 Style::default().fg(Color::White),
             )]),
             Line::from(""),
-            Line::from(vec![Span::styled("Source ", Style::default().fg(MUTED_DARK).bold())]),
+            Line::from(vec![Span::styled(
+                "Source ",
+                Style::default().fg(MUTED_DARK).bold(),
+            )]),
             Line::from(vec![Span::styled(
                 truncate_with_ellipsis(&item.source, inner.width.saturating_sub(2) as usize),
                 Style::default().fg(MUTED),
@@ -647,10 +636,7 @@ impl SkillPicker {
         } else {
             lines.push(Line::from(vec![Span::styled(
                 truncate_with_ellipsis(
-                    &format!(
-                        "Loaded from {}",
-                        item.source,
-                    ),
+                    &format!("Loaded from {}", item.source,),
                     inner.width.saturating_sub(2) as usize,
                 ),
                 Style::default().fg(MUTED),
@@ -724,7 +710,11 @@ fn category_header_line(category: &str, count: usize) -> Line<'static> {
         Span::styled(
             category.to_string(),
             Style::default()
-                .fg(if category == "Loaded" { INSTALLED } else { GOLD })
+                .fg(if category == "Loaded" {
+                    INSTALLED
+                } else {
+                    GOLD
+                })
                 .bold(),
         ),
         Span::styled(
@@ -790,7 +780,8 @@ mod tests {
             SkillItem {
                 name: "optimization".to_string(),
                 category: "Loaded".to_string(),
-                description: "Improve performance by measuring and attributing bottlenecks.".to_string(),
+                description: "Improve performance by measuring and attributing bottlenecks."
+                    .to_string(),
                 source: ".jcode/skills/optimization".to_string(),
                 install: None,
                 installed: true,
@@ -808,9 +799,12 @@ mod tests {
             SkillItem {
                 name: "frontend-design".to_string(),
                 category: "Anthropic Design".to_string(),
-                description: "Create distinctive, production-grade frontend interfaces.".to_string(),
+                description: "Create distinctive, production-grade frontend interfaces."
+                    .to_string(),
                 source: "anthropics/skills (official Anthropic catalog)".to_string(),
-                install: Some("npx skills add anthropics/skills --skill frontend-design --yes".to_string()),
+                install: Some(
+                    "npx skills add anthropics/skills --skill frontend-design --yes".to_string(),
+                ),
                 installed: false,
                 active: false,
             },
@@ -853,7 +847,9 @@ mod tests {
 
         let backend = TestBackend::new(140, 40);
         let mut terminal = Terminal::new(backend).expect("failed to create terminal");
-        terminal.draw(|frame| picker.render(frame)).expect("draw failed");
+        terminal
+            .draw(|frame| picker.render(frame))
+            .expect("draw failed");
         let text = buffer_to_text(terminal.backend().buffer());
 
         for expected in [
@@ -956,7 +952,10 @@ mod tests {
         picker
             .handle_overlay_key(KeyCode::Left, KeyModifiers::empty())
             .expect("left handled");
-        assert_eq!(picker.items[picker.filtered[picker.selected]].category, "Loaded");
+        assert_eq!(
+            picker.items[picker.filtered[picker.selected]].category,
+            "Loaded"
+        );
         assert_eq!(picker.selected, 0);
     }
 
@@ -1006,14 +1005,17 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                let fill =
-                    vec![Line::from("X".repeat(area.width as usize)); area.height as usize];
+                let fill = vec![Line::from("X".repeat(area.width as usize)); area.height as usize];
                 frame.render_widget(Paragraph::new(fill), area);
                 picker.render(frame);
             })
             .expect("draw failed");
 
-        let overlay = centered_rect(OVERLAY_PERCENT_X, OVERLAY_PERCENT_Y, Rect::new(0, 0, 40, 12));
+        let overlay = centered_rect(
+            OVERLAY_PERCENT_X,
+            OVERLAY_PERCENT_Y,
+            Rect::new(0, 0, 40, 12),
+        );
         let probe = &terminal.backend().buffer()[(overlay.x + overlay.width - 3, overlay.y + 2)];
         assert_eq!(probe.symbol(), "X");
         assert_ne!(probe.bg, PANEL_BG);

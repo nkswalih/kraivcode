@@ -37,6 +37,9 @@ impl App {
         self.set_split_view_enabled(restored.split_view_enabled, restored.split_view_enabled);
         self.set_todos_view_enabled(restored.todos_view_enabled, restored.todos_view_enabled);
         self.todo_confidence_spike_challenged = restored.todo_confidence_spike_challenged;
+        self.last_todo_ownership_fingerprint = restored.last_todo_ownership_fingerprint;
+        self.final_response_todo_fingerprint = restored.final_response_todo_fingerprint;
+        self.todo_final_response_requested = self.final_response_todo_fingerprint.is_some();
 
         let mut queued_messages = restored.queued_messages;
         let mut recovered_followups = Vec::new();
@@ -109,6 +112,7 @@ impl App {
         self.dictation_key = keybind::load_dictation_key();
         self.new_terminal_key = keybind::load_new_terminal_key();
         self.open_resume_key = keybind::load_open_resume_key();
+        self.voice_input_key = keybind::load_voice_input_key();
         self.fallback_switch_key = keybind::load_fallback_switch_key();
         self.scroll_keys = keybind::load_scroll_keys();
         crate::logging::info("KEYBINDINGS: reloaded from config change");
@@ -410,8 +414,11 @@ impl App {
             display_messages_version: 0,
             display_user_message_count: 0,
             display_edit_tool_message_count: 0,
+            display_edit_line_counts: (0, 0),
+            terminal_title: RefCell::new(terminal_title::TerminalTitleState::default()),
             compacted_history_lazy: CompactedHistoryLazyState::default(),
             pending_history_anchor: None,
+            pending_resize_anchor: None,
             input: String::new(),
             command_candidates_cache: RefCell::new(None),
             command_suggestions_cache: RefCell::new(None),
@@ -459,7 +466,9 @@ impl App {
             todo_confidence_spike_challenged: false,
             todo_gate_digest_delivered: false,
             todo_completion_gate_attempts: 0,
+            last_todo_ownership_fingerprint: None,
             todo_final_response_requested: false,
+            final_response_todo_fingerprint: None,
             last_auto_poke_fingerprint: None,
             turn_guardrail_stopped: false,
             consecutive_guardrail_stops: 0,
@@ -495,6 +504,7 @@ impl App {
             background_client_action: None,
             pending_background_client_reload: None,
             restart_requested: None,
+            cloud_handoff_requested: None,
             pasted_contents: Vec::new(),
             pending_images: Vec::new(),
             route_next_prompt_to_new_session: false,
@@ -614,6 +624,7 @@ impl App {
             diff_pane_scroll: 0,
             diff_pane_scroll_x: 0,
             side_panel_image_zoom_percent: 100,
+            panel_image_preview: None,
             diff_pane_focus: false,
             diff_pane_auto_scroll: true,
             side_panel: crate::side_panel::SidePanelSnapshot::default(),
@@ -640,6 +651,7 @@ impl App {
             last_client_focus_session_id: None,
             last_side_panel_focus_id: None,
             side_panel_user_hidden: false,
+            side_panel_fullscreen: false,
             side_panel_explicit_hidden: false,
             pin_images: display.pin_images,
             inline_images_visible: super::ui_prefs::inline_images_visible(),
@@ -663,6 +675,7 @@ impl App {
             remote_model_switch_in_flight: false,
             pending_prompt_after_model_switch: None,
             pending_prompt_before_history: None,
+            pending_startup_prompt_echo: None,
             pending_account_picker_action: None,
             model_switch_keys: keybind::load_model_switch_keys(),
             effort_switch_keys: keybind::load_effort_switch_keys(),
@@ -672,6 +685,9 @@ impl App {
             dictation_key: keybind::load_dictation_key(),
             new_terminal_key: keybind::load_new_terminal_key(),
             open_resume_key: keybind::load_open_resume_key(),
+            voice_input_key: keybind::load_voice_input_key(),
+            voice_input: None,
+            voice_input_last_press: None,
             fallback_switch_key: keybind::load_fallback_switch_key(),
             scroll_keys: keybind::load_scroll_keys(),
             keybindings_config_generation: crate::config::config_reload_generation(),
@@ -683,6 +699,7 @@ impl App {
             typing_scroll_lock: false,
             stashed_input: None,
             input_undo_stack: Vec::new(),
+            history_draft: None,
             status_notice: None,
             learn_hint: None,
             learn_hint_shown_this_session: false,
@@ -735,6 +752,8 @@ impl App {
             streaming_md_renderer: RefCell::new(IncrementalMarkdownRenderer::new(None)),
             ambient_system_prompt: None,
             pending_login: None,
+            remote_login: None,
+            remote_login_onboarding: Default::default(),
             pending_account_input: None,
             pending_ssh_remote_name: None,
             force_full_redraw: false,
@@ -742,10 +761,7 @@ impl App {
             last_mouse_scroll: None,
             mouse_scroll_target: None,
             mouse_scroll_queue: 0,
-            chat_overscroll_last: None,
-            chat_scroll_down_last: None,
-            chat_scroll_gesture_from_bottom: false,
-            overscroll_status_mode: display.overscroll_status,
+            agent_edited_cache: std::cell::RefCell::new(None),
             changelog_scroll: None,
             help_scroll: None,
             model_status_scroll: None,
@@ -761,6 +777,7 @@ impl App {
             skills_picker_overlay: None,
             usage_overlay: None,
             usage_report_refreshing: false,
+            usage_reset: Default::default(),
             productivity_refreshing: false,
             last_overnight_card_refresh: None,
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
@@ -864,8 +881,11 @@ impl App {
             display_messages_version: 0,
             display_user_message_count: 0,
             display_edit_tool_message_count: 0,
+            display_edit_line_counts: (0, 0),
+            terminal_title: RefCell::new(terminal_title::TerminalTitleState::default()),
             compacted_history_lazy: CompactedHistoryLazyState::default(),
             pending_history_anchor: None,
+            pending_resize_anchor: None,
             input: String::new(),
             command_candidates_cache: RefCell::new(None),
             command_suggestions_cache: RefCell::new(None),
@@ -913,7 +933,9 @@ impl App {
             todo_confidence_spike_challenged: false,
             todo_gate_digest_delivered: false,
             todo_completion_gate_attempts: 0,
+            last_todo_ownership_fingerprint: None,
             todo_final_response_requested: false,
+            final_response_todo_fingerprint: None,
             last_auto_poke_fingerprint: None,
             turn_guardrail_stopped: false,
             consecutive_guardrail_stops: 0,
@@ -949,6 +971,7 @@ impl App {
             background_client_action: None,
             pending_background_client_reload: None,
             restart_requested: None,
+            cloud_handoff_requested: None,
             pasted_contents: Vec::new(),
             pending_images: Vec::new(),
             route_next_prompt_to_new_session: false,
@@ -1068,6 +1091,7 @@ impl App {
             diff_pane_scroll: 0,
             diff_pane_scroll_x: 0,
             side_panel_image_zoom_percent: 100,
+            panel_image_preview: None,
             diff_pane_focus: false,
             diff_pane_auto_scroll: true,
             side_panel: crate::side_panel::SidePanelSnapshot::default(),
@@ -1094,6 +1118,7 @@ impl App {
             last_client_focus_session_id: None,
             last_side_panel_focus_id: None,
             side_panel_user_hidden: false,
+            side_panel_fullscreen: false,
             side_panel_explicit_hidden: false,
             pin_images: display.pin_images,
             inline_images_visible: super::ui_prefs::inline_images_visible(),
@@ -1117,6 +1142,7 @@ impl App {
             remote_model_switch_in_flight: false,
             pending_prompt_after_model_switch: None,
             pending_prompt_before_history: None,
+            pending_startup_prompt_echo: None,
             pending_account_picker_action: None,
             model_switch_keys: keybind::load_model_switch_keys(),
             effort_switch_keys: keybind::load_effort_switch_keys(),
@@ -1126,6 +1152,9 @@ impl App {
             dictation_key: keybind::load_dictation_key(),
             new_terminal_key: keybind::load_new_terminal_key(),
             open_resume_key: keybind::load_open_resume_key(),
+            voice_input_key: keybind::load_voice_input_key(),
+            voice_input: None,
+            voice_input_last_press: None,
             fallback_switch_key: keybind::load_fallback_switch_key(),
             scroll_keys: keybind::load_scroll_keys(),
             keybindings_config_generation: crate::config::config_reload_generation(),
@@ -1137,6 +1166,7 @@ impl App {
             typing_scroll_lock: false,
             stashed_input: None,
             input_undo_stack: Vec::new(),
+            history_draft: None,
             status_notice: None,
             learn_hint: None,
             learn_hint_shown_this_session: false,
@@ -1189,6 +1219,8 @@ impl App {
             streaming_md_renderer: RefCell::new(IncrementalMarkdownRenderer::new(None)),
             ambient_system_prompt: None,
             pending_login: None,
+            remote_login: None,
+            remote_login_onboarding: Default::default(),
             pending_account_input: None,
             pending_ssh_remote_name: None,
             force_full_redraw: false,
@@ -1196,10 +1228,7 @@ impl App {
             last_mouse_scroll: None,
             mouse_scroll_target: None,
             mouse_scroll_queue: 0,
-            chat_overscroll_last: None,
-            chat_scroll_down_last: None,
-            chat_scroll_gesture_from_bottom: false,
-            overscroll_status_mode: display.overscroll_status,
+            agent_edited_cache: std::cell::RefCell::new(None),
             changelog_scroll: None,
             help_scroll: None,
             model_status_scroll: None,
@@ -1215,6 +1244,7 @@ impl App {
             skills_picker_overlay: None,
             usage_overlay: None,
             usage_report_refreshing: false,
+            usage_reset: Default::default(),
             productivity_refreshing: false,
             last_overnight_card_refresh: None,
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
@@ -1339,6 +1369,7 @@ impl App {
         let registry = Registry::empty();
         let session = resume_session
             .as_ref()
+            .filter(|_| !crate::tui::is_ssh_remote())
             .and_then(|session_id| Session::load_startup_stub(session_id).ok())
             .unwrap_or_else(|| Session::create(None, None));
         let mut app = Self::new_minimal_with_session(provider, registry, session);
@@ -1346,6 +1377,31 @@ impl App {
         app.runtime_mode = AppRuntimeMode::RemoteClient;
         app.remote_startup_phase = Some(super::RemoteStartupPhase::Connecting);
         app.remote_startup_phase_started = Some(Instant::now());
+
+        if let Some(host) = crate::tui::ssh_remote_host() {
+            // The server supplies history, credentials, models and project state.
+            // Local reload files can belong to an unrelated session with the same id.
+            app.onboarding_startup_checked = true;
+            app.auto_server_reload = false;
+            app.session.working_dir = None;
+            app.resume_session_id = resume_session;
+            app.set_status_notice(format!("SSH: {host} (remote server)"));
+            // `/cloud` hands a mid-task session over and asks the new runtime
+            // to keep going without the user retyping anything. One-shot.
+            if let Ok(message) = std::env::var("JCODE_CLOUD_CONTINUE_MESSAGE") {
+                crate::env::remove_var("JCODE_CLOUD_CONTINUE_MESSAGE");
+                if !message.trim().is_empty() {
+                    app.hidden_queued_system_messages.push(message);
+                    app.set_status_notice(format!("Continuing on {host}"));
+                }
+            }
+            return app;
+        }
+
+        // Minimal local clients start with empty skill registries. Load global
+        // metadata once so autocomplete works before the first History event.
+        // SSH clients above must use only the remote server's skill metadata.
+        app.refresh_skills_snapshot();
 
         let reload_fast_start = std::env::var("JCODE_RELOAD_FAST_START")
             .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))

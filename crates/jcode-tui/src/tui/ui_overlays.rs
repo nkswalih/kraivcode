@@ -4,13 +4,13 @@ use super::{
     record_chat_overlay_copy_snapshot, render_rounded_box, rgb, tool_color, user_bg, user_color,
     user_text,
 };
-use std::sync::{Mutex, OnceLock};
 use crate::tui::TuiState;
 use crate::tui::info_widget::WidgetPlacement;
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph},
 };
+use std::sync::{Mutex, OnceLock};
 
 use super::selection_highlight::highlight_line_selection;
 
@@ -21,7 +21,6 @@ const SELECTED_BG: Color = Color::Rgb(46, 32, 16);
 const MUTED: Color = Color::Rgb(172, 152, 112);
 const MUTED_DARK: Color = Color::Rgb(118, 100, 74);
 const ACCENT: Color = Color::Rgb(255, 140, 0);
-const HINT: Color = Color::Rgb(170, 210, 255);
 
 fn hotkey(text: &'static str) -> Span<'static> {
     Span::styled(text, Style::default().fg(Color::White).bg(Color::DarkGray))
@@ -235,6 +234,10 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(help_entry("/config", "Show active configuration"));
     lines.push(help_entry("/config init", "Create default config file"));
     lines.push(help_entry("/config edit", "Open config in $EDITOR"));
+    lines.push(help_entry(
+        "/voice",
+        "Voice input: speak, then send (Ctrl+Space)",
+    ));
     lines.push(help_entry("/dictate", "Run configured external dictation"));
     lines.push(help_entry(
         "/git [status]",
@@ -252,6 +255,10 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(help_entry(
         "/keys",
         "Show keybinding conflicts with your terminal/OS",
+    ));
+    lines.push(help_entry(
+        "/reset usage limits openai",
+        "Review a banked reset, then confirm or cancel",
     ));
     lines.push(help_entry("/usage", "Show connected provider usage limits"));
     lines.push(help_entry(
@@ -501,7 +508,11 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(Line::from(""));
     lines.push(key_entry(
         &crate::tui::keybind::side_panel_toggle_key_label(),
-        "Toggle side panel (or diagram pane if empty)",
+        "Cycle side panel: split, fullscreen, hidden",
+    ));
+    lines.push(key_entry(
+        &crate::tui::keybind::diagram_pane_visibility_key_label(),
+        "Show/hide diagram pane",
     ));
     lines.push(key_entry(&alt("T"), "Toggle diagram position (side/top)"));
     lines.push(key_entry(
@@ -820,8 +831,7 @@ static MODEL_DETAIL_POPUP_GEOMETRY: OnceLock<Mutex<Option<ModelDetailPopupGeomet
     OnceLock::new();
 
 #[cfg(not(test))]
-fn model_detail_popup_geometry_slot()
--> &'static Mutex<Option<ModelDetailPopupGeometry>> {
+fn model_detail_popup_geometry_slot() -> &'static Mutex<Option<ModelDetailPopupGeometry>> {
     MODEL_DETAIL_POPUP_GEOMETRY.get_or_init(|| Mutex::new(None))
 }
 
@@ -920,7 +930,10 @@ pub(super) fn draw_permission_panel(
     let mut lines: Vec<Line<'static>> = Vec::new();
     lines.push(Line::from(vec![
         Span::styled("Plan agent wants to ", value_style),
-        Span::styled(panel.request.tool_name.to_uppercase(), Style::default().fg(user_color()).bold()),
+        Span::styled(
+            panel.request.tool_name.to_uppercase(),
+            Style::default().fg(user_color()).bold(),
+        ),
     ]));
     if !panel.request.path.is_empty() {
         lines.push(Line::from(Span::styled(
@@ -1019,10 +1032,7 @@ pub(super) fn draw_permission_panel(
         ));
     }
 
-    store_permission_panel_geometry(PermissionPanelGeometry {
-        card,
-        pills,
-    });
+    store_permission_panel_geometry(PermissionPanelGeometry { card, pills });
 
     frame.render_widget(ratatui::widgets::Clear, card);
     for (index, line) in boxed.iter().enumerate() {
@@ -1041,7 +1051,11 @@ pub(super) fn draw_permission_panel(
 /// Renders key/value facts, the two action pills, and records their screen
 /// rects for mouse hit-testing. Called late in the frame so the card floats
 /// above the picker, transcript, and info widgets.
-pub(super) fn draw_model_detail_popup(frame: &mut Frame, area: Rect, popup: &crate::tui::ModelDetailPopup) {
+pub(super) fn draw_model_detail_popup(
+    frame: &mut Frame,
+    area: Rect,
+    popup: &crate::tui::ModelDetailPopup,
+) {
     use crate::tui::ModelDetailButton;
 
     let dim_value_style = Style::default().fg(dim_color());
@@ -1059,11 +1073,12 @@ pub(super) fn draw_model_detail_popup(frame: &mut Frame, area: Rect, popup: &cra
     lines.push(kv("Provider", popup.provider_label.as_str()));
     lines.push(kv("Login", popup.login_method.as_str()));
     lines.push(kv("API", popup.api_method.as_str()));
-    lines.push(kv(
-        "Base URL",
-        popup.base_url.as_deref().unwrap_or("—"),
-    ));
-    let default_suffix = if popup.is_default { "  ◆ current default" } else { "" };
+    lines.push(kv("Base URL", popup.base_url.as_deref().unwrap_or("—")));
+    let default_suffix = if popup.is_default {
+        "  ◆ current default"
+    } else {
+        ""
+    };
     lines.push(kv(
         "Status",
         format!("{}{}", popup.status, default_suffix).as_str(),
@@ -1143,7 +1158,10 @@ pub(super) fn draw_model_detail_popup(frame: &mut Frame, area: Rect, popup: &cra
     let mut button_rects: Vec<(Rect, ModelDetailButton)> = Vec::new();
     let mut search_from = 0usize;
     for (button, label) in [
-        (ModelDetailButton::SetDefault, ModelDetailButton::SetDefault.label()),
+        (
+            ModelDetailButton::SetDefault,
+            ModelDetailButton::SetDefault.label(),
+        ),
         (
             ModelDetailButton::SelectSession,
             ModelDetailButton::SelectSession.label(),
@@ -1198,7 +1216,12 @@ pub(super) fn draw_ask_user_popup(
     // Clear blanks the rect; styled spaces ensure every cell gets PANEL_BG.
     frame.render_widget(ratatui::widgets::Clear, panel);
     let fill_lines: Vec<Line> = (0..panel.height)
-        .map(|_| Line::from(Span::styled(" ".repeat(panel.width as usize), Style::default().bg(PANEL_BG))))
+        .map(|_| {
+            Line::from(Span::styled(
+                " ".repeat(panel.width as usize),
+                Style::default().bg(PANEL_BG),
+            ))
+        })
         .collect();
     frame.render_widget(Paragraph::new(fill_lines), panel);
 
@@ -1381,10 +1404,7 @@ fn free_text_line(
             "▊",
             Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(
-            visible[split..].to_string(),
-            Style::default().fg(MUTED),
-        ),
+        Span::styled(visible[split..].to_string(), Style::default().fg(MUTED)),
     ])
 }
 

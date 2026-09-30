@@ -32,6 +32,26 @@ pub(crate) fn set_unseen_changelog_entries_override_for_tests(entries: Option<Ve
     *guard = entries;
 }
 
+/// Keep an override in place only while its owning render test is in scope.
+/// Callers must hold the shared render-state test lock before creating this guard.
+#[cfg(test)]
+pub(crate) struct ChangelogEntriesOverrideGuard;
+
+#[cfg(test)]
+pub(crate) fn scoped_unseen_changelog_entries_override_for_tests(
+    entries: Vec<String>,
+) -> ChangelogEntriesOverrideGuard {
+    set_unseen_changelog_entries_override_for_tests(Some(entries));
+    ChangelogEntriesOverrideGuard
+}
+
+#[cfg(test)]
+impl Drop for ChangelogEntriesOverrideGuard {
+    fn drop(&mut self) {
+        set_unseen_changelog_entries_override_for_tests(None);
+    }
+}
+
 pub(crate) fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
@@ -172,32 +192,20 @@ fn build_persistent_header_with_auth(
     let title_len = title.chars().count();
     let project_len = project.chars().count();
 
-    let gap = width
-        .saturating_sub(title_len + project_len)
-        .max(2);
+    let gap = width.saturating_sub(title_len + project_len).max(2);
 
     if title_len + gap + project_len > width {
         return vec![Line::from(Span::styled(
             title,
-            Style::default()
-                .fg(header_name_color())
-                .bold(),
+            Style::default().fg(header_name_color()).bold(),
         ))];
     }
 
     vec![
         Line::from(vec![
-            Span::styled(
-                title,
-                Style::default()
-                    .fg(header_name_color())
-                    .bold(),
-            ),
+            Span::styled(title, Style::default().fg(header_name_color()).bold()),
             Span::raw(" ".repeat(gap)),
-            Span::styled(
-                project,
-                Style::default().fg(dim_color()),
-            ),
+            Span::styled(project, Style::default().fg(dim_color())),
         ])
         .alignment(Alignment::Left),
     ]
@@ -214,6 +222,11 @@ fn build_header_lines_with_auth(
     _width: u16,
     _auth: &AuthStatus,
 ) -> Vec<Line<'static>> {
+    // Kraivcode (19a79f758): the secondary header block is intentionally empty.
+    // `build_persistent_header` renders the live status line instead, so the
+    // auth inventory / MCP / version block that upstream draws here is dead
+    // weight in this fork. Upstream's full body is preserved in git history at
+    // upstream/master:crates/jcode-tui/src/tui/ui_header.rs.
     Vec::new()
 }
 
@@ -275,7 +288,7 @@ pub(super) fn build_updates_box_lines(width: u16, max_lines: usize) -> Vec<Line<
 /// Build both header sections from one authentication snapshot. Credential
 /// discovery can touch several files on Windows, so the render path must not
 /// repeat it for the persistent and secondary portions of the same frame.
-pub(super) fn build_header_sections(
+pub(in crate::tui) fn build_header_sections(
     app: &dyn TuiState,
     width: u16,
 ) -> (Vec<Line<'static>>, Vec<Line<'static>>) {
@@ -297,6 +310,26 @@ mod tests {
     use async_trait::async_trait;
     use std::sync::Arc;
     use std::sync::OnceLock;
+
+    #[test]
+    fn changelog_override_is_cleared_after_a_render_test_panics() {
+        let _lock = crate::tui::ui::render_state_test_lock();
+        let panic = std::panic::catch_unwind(|| {
+            let _fixture = scoped_unseen_changelog_entries_override_for_tests(vec![
+                "temporary changelog entry".to_owned(),
+            ]);
+            assert_eq!(unseen_changelog_entries(), ["temporary changelog entry"]);
+            panic!("injected render failure");
+        });
+        assert!(panic.is_err());
+        assert!(
+            unseen_changelog_entries_override()
+                .lock()
+                .unwrap()
+                .is_none(),
+            "a failed render test must not leak its changelog fixture"
+        );
+    }
 
     struct MockProvider;
 

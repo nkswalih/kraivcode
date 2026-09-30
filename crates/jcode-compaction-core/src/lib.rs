@@ -188,7 +188,8 @@ pub fn build_compaction_conversation_text(
                 ContentBlock::Reasoning { .. }
                 | ContentBlock::ReasoningTrace { .. }
                 | ContentBlock::AnthropicThinking { .. }
-                | ContentBlock::OpenAIReasoning { .. } => {}
+                | ContentBlock::OpenAIReasoning { .. }
+                | ContentBlock::ToolReference { .. } => {}
                 ContentBlock::Image { .. } => conversation_text.push_str("[Image]\n"),
                 ContentBlock::OpenAICompaction { .. } => {
                     conversation_text.push_str("[OpenAI native compaction]\n")
@@ -324,6 +325,9 @@ pub fn content_char_count(content: &[ContentBlock]) -> usize {
             // compactions.
             ContentBlock::Image { .. } => IMAGE_TOKEN_COST * CHARS_PER_TOKEN,
             ContentBlock::OpenAICompaction { encrypted_content } => encrypted_content.len(),
+            // The provider expands a reference into the full definition, but
+            // that definition is already accounted for by the tool catalog.
+            ContentBlock::ToolReference { tool_name, .. } => tool_name.len() + 20,
         })
         .sum()
 }
@@ -386,9 +390,10 @@ pub fn message_token_count(msg: &Message) -> usize {
             ContentBlock::Text { text, .. } => estimate_tokens_heuristic(text),
             ContentBlock::Reasoning { text } => estimate_tokens_heuristic(text),
             ContentBlock::ReasoningTrace { text } => estimate_tokens_heuristic(text),
-            ContentBlock::AnthropicThinking { thinking, signature } => {
-                estimate_tokens_heuristic(thinking) + estimate_tokens_heuristic(signature)
-            }
+            ContentBlock::AnthropicThinking {
+                thinking,
+                signature,
+            } => estimate_tokens_heuristic(thinking) + estimate_tokens_heuristic(signature),
             ContentBlock::OpenAIReasoning {
                 id,
                 summary,
@@ -396,7 +401,11 @@ pub fn message_token_count(msg: &Message) -> usize {
                 status,
             } => {
                 estimate_tokens_heuristic(id)
-                    + summary.iter().map(String::as_str).map(estimate_tokens_heuristic).sum::<usize>()
+                    + summary
+                        .iter()
+                        .map(String::as_str)
+                        .map(estimate_tokens_heuristic)
+                        .sum::<usize>()
                     + encrypted_content
                         .as_ref()
                         .map(String::as_str)
@@ -412,13 +421,16 @@ pub fn message_token_count(msg: &Message) -> usize {
             ContentBlock::ToolUse { input, .. } => {
                 estimate_tokens_heuristic(&input.to_string()) + 50
             }
-            ContentBlock::ToolResult { content, .. } => {
-                estimate_tokens_heuristic(content) + 20
-            }
+            ContentBlock::ToolResult { content, .. } => estimate_tokens_heuristic(content) + 20,
             ContentBlock::Image { .. } => IMAGE_TOKEN_COST * CHARS_PER_TOKEN,
             // Encrypted base64: heuristic on it is meaningless, keep the flat ratio.
             ContentBlock::OpenAICompaction { encrypted_content } => {
                 encrypted_content.len() / CHARS_PER_TOKEN
+            }
+            // The provider expands a reference into the full definition, but
+            // that definition is already accounted for by the tool catalog.
+            ContentBlock::ToolReference { tool_name, .. } => {
+                estimate_tokens_heuristic(tool_name) + 20
             }
         })
         .sum()
@@ -442,7 +454,9 @@ pub fn estimate_compaction_tokens_from_text(
     message_tokens: usize,
     token_budget: usize,
 ) -> usize {
-    estimate_tokens_heuristic(summary_text) + message_tokens + compaction_overhead_tokens(token_budget)
+    estimate_tokens_heuristic(summary_text)
+        + message_tokens
+        + compaction_overhead_tokens(token_budget)
 }
 
 /// Best-effort context size (tokens) from a provider usage report.
@@ -465,12 +479,14 @@ pub fn effective_context_tokens_from_usage(
     cache_read_input_tokens: Option<u64>,
     cache_creation_input_tokens: Option<u64>,
 ) -> u64 {
-    if input_tokens == 0 {
-        return 0;
-    }
     let cache_read = cache_read_input_tokens.unwrap_or(0);
     let cache_creation = cache_creation_input_tokens.unwrap_or(0);
     let provider_name = provider_name.to_lowercase();
+
+    // OpenAI cache writes, like reads, are subsets of the inclusive input count.
+    if provider_name.contains("openai") || provider_name.contains("codex") {
+        return input_tokens;
+    }
 
     let split_cache_accounting = provider_name.contains("anthropic")
         || provider_name.contains("claude")
@@ -839,6 +855,10 @@ mod tests {
             effective_context_tokens_from_usage("openai", 400_000, Some(390_000), None),
             400_000
         );
+        assert_eq!(
+            effective_context_tokens_from_usage("openai-api", 10_000, Some(6_000), Some(2_000)),
+            10_000
+        );
         // No cache info at all: pass through.
         assert_eq!(
             effective_context_tokens_from_usage("opencode-go", 396_000, None, None),
@@ -861,10 +881,10 @@ mod tests {
     }
 
     #[test]
-    fn effective_context_zero_input_reports_zero() {
+    fn effective_context_zero_uncached_input_preserves_cached_prompt() {
         assert_eq!(
             effective_context_tokens_from_usage("anthropic", 0, Some(300_000), Some(5_000)),
-            0
+            305_000
         );
     }
 

@@ -74,6 +74,7 @@ fn test_replace_latest_tool_display_message_updates_latest_match_and_bumps_versi
         intent: None, thought_signature: None, };
 
     app.push_display_message(DisplayMessage {
+        pasted_segments: None,
         role: "tool".to_string(),
         content: "placeholder 1".to_string(),
         tool_calls: vec![],
@@ -82,6 +83,7 @@ fn test_replace_latest_tool_display_message_updates_latest_match_and_bumps_versi
         tool_data: Some(tool_call.clone()),
     });
     app.push_display_message(DisplayMessage {
+        pasted_segments: None,
         role: "tool".to_string(),
         content: "placeholder 2".to_string(),
         tool_calls: vec![],
@@ -121,6 +123,7 @@ fn test_replace_latest_tool_display_message_updates_latest_match_and_bumps_versi
 fn test_replace_latest_tool_display_message_removes_background_lifecycle_card() {
     let mut app = create_test_app();
     app.push_display_message(DisplayMessage {
+        pasted_segments: None,
         role: "tool".to_string(),
         content: "running bash".to_string(),
         tool_calls: vec![],
@@ -211,6 +214,7 @@ fn test_incremental_display_message_counts_match_full_recompute() {
         app.push_display_message(DisplayMessage::assistant(format!("reply {i}")));
         if i % 3 == 0 {
             app.push_display_message(DisplayMessage {
+                pasted_segments: None,
                 role: "tool".to_string(),
                 content: format!("edited file {i}"),
                 tool_calls: vec![],
@@ -381,6 +385,7 @@ fn test_tool_done_preserves_sibling_streaming_tool_inputs_and_intents() {
     );
     app.handle_server_event(
         crate::protocol::ServerEvent::ToolInput {
+            id: None,
             delta: r#"{"url":"https://example.com/a","intent":"Fetch page A"}"#.to_string(),
         },
         &mut remote,
@@ -403,6 +408,7 @@ fn test_tool_done_preserves_sibling_streaming_tool_inputs_and_intents() {
     );
     app.handle_server_event(
         crate::protocol::ServerEvent::ToolInput {
+            id: None,
             delta: r#"{"url":"https://example.com/b","intent":"Fetch page B"}"#.to_string(),
         },
         &mut remote,
@@ -463,4 +469,54 @@ fn test_tool_done_preserves_sibling_streaming_tool_inputs_and_intents() {
         tool_b.input.get("url").and_then(|v| v.as_str()),
         Some("https://example.com/b")
     );
+}
+
+#[test]
+fn test_keyed_tool_inputs_interleave_in_remote_events() {
+    use crate::protocol::ServerEvent;
+    let mut app = create_test_app();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let _guard = rt.enter();
+    let mut remote = crate::tui::backend::RemoteConnection::dummy();
+    for event in [
+        ServerEvent::ToolStart {
+            id: "a".into(),
+            name: "read".into(),
+        },
+        ServerEvent::ToolInput {
+            id: Some("a".into()),
+            delta: r#"{"file_path":"a","intent":"Read "#.into(),
+        },
+        ServerEvent::ToolStart {
+            id: "b".into(),
+            name: "read".into(),
+        },
+        ServerEvent::ToolInput {
+            id: Some("b".into()),
+            delta: r#"{"file_path":"b","intent":"Read B"}"#.into(),
+        },
+        ServerEvent::ToolInput {
+            id: Some("a".into()),
+            delta: r#"A"}"#.into(),
+        },
+        ServerEvent::ToolExec {
+            id: "a".into(),
+            name: "read".into(),
+        },
+        ServerEvent::ToolExec {
+            id: "b".into(),
+            name: "read".into(),
+        },
+    ] {
+        app.handle_server_event(event, &mut remote);
+    }
+    for (id, intent) in [("a", "Read A"), ("b", "Read B")] {
+        let tool = app
+            .streaming_tool_calls
+            .iter()
+            .find(|tool| tool.id == id)
+            .unwrap();
+        assert_eq!(tool.input["file_path"], id);
+        assert_eq!(tool.intent.as_deref(), Some(intent));
+    }
 }
