@@ -134,11 +134,11 @@ fn test_handle_server_event_history_with_interruption_queues_continuation() {
             id: 1,
             session_id: "ses_test_123".to_string(),
             messages: vec![crate::protocol::HistoryMessage {
+                response_stats: None,
                 role: "assistant".to_string(),
                 content: "I was working on something".to_string(),
                 tool_calls: None,
                 tool_data: None,
-                pasted_segments: None,
             }],
             images: vec![],
             provider_name: Some("claude".to_string()),
@@ -170,6 +170,7 @@ fn test_handle_server_event_history_with_interruption_queues_continuation() {
             compaction_mode: crate::config::CompactionMode::Reactive,
             activity: None,
             side_panel: crate::side_panel::SidePanelSnapshot::default(),
+            applets: Default::default(),
         },
         &mut remote,
     );
@@ -208,11 +209,11 @@ fn test_handle_server_event_history_uses_server_owned_reload_recovery_directive(
         id: 1,
         session_id: "ses_server_owned_reload".to_string(),
         messages: vec![crate::protocol::HistoryMessage {
+            response_stats: None,
             role: "assistant".to_string(),
             content: "Reconnect me from server history".to_string(),
             tool_calls: None,
             tool_data: None,
-            pasted_segments: None,
         }],
         images: vec![],
         provider_name: Some("claude".to_string()),
@@ -247,6 +248,7 @@ fn test_handle_server_event_history_uses_server_owned_reload_recovery_directive(
         compaction_mode: crate::config::CompactionMode::Reactive,
         activity: None,
         side_panel: crate::side_panel::SidePanelSnapshot::default(),
+        applets: Default::default(),
     };
 
     app.handle_server_event(event.clone(), &mut remote);
@@ -290,11 +292,11 @@ fn test_handle_server_event_history_without_interruption_does_not_queue() {
             id: 1,
             session_id: "ses_test_456".to_string(),
             messages: vec![crate::protocol::HistoryMessage {
+                response_stats: None,
                 role: "assistant".to_string(),
                 content: "Normal response".to_string(),
                 tool_calls: None,
                 tool_data: None,
-                pasted_segments: None,
             }],
             images: vec![],
             provider_name: Some("claude".to_string()),
@@ -326,6 +328,7 @@ fn test_handle_server_event_history_without_interruption_does_not_queue() {
             compaction_mode: crate::config::CompactionMode::Reactive,
             activity: None,
             side_panel: crate::side_panel::SidePanelSnapshot::default(),
+            applets: Default::default(),
         },
         &mut remote,
     );
@@ -354,11 +357,11 @@ fn test_handle_server_event_history_after_reload_reports_no_continuation_needed(
             id: 1,
             session_id: "ses_reload_done".to_string(),
             messages: vec![crate::protocol::HistoryMessage {
+                response_stats: None,
                 role: "assistant".to_string(),
                 content: "Finished before reload".to_string(),
                 tool_calls: None,
                 tool_data: None,
-                pasted_segments: None,
             }],
             images: vec![],
             provider_name: Some("claude".to_string()),
@@ -390,6 +393,7 @@ fn test_handle_server_event_history_after_reload_reports_no_continuation_needed(
             compaction_mode: crate::config::CompactionMode::Reactive,
             activity: None,
             side_panel: crate::side_panel::SidePanelSnapshot::default(),
+            applets: Default::default(),
         },
         &mut remote,
     );
@@ -644,12 +648,14 @@ fn test_handle_server_event_history_restores_side_panel_snapshot() {
     let mut remote = crate::tui::backend::RemoteConnection::dummy();
 
     let side_panel = crate::side_panel::SidePanelSnapshot {
+        focus_revision: 0,
         focused_page_id: Some("plan".to_string()),
         pages: vec![crate::side_panel::SidePanelPage {
             id: "plan".to_string(),
             title: "Plan".to_string(),
             file_path: "/tmp/plan.md".to_string(),
             format: crate::side_panel::SidePanelPageFormat::Markdown,
+            pdf_data: None,
             source: crate::side_panel::SidePanelPageSource::Managed,
             content: "# Plan\n```mermaid\nflowchart LR\nA-->B\n```".to_string(),
             updated_at_ms: 1,
@@ -691,6 +697,7 @@ fn test_handle_server_event_history_restores_side_panel_snapshot() {
             compaction_mode: crate::config::CompactionMode::Reactive,
             activity: None,
             side_panel: side_panel.clone(),
+            applets: Default::default(),
         },
         &mut remote,
     );
@@ -751,6 +758,7 @@ fn test_handle_server_event_history_restores_active_resume_processing_state() {
                 current_tool_name: Some("batch".to_string()),
             }),
             side_panel: crate::side_panel::SidePanelSnapshot::default(),
+            applets: Default::default(),
         },
         &mut remote,
     );
@@ -770,12 +778,14 @@ fn test_handle_server_event_side_panel_state_updates_snapshot() {
     let mut remote = crate::tui::backend::RemoteConnection::dummy();
 
     app.side_panel = crate::side_panel::SidePanelSnapshot {
+        focus_revision: 0,
         focused_page_id: Some("old".to_string()),
         pages: vec![crate::side_panel::SidePanelPage {
             id: "old".to_string(),
             title: "Old".to_string(),
             file_path: "/tmp/old.md".to_string(),
             format: crate::side_panel::SidePanelPageFormat::Markdown,
+            pdf_data: None,
             source: crate::side_panel::SidePanelPageSource::Managed,
             content: "old".to_string(),
             updated_at_ms: 1,
@@ -786,12 +796,14 @@ fn test_handle_server_event_side_panel_state_updates_snapshot() {
     app.handle_server_event(
         crate::protocol::ServerEvent::SidePanelState {
             snapshot: crate::side_panel::SidePanelSnapshot {
+                focus_revision: 0,
                 focused_page_id: Some("new".to_string()),
                 pages: vec![crate::side_panel::SidePanelPage {
                     id: "new".to_string(),
                     title: "New".to_string(),
                     file_path: "/tmp/new.md".to_string(),
                     format: crate::side_panel::SidePanelPageFormat::Markdown,
+                    pdf_data: None,
                     source: crate::side_panel::SidePanelPageSource::Managed,
                     content: "# New".to_string(),
                     updated_at_ms: 2,

@@ -692,6 +692,7 @@ fn configure_test_remote_models_with_cursor(app: &mut App) {
             api_method: "cursor".to_string(),
             available: true,
             detail: String::new(),
+            usage: None,
             cheapness: None,
         })
         .collect();
@@ -763,6 +764,7 @@ fn test_available_models_updated_event_surfaces_authed_provider_in_remote_model_
                     api_method: "copilot".to_string(),
                     available: true,
                     detail: String::new(),
+                    usage: None,
                     cheapness: None,
                 },
                 crate::provider::ModelRoute {
@@ -771,6 +773,7 @@ fn test_available_models_updated_event_surfaces_authed_provider_in_remote_model_
                     api_method: "copilot".to_string(),
                     available: true,
                     detail: String::new(),
+                    usage: None,
                     cheapness: None,
                 },
             ],
@@ -824,6 +827,7 @@ fn test_duplicate_available_models_updated_event_is_a_no_op() {
                 api_method: "copilot".to_string(),
                 available: true,
                 detail: String::new(),
+                usage: None,
                 cheapness: None,
             }],
         };
@@ -864,6 +868,7 @@ fn test_remote_final_catalog_replaces_post_login_loading_state_in_place() {
         api_method: "openai-oauth".to_string(),
         available: true,
         detail: String::new(),
+        usage: None,
         cheapness: None,
     }];
     app.auth_catalog_refresh_pending = true;
@@ -887,6 +892,7 @@ fn test_remote_final_catalog_replaces_post_login_loading_state_in_place() {
                 api_method: "anthropic-oauth".to_string(),
                 available: true,
                 detail: String::new(),
+                usage: None,
                 cheapness: None,
             }],
         },
@@ -951,6 +957,8 @@ fn test_remote_model_switch_failure_shows_actionable_guidance() {
             model: "claude-opus-4.6".to_string(),
             provider_name: Some("Copilot".to_string()),
             error: Some("credentials expired".to_string()),
+            resolved_credential: None,
+            reasoning_effort: None,
         },
         &mut remote,
     );
@@ -978,6 +986,7 @@ fn test_remote_prompt_defers_while_model_switch_is_in_flight() {
         &mut app,
         &mut remote,
         crate::tui::app::input::PreparedInput {
+            segments: None,
             raw_input: "hello after model switch".to_string(),
             expanded: "hello after model switch".to_string(),
             images: vec![("image/png".to_string(), "abc123".to_string())],
@@ -1017,6 +1026,7 @@ fn test_remote_prompt_defers_while_post_login_model_setup_is_pending() {
         &mut app,
         &mut remote,
         crate::tui::app::input::PreparedInput {
+            segments: None,
             raw_input: "review my project".to_string(),
             expanded: "review my project".to_string(),
             images: Vec::new(),
@@ -1053,6 +1063,7 @@ fn test_remote_model_switch_failure_restores_deferred_prompt() {
     app.is_remote = true;
     app.remote_model_switch_in_flight = true;
     app.pending_prompt_after_model_switch = Some(crate::tui::app::input::PreparedInput {
+        segments: None,
         raw_input: "please use the selected model".to_string(),
         expanded: "please use the selected model".to_string(),
         images: vec![("image/jpeg".to_string(), "def456".to_string())],
@@ -1065,6 +1076,8 @@ fn test_remote_model_switch_failure_restores_deferred_prompt() {
             model: "Qwen/Qwen3-32B-TEE".to_string(),
             provider_name: Some("Chutes".to_string()),
             error: Some("model switch failed".to_string()),
+            resolved_credential: None,
+            reasoning_effort: None,
         },
         &mut remote,
     );
@@ -1144,6 +1157,7 @@ fn test_detailed_catalog_replaces_placeholder_routes_after_names_only_update() {
                     api_method: "copilot".to_string(),
                     available: true,
                     detail: String::new(),
+                    usage: None,
                     cheapness: None,
                 }],
             },

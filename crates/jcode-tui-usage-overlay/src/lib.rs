@@ -164,9 +164,14 @@ impl UsageOverlay {
                 "Fetching limits from connected providers",
                 UsageOverlayStatus::Loading,
                 vec![
-                    DetailLine::Text("Fetching usage limits from all connected providers...".to_string()),
+                    DetailLine::Text(
+                        "Fetching usage limits from all connected providers...".to_string(),
+                    ),
                     DetailLine::Text("".to_string()),
-                    DetailLine::Text("This view will update automatically when the usage report returns.".to_string()),
+                    DetailLine::Text(
+                        "This view will update automatically when the usage report returns."
+                            .to_string(),
+                    ),
                 ],
             )],
             UsageOverlaySummary::default(),
@@ -232,8 +237,13 @@ impl UsageOverlay {
                 UsageOverlayStatus::Info,
                 vec![
                     DetailLine::Text("## No usage sources found".to_string()),
-                    DetailLine::Text("• No providers with OAuth credentials were found.".to_string()),
-                    DetailLine::Text("• Use `/login claude` or `/login openai` to connect a provider.".to_string()),
+                    DetailLine::Text(
+                        "• No providers with OAuth credentials were found.".to_string(),
+                    ),
+                    DetailLine::Text(
+                        "• Use `/login claude` or `/login openai` to connect a provider."
+                            .to_string(),
+                    ),
                     DetailLine::Text("• Then run `/usage` again.".to_string()),
                 ],
             ));
@@ -636,25 +646,23 @@ impl UsageOverlay {
             Some(item) => item
                 .detail_lines
                 .iter()
-                .map(|line| {
-                    match line {
-                        DetailLine::Bar(spans) => Line::from(spans.clone()),
-                        DetailLine::Text(text) => {
-                            if text.is_empty() {
-                                Line::from("")
-                            } else if let Some(rest) = text.strip_prefix("## ") {
-                                Line::from(Span::styled(
-                                    format!("  {}", rest),
-                                    Style::default().fg(Color::Rgb(255, 200, 50)).bold(),
-                                ))
-                            } else if let Some(rest) = text.strip_prefix("• ") {
-                                Line::from(vec![
-                                    Span::styled("  • ", Style::default().fg(MUTED_DARK)),
-                                    Span::styled(rest.to_string(), Style::default().fg(MUTED)),
-                                ])
-                            } else {
-                                Line::from(Span::styled(text.clone(), Style::default().fg(MUTED)))
-                            }
+                .map(|line| match line {
+                    DetailLine::Bar(spans) => Line::from(spans.clone()),
+                    DetailLine::Text(text) => {
+                        if text.is_empty() {
+                            Line::from("")
+                        } else if let Some(rest) = text.strip_prefix("## ") {
+                            Line::from(Span::styled(
+                                format!("  {}", rest),
+                                Style::default().fg(Color::Rgb(255, 200, 50)).bold(),
+                            ))
+                        } else if let Some(rest) = text.strip_prefix("• ") {
+                            Line::from(vec![
+                                Span::styled("  • ", Style::default().fg(MUTED_DARK)),
+                                Span::styled(rest.to_string(), Style::default().fg(MUTED)),
+                            ])
+                        } else {
+                            Line::from(Span::styled(text.clone(), Style::default().fg(MUTED)))
                         }
                     }
                 })
@@ -678,9 +686,7 @@ fn estimate_item_bytes(item: &UsageOverlayItem) -> usize {
             .iter()
             .map(|line| match line {
                 DetailLine::Text(s) => s.capacity(),
-                DetailLine::Bar(spans) => {
-                    spans.iter().map(|s| s.content.len()).sum::<usize>()
-                }
+                DetailLine::Bar(spans) => spans.iter().map(|s| s.content.len()).sum::<usize>(),
             })
             .sum::<usize>()
 }
@@ -877,10 +883,7 @@ fn provider_detail_lines(report: &jcode_usage_types::ProviderUsage) -> Vec<Detai
             let mut bar_spans = format_usage_bar(limit.usage_percent, 18);
             bar_spans.insert(
                 0,
-                Span::styled(
-                    format!("• {}  ", limit.name),
-                    Style::default().fg(MUTED),
-                ),
+                Span::styled(format!("• {}  ", limit.name), Style::default().fg(MUTED)),
             );
             if !reset.is_empty() {
                 bar_spans.push(Span::styled(reset, Style::default().fg(MUTED)));
@@ -977,6 +980,8 @@ mod tests {
                 }],
                 extra_info: vec![("plan".to_string(), "max".to_string())],
                 hard_limit_reached: false,
+                openai_reset_credits: None,
+                anthropic_limit_reset: None,
                 error: None,
                 last_used_unix_secs: None,
             }],

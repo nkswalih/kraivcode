@@ -220,8 +220,16 @@ pub(in crate::tui::app) enum ToolGateDecision {
 /// Path substrings treated as secrets for the Plan persona.
 fn is_secret_path(path_lower: &str) -> bool {
     const SECRET_MARKERS: [&str; 10] = [
-        ".env", ".pem", ".key", "id_rsa", "id_ed25519", "/.ssh/", "\\.ssh\\", "credentials",
-        "secret", "private_key",
+        ".env",
+        ".pem",
+        ".key",
+        "id_rsa",
+        "id_ed25519",
+        "/.ssh/",
+        "\\.ssh\\",
+        "credentials",
+        "secret",
+        "private_key",
     ];
     SECRET_MARKERS
         .iter()
@@ -283,7 +291,11 @@ pub(in crate::tui::app) fn gate_plan_tool(
 pub(in crate::tui::app) fn allow_plan_read_path(path: &str) {
     let mut store = read_store().unwrap_or_default();
     let lowered = path.to_ascii_lowercase();
-    if store.plan_read_allowlist.iter().any(|rule| lowered.contains(&rule.to_ascii_lowercase())) {
+    if store
+        .plan_read_allowlist
+        .iter()
+        .any(|rule| lowered.contains(&rule.to_ascii_lowercase()))
+    {
         return;
     }
     store.plan_read_allowlist.push(path.to_string());

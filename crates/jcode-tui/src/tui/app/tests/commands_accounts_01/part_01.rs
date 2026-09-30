@@ -371,7 +371,6 @@ fn session_picker_preview_wheel_uses_shared_scroll_momentum() {
             content: format!("prompt line {i}"),
             tool_calls: Vec::new(),
             tool_data: None,
-            pasted_segments: None,
             timestamp: None,
         });
         messages.push(PreviewMessage {
@@ -379,7 +378,6 @@ fn session_picker_preview_wheel_uses_shared_scroll_momentum() {
             content: format!("assistant reply {i}"),
             tool_calls: Vec::new(),
             tool_data: None,
-            pasted_segments: None,
             timestamp: None,
         });
     }

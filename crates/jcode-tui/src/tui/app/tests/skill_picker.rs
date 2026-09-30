@@ -1,7 +1,7 @@
-//! Integration tests for the interactive `/skills` dialog panel.
-
-use crossterm::event::{KeyCode, KeyModifiers};
-
+// Integration tests for the interactive `/skills` dialog panel. This file is
+// `include!`d into `mod tests`, so it must not carry an inner doc comment or
+// re-import names (`KeyCode`, `KeyModifiers`) that the including module
+// already brings into scope.
 #[test]
 fn slash_skills_opens_interactive_panel_and_skills_text_keeps_plain_report() {
     let mut app = create_test_app();

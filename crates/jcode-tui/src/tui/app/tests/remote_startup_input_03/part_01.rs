@@ -539,7 +539,7 @@ fn test_multiple_pasted_blocks_keep_compact_display_and_expand_for_provider() {
         .expect("expected submitted user message");
     match &user_message.content[0] {
         crate::message::ContentBlock::Text { text, .. } => {
-            assert_eq!(text, format!("{first} {second}"));
+            assert_eq!(text.as_str(), format!("{first} {second}"));
         }
         _ => panic!("Expected Text content block"),
     }
@@ -923,6 +923,23 @@ fn test_startup_update_up_to_date_removes_transient_card() {
             .all(|message| message.title.as_deref() != Some("Update")),
         "no-update startup checks should not leave a persistent update card"
     );
+    assert!(app.background_client_action.is_none());
+    assert!(app.pending_background_client_reload.is_none());
+}
+
+#[test]
+fn test_startup_update_skipped_stays_quiet() {
+    let mut app = create_test_app();
+    app.handle_update_status(UpdateStatus::Checking);
+    app.handle_update_status(UpdateStatus::Skipped {
+        reason: "no upstream configured".to_string(),
+    });
+    assert!(
+        app.display_messages()
+            .iter()
+            .all(|message| message.title.as_deref() != Some("Update"))
+    );
+    assert!(app.status_notice().is_none());
     assert!(app.background_client_action.is_none());
     assert!(app.pending_background_client_reload.is_none());
 }
