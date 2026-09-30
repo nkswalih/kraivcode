@@ -438,7 +438,7 @@ mod tests {
         // and, when written as backslashes on Windows, must reach the parser
         // untouched (a `\` is the path separator, not an escape).
         let pasted = format!("{}\n{}", first.display(), second.display());
-        assert_eq!(parse_dropped_paths(&pasted).unwrap(), vec![first, second]);
+        assert_eq!(parse_dropped_paths(&pasted).unwrap(), vec![first.clone(), second]);
 
         // Unquoted whitespace splitting must still work for spaced filenames.
         let spaced = parse_dropped_paths(&format!("'{}'", first.display())).unwrap();
@@ -3723,7 +3723,18 @@ impl App {
     ) -> Result<()> {
         let mut code = code;
         let mut modifiers = modifiers;
+        let mut text_input = text_input;
         ctrl_bracket_fallback_to_esc(&mut code, &mut modifiers);
+        // Some terminals encode the physical Backspace key as DEL (U+007F)
+        // instead of BS (0x08). Normalize so all downstream handlers
+        // (chip detection, selection-aware delete, etc.) see a single
+        // KeyCode::Backspace.  Also clear text_input so the DEL character
+        // is not treated as printable text by the TEXT INPUT PATH.
+        if code == KeyCode::Char('\u{7f}') || code == KeyCode::Char('\u{08}') {
+            code = KeyCode::Backspace;
+            text_input = None;
+        }
+
         // Consume any remaining recovered raw-paste events, then record the
         // timing/kind sample. Both must land before dispatch decisions that
         // consult the classification predicates.
