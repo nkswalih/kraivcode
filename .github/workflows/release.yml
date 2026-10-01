@@ -80,17 +80,17 @@ jobs:
             # Debian/Ubuntu containers used by many TB tasks.
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            artifact: jcode-linux-x86_64
+            artifact: kraivcode-linux-x86_64
             compat_container: true
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            artifact: jcode-linux-aarch64
+            artifact: kraivcode-linux-aarch64
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: jcode-macos-aarch64
+            artifact: kraivcode-macos-aarch64
           - os: macos-15-intel
             target: x86_64-apple-darwin
-            artifact: jcode-macos-x86_64
+            artifact: kraivcode-macos-x86_64
 
     steps:
       - uses: actions/checkout@v4
@@ -217,11 +217,11 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: jcode-windows-x86_64
+            artifact: kraivcode-windows-x86_64
             unsigned_artifact: windows-unsigned-x86_64
           - os: windows-11-arm
             target: aarch64-pc-windows-msvc
-            artifact: jcode-windows-aarch64
+            artifact: kraivcode-windows-aarch64
             unsigned_artifact: windows-unsigned-aarch64
             cargo_args: "--no-default-features --features pdf"
 
@@ -396,8 +396,8 @@ jobs:
           signing-account-name: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ vars.WINDOWS_SIGNING_CERTIFICATE_PROFILE }}
           files: |
-            ${{ github.workspace }}\artifacts\windows-unsigned-x86_64\jcode-windows-x86_64.exe
-            ${{ github.workspace }}\artifacts\windows-unsigned-aarch64\jcode-windows-aarch64.exe
+            ${{ github.workspace }}\artifacts\windows-unsigned-x86_64\kraivcode-windows-x86_64.exe
+            ${{ github.workspace }}\artifacts\windows-unsigned-aarch64\kraivcode-windows-aarch64.exe
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
@@ -407,8 +407,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $assets = @(
-            @{ Name = 'jcode-windows-x86_64'; Path = 'artifacts/windows-unsigned-x86_64/jcode-windows-x86_64.exe' },
-            @{ Name = 'jcode-windows-aarch64'; Path = 'artifacts/windows-unsigned-aarch64/jcode-windows-aarch64.exe' }
+            @{ Name = 'kraivcode-windows-x86_64'; Path = 'artifacts/windows-unsigned-x86_64/kraivcode-windows-x86_64.exe' },
+            @{ Name = 'kraivcode-windows-aarch64'; Path = 'artifacts/windows-unsigned-aarch64/kraivcode-windows-aarch64.exe' }
           )
 
           foreach ($asset in $assets) {
@@ -429,18 +429,18 @@ jobs:
       - name: Upload final Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: jcode-windows-x86_64
+          name: kraivcode-windows-x86_64
           path: |
-            dist/jcode-windows-x86_64.exe
-            dist/jcode-windows-x86_64.tar.gz
+            dist/kraivcode-windows-x86_64.exe
+            dist/kraivcode-windows-x86_64.tar.gz
 
       - name: Upload final Windows ARM64 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: jcode-windows-aarch64
+          name: kraivcode-windows-aarch64
           path: |
-            dist/jcode-windows-aarch64.exe
-            dist/jcode-windows-aarch64.tar.gz
+            dist/kraivcode-windows-aarch64.exe
+            dist/kraivcode-windows-aarch64.tar.gz
 
       - name: Publish Windows assets to release
         shell: pwsh
@@ -448,7 +448,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release upload "${env:GITHUB_REF_NAME}" dist/jcode-windows-x86_64.exe dist/jcode-windows-x86_64.tar.gz dist/jcode-windows-aarch64.exe dist/jcode-windows-aarch64.tar.gz --clobber
+          gh release upload "${env:GITHUB_REF_NAME}" dist/kraivcode-windows-x86_64.exe dist/kraivcode-windows-x86_64.tar.gz dist/kraivcode-windows-aarch64.exe dist/kraivcode-windows-aarch64.tar.gz --clobber
 
   build-freebsd:
     name: Build (x86_64-unknown-freebsd)
@@ -547,14 +547,14 @@ jobs:
         run: |
           set -euo pipefail
           expected=(
-            artifacts/jcode-linux-x86_64/jcode-linux-x86_64.tar.gz
-            artifacts/jcode-linux-aarch64/jcode-linux-aarch64.tar.gz
-            artifacts/jcode-macos-aarch64/jcode-macos-aarch64.tar.gz
-            artifacts/jcode-macos-x86_64/jcode-macos-x86_64.tar.gz
-            artifacts/jcode-windows-x86_64/jcode-windows-x86_64.exe
-            artifacts/jcode-windows-x86_64/jcode-windows-x86_64.tar.gz
-            artifacts/jcode-windows-aarch64/jcode-windows-aarch64.exe
-            artifacts/jcode-windows-aarch64/jcode-windows-aarch64.tar.gz
+            artifacts/kraivcode-linux-x86_64/kraivcode-linux-x86_64.tar.gz
+            artifacts/kraivcode-linux-aarch64/kraivcode-linux-aarch64.tar.gz
+            artifacts/kraivcode-macos-aarch64/kraivcode-macos-aarch64.tar.gz
+            artifacts/kraivcode-macos-x86_64/kraivcode-macos-x86_64.tar.gz
+            artifacts/kraivcode-windows-x86_64/kraivcode-windows-x86_64.exe
+            artifacts/kraivcode-windows-x86_64/kraivcode-windows-x86_64.tar.gz
+            artifacts/kraivcode-windows-aarch64/kraivcode-windows-aarch64.exe
+            artifacts/kraivcode-windows-aarch64/kraivcode-windows-aarch64.tar.gz
             artifacts/jcode-freebsd-x86_64/jcode-freebsd-x86_64.tar.gz
           )
 
@@ -596,12 +596,12 @@ jobs:
             if [ -f "$1" ]; then printf true; else printf false; fi
           }
 
-          linux_x86_64=$(available artifacts/jcode-linux-x86_64/jcode-linux-x86_64.tar.gz)
-          linux_aarch64=$(available artifacts/jcode-linux-aarch64/jcode-linux-aarch64.tar.gz)
-          macos_aarch64=$(available artifacts/jcode-macos-aarch64/jcode-macos-aarch64.tar.gz)
-          macos_x86_64=$(available artifacts/jcode-macos-x86_64/jcode-macos-x86_64.tar.gz)
-          windows_x86_64=$(available artifacts/jcode-windows-x86_64/jcode-windows-x86_64.exe)
-          windows_aarch64=$(available artifacts/jcode-windows-aarch64/jcode-windows-aarch64.exe)
+          linux_x86_64=$(available artifacts/kraivcode-linux-x86_64/kraivcode-linux-x86_64.tar.gz)
+          linux_aarch64=$(available artifacts/kraivcode-linux-aarch64/kraivcode-linux-aarch64.tar.gz)
+          macos_aarch64=$(available artifacts/kraivcode-macos-aarch64/kraivcode-macos-aarch64.tar.gz)
+          macos_x86_64=$(available artifacts/kraivcode-macos-x86_64/kraivcode-macos-x86_64.tar.gz)
+          windows_x86_64=$(available artifacts/kraivcode-windows-x86_64/kraivcode-windows-x86_64.exe)
+          windows_aarch64=$(available artifacts/kraivcode-windows-aarch64/kraivcode-windows-aarch64.exe)
           freebsd_x86_64=$(available artifacts/jcode-freebsd-x86_64/jcode-freebsd-x86_64.tar.gz)
 
           homebrew_ready=false
@@ -739,10 +739,10 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           VERSION_NUM="${VERSION#v}"
 
-          LINUX_SHA=$(sha256sum artifacts/jcode-linux-x86_64/jcode-linux-x86_64.tar.gz | cut -d' ' -f1)
-          LINUX_ARM_SHA=$(sha256sum artifacts/jcode-linux-aarch64/jcode-linux-aarch64.tar.gz | cut -d' ' -f1)
-          MACOS_ARM_SHA=$(sha256sum artifacts/jcode-macos-aarch64/jcode-macos-aarch64.tar.gz | cut -d' ' -f1)
-          MACOS_INTEL_SHA=$(sha256sum artifacts/jcode-macos-x86_64/jcode-macos-x86_64.tar.gz | cut -d' ' -f1)
+          LINUX_SHA=$(sha256sum artifacts/kraivcode-linux-x86_64/kraivcode-linux-x86_64.tar.gz | cut -d' ' -f1)
+          LINUX_ARM_SHA=$(sha256sum artifacts/kraivcode-linux-aarch64/kraivcode-linux-aarch64.tar.gz | cut -d' ' -f1)
+          MACOS_ARM_SHA=$(sha256sum artifacts/kraivcode-macos-aarch64/kraivcode-macos-aarch64.tar.gz | cut -d' ' -f1)
+          MACOS_INTEL_SHA=$(sha256sum artifacts/kraivcode-macos-x86_64/kraivcode-macos-x86_64.tar.gz | cut -d' ' -f1)
 
           mkdir -p ~/.ssh
           echo "$HOMEBREW_DEPLOY_KEY" > ~/.ssh/deploy_key
@@ -760,45 +760,45 @@ jobs:
 
             on_macos do
               on_arm do
-                url "https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/jcode-macos-aarch64.tar.gz"
+                url "https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/kraivcode-macos-aarch64.tar.gz"
                 sha256 "${MACOS_ARM_SHA}"
 
                 def install
-                  bin.install "jcode-macos-aarch64" => "jcode"
+                  bin.install "kraivcode-macos-aarch64" => "kraivcode"
                 end
               end
 
               on_intel do
-                url "https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/jcode-macos-x86_64.tar.gz"
+                url "https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/kraivcode-macos-x86_64.tar.gz"
                 sha256 "${MACOS_INTEL_SHA}"
 
                 def install
-                  bin.install "jcode-macos-x86_64" => "jcode"
+                  bin.install "kraivcode-macos-x86_64" => "kraivcode"
                 end
               end
             end
 
             on_linux do
               on_intel do
-                url "https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/jcode-linux-x86_64.tar.gz"
+                url "https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/kraivcode-linux-x86_64.tar.gz"
                 sha256 "${LINUX_SHA}"
 
                 def install
-                  libexec.install "jcode-linux-x86_64", "jcode-linux-x86_64.bin"
+                  libexec.install "kraivcode-linux-x86_64", "kraivcode-linux-x86_64.bin"
                   libexec.install Dir["libssl.so*"], Dir["libcrypto.so*"] unless Dir["libssl.so*", "libcrypto.so*"].empty?
                   (bin/"jcode").write <<~SH
                     #!/bin/sh
-                    exec "#{libexec}/jcode-linux-x86_64" "\$@"
+                    exec "#{libexec}/kraivcode-linux-x86_64" "\$@"
                   SH
                 end
               end
 
               on_arm do
-                url "https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/jcode-linux-aarch64.tar.gz"
+                url "https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/kraivcode-linux-aarch64.tar.gz"
                 sha256 "${LINUX_ARM_SHA}"
 
                 def install
-                  bin.install "jcode-linux-aarch64" => "jcode"
+                  bin.install "kraivcode-linux-aarch64" => "kraivcode"
                 end
               end
             end
@@ -812,7 +812,7 @@ jobs:
           sed -i 's/^          //' /tmp/homebrew-kraivcode/Formula/kraivcode.rb
 
           cd /tmp/homebrew-kraivcode
-          git config user.name "jcode-release-bot"
+          git config user.name "kraivcode-release-bot"
           git config user.email "release@jcode.dev"
           git add Formula/kraivcode.rb
           git commit -m "Update to ${VERSION}" || echo "No changes"
@@ -845,8 +845,8 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           VERSION_NUM="${VERSION#v}"
 
-          LINUX_SHA=$(sha256sum artifacts/jcode-linux-x86_64/jcode-linux-x86_64.tar.gz | cut -d' ' -f1)
-          LINUX_URL="https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/jcode-linux-x86_64.tar.gz"
+          LINUX_SHA=$(sha256sum artifacts/kraivcode-linux-x86_64/kraivcode-linux-x86_64.tar.gz | cut -d' ' -f1)
+          LINUX_URL="https://github.com/nkswalih/kraivcode/releases/download/${VERSION}/kraivcode-linux-x86_64.tar.gz"
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
@@ -877,8 +877,8 @@ jobs:
           sha256sums=('SHA_PLACEHOLDER')
 
           package() {
-              install -Dm755 "${srcdir}/jcode-linux-x86_64" "${pkgdir}/usr/lib/kraivcode/jcode-linux-x86_64"
-              install -Dm755 "${srcdir}/jcode-linux-x86_64.bin" "${pkgdir}/usr/lib/kraivcode/jcode-linux-x86_64.bin"
+              install -Dm755 "${srcdir}/kraivcode-linux-x86_64" "${pkgdir}/usr/lib/kraivcode/kraivcode-linux-x86_64"
+              install -Dm755 "${srcdir}/kraivcode-linux-x86_64.bin" "${pkgdir}/usr/lib/kraivcode/kraivcode-linux-x86_64.bin"
               if compgen -G "${srcdir}/libssl.so*" >/dev/null; then
                   install -Dm644 "${srcdir}"/libssl.so* "${pkgdir}/usr/lib/kraivcode/"
               fi
@@ -886,7 +886,7 @@ jobs:
                   install -Dm644 "${srcdir}"/libcrypto.so* "${pkgdir}/usr/lib/kraivcode/"
               fi
               mkdir -p "${pkgdir}/usr/bin"
-              ln -s /usr/lib/kraivcode/jcode-linux-x86_64 "${pkgdir}/usr/bin/kraivcode"
+              ln -s /usr/lib/kraivcode/kraivcode-linux-x86_64 "${pkgdir}/usr/bin/kraivcode"
           }
           PKGBUILD_END
 

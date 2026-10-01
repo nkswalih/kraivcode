@@ -104,7 +104,7 @@ impl Tool for JcodeDocsTool {
                 ));
             }
         };
-        Ok(ToolOutput::new(output).with_title(format!("jcode docs {}", params.action)))
+        Ok(ToolOutput::new(output).with_title(format!("kraivcode docs {}", params.action)))
     }
 }
 

@@ -245,7 +245,7 @@ pub fn spawn_control_master_terminal(profile: &SshRemoteProfile) -> Result<bool>
         "sh".to_string(),
         vec!["-c".to_string(), script],
     )
-    .title(format!("jcode ssh · {}", profile.name));
+    .title(format!("kraivcode ssh · {}", profile.name));
     crate::terminal_launch::spawn_command_in_new_terminal(&command, Path::new("."))
 }
 

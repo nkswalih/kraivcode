@@ -478,8 +478,8 @@ pub(super) async fn run_usage_command(emit_json: bool) -> Result<()> {
         println!("No connected providers");
         println!();
         println!("Next steps:");
-        println!("- Use `jcode login --provider claude` to connect Claude OAuth.");
-        println!("- Use `jcode login --provider openai` to connect ChatGPT / Codex OAuth.");
+        println!("- Use `kraivcode login --provider claude` to connect Claude OAuth.");
+        println!("- Use `kraivcode login --provider openai` to connect ChatGPT / Codex OAuth.");
         return Ok(());
     }
 
@@ -827,7 +827,7 @@ mod tests {
                 .recommended_actions
                 .iter()
                 .any(|line| {
-                    line == &format!("Connect it: jcode login --provider {}", provider.id)
+                    line == &format!("Connect it: kraivcode login --provider {}", provider.id)
                 })
         );
 
@@ -900,7 +900,7 @@ mod tests {
             after_doctor_provider
                 .recommended_actions
                 .iter()
-                .any(|line| { line == "Review current state: jcode auth status --json" })
+                .any(|line| { line == "Review current state: kraivcode auth status --json" })
         );
     }
 }

@@ -83,7 +83,7 @@ pub fn setup() -> Result<ToolOutput> {
             .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
             .status();
         log.push(
-            "Opened Privacy & Security > Accessibility. Add and enable your terminal/jcode there."
+            "Opened Privacy & Security > Accessibility. Add and enable your terminal/Kraivcode there."
                 .into(),
         );
     }
@@ -92,7 +92,7 @@ pub fn setup() -> Result<ToolOutput> {
             .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
             .status();
         log.push(
-            "Opened Privacy & Security > Screen Recording. Add and enable your terminal/jcode there."
+            "Opened Privacy & Security > Screen Recording. Add and enable your terminal/Kraivcode there."
                 .into(),
         );
     }

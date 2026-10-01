@@ -587,7 +587,7 @@ fn windows_native_hotkey_loop(_entries: Vec<WindowsHotkey>) -> Result<()> {
 /// Build the TUI startup notice for the Windows launch hotkeys (or `None` when
 /// there is nothing to show). Mirrors the macOS/Linux notices with Windows-native
 /// display labels. Only shown once the listener is configured, since Windows needs the
-/// interactive `jcode setup-hotkey` flow to install it.
+/// interactive `kraivcode setup-hotkey` flow to install it.
 pub(super) fn windows_launch_hotkeys_notice(state: &SetupHintsState) -> Option<StartupHints> {
     if !state.hotkey_configured {
         return None;
@@ -725,7 +725,7 @@ fn nudge_hotkey(state: &mut SetupHintsState) -> bool {
                 Err(e) => {
                     eprintln!("  \x1b[31m✗\x1b[0m Failed to create hotkey: {}", e);
                     eprintln!(
-                        "    You can set it up manually later with: \x1b[1mjcode setup-hotkey\x1b[0m"
+                        "    You can set it up manually later with: \x1b[1mkraivcode setup-hotkey\x1b[0m"
                     );
                     eprintln!();
                     false
@@ -981,7 +981,7 @@ pub(super) fn run_setup_hotkey_windows() -> Result<()> {
     let terminal = detect_terminal();
     let already_using_alacritty = terminal == "alacritty";
 
-    eprintln!("\x1b[1mjcode setup-hotkey\x1b[0m");
+    eprintln!("\x1b[1mkraivcode setup-hotkey\x1b[0m");
     eprintln!();
 
     eprintln!(

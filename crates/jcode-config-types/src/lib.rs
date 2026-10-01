@@ -819,7 +819,7 @@ pub struct TerminalConfig {
     /// One of: `ghostty`, `iterm2`, `wezterm`, `warp`, `alacritty`, `vscode`,
     /// `terminal` (Apple Terminal). When set, this is the source of truth for
     /// which terminal jcode launches into and is preferred over the legacy
-    /// `~/.jcode/preferred_terminal.json` file. Re-run `jcode setup-hotkey`
+    /// `~/.jcode/preferred_terminal.json` file. Re-run `kraivcode setup-hotkey`
     /// after changing it so the generated launcher script picks up the change.
     ///
     /// macOS only; ignored on other platforms.

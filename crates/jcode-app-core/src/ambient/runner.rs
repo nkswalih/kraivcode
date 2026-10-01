@@ -879,7 +879,7 @@ impl AmbientRunnerHandle {
             std::process::Command::new("kitty")
                 .args([
                     "--title",
-                    "🤖 jcode ambient cycle",
+                    "🤖 kraivcode ambient cycle",
                     "-e",
                     &jcode_bin.to_string_lossy(),
                     "ambient",

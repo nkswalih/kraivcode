@@ -1,6 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
-//! Self-development tool - manage canary builds when working on jcode itself
+//! Self-development tool - manage canary builds when working on Kraivcode itself
 
 use crate::background::{self, TaskResult};
 use crate::build;
@@ -487,9 +487,9 @@ impl SelfDevTool {
     /// reload/find-config); inside self-dev it manages builds and reloads.
     pub fn description_for(is_selfdev: bool) -> &'static str {
         if is_selfdev {
-            "Manage self-dev builds, tests, and reloads while working on jcode itself."
+            "Manage self-dev builds, tests, and reloads while working on Kraivcode itself."
         } else {
-            "Enter self-dev mode to work on jcode itself: setup, reload, find config/paths."
+            "Enter self-dev mode to work on Kraivcode itself: setup, reload, find config/paths."
         }
     }
 
@@ -614,7 +614,7 @@ impl Tool for SelfDevTool {
             }
 
             // Self-dev-only actions: building, testing, and low-level socket
-            // access only make sense once you are working on jcode itself.
+            // access only make sense once you are working on Kraivcode itself.
             "build" => {
                 self.do_build(
                     params.reason,
@@ -767,7 +767,7 @@ impl SelfDevTool {
         build::client_update_candidate(true)
             .map(|(path, _label)| path)
             .or_else(|| std::env::current_exe().ok())
-            .ok_or_else(|| anyhow::anyhow!("Could not resolve jcode executable to launch"))
+            .ok_or_else(|| anyhow::anyhow!("Could not resolve Kraivcode executable to launch"))
     }
 
     fn build_command(repo_dir: &Path, target: build::SelfDevBuildTarget) -> SelfDevBuildCommand {

@@ -10,7 +10,7 @@ pub fn hot_rebuild(session_id: &str) -> Result<()> {
     let repo_dir =
         build::get_repo_dir().ok_or_else(|| anyhow::anyhow!("Could not find Kraivcode repository"))?;
 
-    eprintln!("Rebuilding jcode with session {}...", session_id);
+    eprintln!("Rebuilding Kraivcode with session {}...", session_id);
     pull_latest_changes_for_rebuild(&repo_dir);
     run_release_build(&repo_dir)?;
     run_release_tests(&repo_dir)?;

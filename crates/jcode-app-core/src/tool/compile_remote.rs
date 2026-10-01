@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
 const ACCESS_TTL: Duration = Duration::from_secs(60);
-const SUBSCRIBE: &str = "Remote compilation requires a Jcode subscription. Tell the user to subscribe at https://jcode.sh/pricing, then sign in with `jcode account login`. Do not open checkout or purchase automatically.";
+const SUBSCRIBE: &str = "Remote compilation requires a Jcode subscription. Tell the user to subscribe at https://jcode.sh/pricing, then sign in with `kraivcode account login`. Do not open checkout or purchase automatically.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Access {
@@ -30,7 +30,7 @@ impl Access {
     fn description(self) -> &'static str {
         match self {
             Self::SignedOut => {
-                "Not signed in. Subscribe at https://jcode.sh/pricing, then `jcode account login`."
+                "Not signed in. Subscribe at https://jcode.sh/pricing, then `kraivcode account login`."
             }
             Self::SubscriptionRequired => SUBSCRIBE,
             Self::Ready => {
@@ -347,7 +347,7 @@ async fn submit(
         ))?;
     match response.status().as_u16() {
         200 => {}
-        401 => bail!("Jcode sign-in expired. Run `jcode account login` before retrying."),
+        401 => bail!("Jcode sign-in expired. Run `kraivcode account login` before retrying."),
         402 => bail!(
             "Insufficient cloud-compute credits. Remote builds and cloud agents share the same credit balance. Manage credits at https://jcode.sh/account. No automatic top-up was performed."
         ),

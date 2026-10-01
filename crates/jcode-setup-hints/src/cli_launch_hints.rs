@@ -435,7 +435,7 @@ mod tests {
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "jcode setup-hotkey --notify-cli-launch old",
+                            "command": "kraivcode setup-hotkey --notify-cli-launch old",
                             "timeout": 30
                         },
                         {"type": "command", "command": "echo user-owned"}
