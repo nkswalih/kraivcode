@@ -62,12 +62,12 @@ pub fn find_repo_in_ancestors(start: &Path) -> Option<PathBuf> {
 }
 
 pub fn binary_stem() -> &'static str {
-    "jcode"
+    "kraivcode"
 }
 
 pub fn binary_name() -> &'static str {
     if cfg!(windows) {
-        "jcode.exe"
+        "kraivcode.exe"
     } else {
         binary_stem()
     }
@@ -183,9 +183,13 @@ fn selfdev_build_command_for_target_on_platform(
         SelfDevBuildTarget::Auto => infer_selfdev_build_target(repo_dir),
         explicit => explicit,
     };
+    // Package and bin name come from the root `Cargo.toml`, not from
+    // `binary_stem()`, because the self-dev profile builds the workspace
+    // package directly. They must stay equal to that package name or Cargo
+    // rejects the build with "did not match any packages".
     let specs = match target {
-        SelfDevBuildTarget::Tui => vec![("jcode", "jcode")],
-        SelfDevBuildTarget::All | SelfDevBuildTarget::Auto => vec![("jcode", "jcode")],
+        SelfDevBuildTarget::Tui => vec![("kraivcode", "kraivcode")],
+        SelfDevBuildTarget::All | SelfDevBuildTarget::Auto => vec![("kraivcode", "kraivcode")],
     };
     let wrapper = repo_dir.join("scripts").join("dev_cargo.sh");
     // `bash` on Windows may resolve to WSL, which cannot use the native Rust
@@ -656,8 +660,8 @@ mod tests {
     fn every_build_target_builds_its_own_package() {
         let repo = repo_fixture(false);
         let cases = [
-            (SelfDevBuildTarget::Tui, vec!["-p jcode "]),
-            (SelfDevBuildTarget::All, vec!["-p jcode "]),
+            (SelfDevBuildTarget::Tui, vec!["-p kraivcode "]),
+            (SelfDevBuildTarget::All, vec!["-p kraivcode "]),
         ];
         for (target, expected) in cases {
             let command = selfdev_build_command_for_target(repo.path(), target);
@@ -693,9 +697,9 @@ mod tests {
                 "--profile",
                 "selfdev",
                 "-p",
-                "jcode",
+                "kraivcode",
                 "--bin",
-                "jcode"
+                "kraivcode"
             ]
         );
         assert!(
@@ -743,9 +747,9 @@ mod tests {
                 "--profile",
                 "selfdev",
                 "-p",
-                "jcode",
+                "kraivcode",
                 "--bin",
-                "jcode",
+                "kraivcode",
             ]
         );
     }
@@ -810,14 +814,14 @@ mod tests {
         assert!(is_kraivcode_repo(repo.path()));
     }
 
-    /// Build a release-style install dir: `jcode` wrapper script + payload.
+    /// Build a release-style install dir: `kraivcode` wrapper script + payload.
     fn release_install_fixture() -> (tempfile::TempDir, PathBuf, PathBuf) {
         let temp = tempfile::TempDir::new().expect("temp install");
-        let wrapper = temp.path().join("jcode");
-        let payload = temp.path().join("jcode-linux-x86_64.bin");
+        let wrapper = temp.path().join("kraivcode");
+        let payload = temp.path().join("kraivcode-linux-x86_64.bin");
         std::fs::write(
             &wrapper,
-            "#!/usr/bin/env sh\nexec ./jcode-linux-x86_64.bin \"$@\"\n",
+            "#!/usr/bin/env sh\nexec ./kraivcode-linux-x86_64.bin \"$@\"\n",
         )
         .expect("wrapper");
         std::fs::write(&payload, vec![0x7fu8; 64]).expect("payload");
@@ -857,7 +861,7 @@ mod tests {
         let temp = tempfile::TempDir::new().expect("temp install");
         let binary = temp.path().join("jcode");
         std::fs::write(&binary, vec![0x7fu8; 8192]).expect("binary");
-        std::fs::write(temp.path().join("jcode-linux-x86_64.bin"), [0u8; 8]).expect("bin");
+        std::fs::write(temp.path().join("kraivcode-linux-x86_64.bin"), [0u8; 8]).expect("bin");
         assert_eq!(
             resolve_binary_payload(&binary),
             std::fs::canonicalize(&binary).expect("canonical binary")
@@ -878,7 +882,7 @@ mod tests {
     #[test]
     fn resolve_binary_payload_refuses_ambiguous_payloads() {
         let (temp, wrapper, _payload) = release_install_fixture();
-        std::fs::write(temp.path().join("jcode-macos-aarch64.bin"), [0u8; 8]).expect("second bin");
+        std::fs::write(temp.path().join("kraivcode-macos-aarch64.bin"), [0u8; 8]).expect("second bin");
         assert_eq!(
             resolve_binary_payload(&wrapper),
             std::fs::canonicalize(&wrapper).expect("canonical wrapper")
