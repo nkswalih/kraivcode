@@ -141,6 +141,14 @@ fn startup_dir() -> PathBuf {
     appdata.join(r"Microsoft\Windows\Start Menu\Programs\Startup")
 }
 fn startup_shortcut_path() -> PathBuf {
+    startup_dir().join("kraivcode-hotkey.lnk")
+}
+
+/// Startup shortcut name used before the fork rename. `scripts/install.ps1`
+/// already writes the new name, so an install that was upgraded from an
+/// upstream binary can still have this one lying around. It launches the same
+/// listener, so leaving it behind would register the launch hotkey twice.
+fn legacy_startup_shortcut_path() -> PathBuf {
     startup_dir().join("jcode-hotkey.lnk")
 }
 
@@ -235,12 +243,16 @@ fn create_startup_shortcut(exe_path: &Path) -> Result<()> {
     if !stdout.contains("OK") {
         anyhow::bail!("Startup shortcut creation did not confirm success");
     }
+    // Best effort: reclaim the pre-rename shortcut so the listener is not
+    // registered twice.
+    let _ = remove_file_if_exists(&legacy_startup_shortcut_path());
     Ok(())
 }
 
 pub(super) fn uninstall_windows_hotkey_listener() -> Result<()> {
     stop_windows_hotkey_listeners();
     remove_file_if_exists(&startup_shortcut_path())?;
+    remove_file_if_exists(&legacy_startup_shortcut_path())?;
     remove_file_if_exists(&hotkey_vbs_path()?)?;
     remove_file_if_exists(&legacy_hotkey_ps1_path()?)?;
 
@@ -248,7 +260,7 @@ pub(super) fn uninstall_windows_hotkey_listener() -> Result<()> {
     state.hotkey_configured = false;
     state.hotkey_dismissed = true;
     state.save()?;
-    eprintln!("  \x1b[32m✓\x1b[0m Removed jcode Windows launch-hotkey listener");
+    eprintln!("  \x1b[32m✓\x1b[0m Removed Kraivcode Windows launch-hotkey listener");
     Ok(())
 }
 
@@ -881,6 +893,13 @@ mod tests {
                 .file_name()
                 .unwrap()
                 .to_string_lossy(),
+            "kraivcode-hotkey.lnk"
+        );
+        assert_eq!(
+            legacy_startup_shortcut_path()
+                .file_name()
+                .unwrap()
+                .to_string_lossy(),
             "jcode-hotkey.lnk"
         );
         assert_eq!(
@@ -916,7 +935,7 @@ mod tests {
     #[test]
     fn startup_shortcut_uses_native_listener_without_vbscript_or_bypass() {
         let script = render_startup_shortcut_script(
-            Path::new(r"C:\Users\O'Hara\Startup\jcode-hotkey.lnk"),
+            Path::new(r"C:\Users\O'Hara\Startup\kraivcode-hotkey.lnk"),
             Path::new(r"C:\Program Files\Jcode O'Hara\jcode.exe"),
         );
         assert!(script.contains("$shortcut.TargetPath = 'powershell.exe'"));
@@ -933,7 +952,7 @@ pub(super) fn maybe_show_windows_setup_hints(
     state: &mut SetupHintsState,
     startup_hints: Option<StartupHints>,
 ) -> Option<StartupHints> {
-    if state.launch_count % 3 != 0 {
+    if !state.launch_count.is_multiple_of(3) {
         return startup_hints;
     }
 
@@ -1086,7 +1105,7 @@ pub(super) fn create_windows_desktop_shortcut(state: &mut SetupHintsState) -> Re
     };
 
     let desktop_dir = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\Default".into());
-    let shortcut_path = format!("{}\\Desktop\\jcode.lnk", desktop_dir);
+    let shortcut_path = format!("{}\\Desktop\\kraivcode.lnk", desktop_dir);
 
     let ps_script = format!(
         r#"
@@ -1094,7 +1113,7 @@ $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut("{shortcut_path}")
 $shortcut.TargetPath = "{target}"
 $shortcut.Arguments = '{args}'
-$shortcut.Description = "jcode - AI coding agent"
+$shortcut.Description = "Kraivcode - AI coding agent"
 $shortcut.Save()
 Write-Output "OK"
 "#,

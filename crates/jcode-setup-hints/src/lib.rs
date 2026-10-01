@@ -572,7 +572,7 @@ fn install_macos_hotkey_listener(
     let status = std::process::Command::new("launchctl")
         .args(["load", "-w", plist_path.to_string_lossy().as_ref()])
         .status()
-        .context("failed to load jcode LaunchAgent")?;
+        .context("failed to load Kraivcode LaunchAgent")?;
     if !status.success() {
         anyhow::bail!("launchctl load failed with exit code {:?}", status.code());
     }
@@ -586,7 +586,7 @@ fn startup_hints_for_launch(_state: &SetupHintsState) -> Option<StartupHints> {
         None
     } else {
         Some(format!(
-            "Cmd+; launches a new jcode in your home directory from anywhere, system-wide (opens in {}). Cmd+' reopens your last project; Cmd+Shift+' opens a self-dev session.",
+            "Cmd+; launches a new Kraivcode session in your home directory from anywhere, system-wide (opens in {}). Cmd+' reopens your last project; Cmd+Shift+' opens a self-dev session.",
             effective_macos_terminal().label()
         ))
     };
@@ -681,7 +681,7 @@ pub fn run_setup_hotkey(
         eprintln!("\x1b[1mkraivcode setup-hotkey\x1b[0m");
         eprintln!();
         eprintln!("  Preferred terminal: {}", terminal.label());
-        eprintln!("  Installing a LaunchAgent with three system-wide jcode launch hotkeys.");
+        eprintln!("  Installing a LaunchAgent with three system-wide Kraivcode launch hotkeys.");
         eprintln!();
 
         match install_macos_hotkey_listener(Some(terminal)) {
@@ -692,15 +692,19 @@ pub fn run_setup_hotkey(
                 state.launch_hotkey_tracking_version = LAUNCH_HOTKEY_TRACKING_VERSION;
                 let _ = state.save();
                 eprintln!(
-                    "  \x1b[32m✓\x1b[0m Created launch hotkeys → {} + jcode",
+                    "  \x1b[32m✓\x1b[0m Created launch hotkeys → {} + Kraivcode",
                     installed_terminal.label()
                 );
                 eprintln!();
                 eprintln!("  Press these anywhere, system-wide:");
-                eprintln!("    \x1b[1mCmd+;\x1b[0m       new jcode in your home directory");
-                eprintln!("    \x1b[1mCmd+'\x1b[0m       new jcode in your last project directory");
                 eprintln!(
-                    "    \x1b[1mCmd+Shift+'\x1b[0m new jcode self-dev session (last Kraivcode repo)"
+                    "    \x1b[1mCmd+;\x1b[0m       new Kraivcode session in your home directory"
+                );
+                eprintln!(
+                    "    \x1b[1mCmd+'\x1b[0m       new Kraivcode session in your last project directory"
+                );
+                eprintln!(
+                    "    \x1b[1mCmd+Shift+'\x1b[0m new Kraivcode self-dev session (last Kraivcode repo)"
                 );
                 install_cli_launch_hints_notice();
                 return Ok(());
@@ -1038,7 +1042,7 @@ fn run_macos_hotkey_listener() -> Result<()> {
     }
 
     if launch_for_id.is_empty() {
-        anyhow::bail!("failed to register any jcode launch hotkey");
+        anyhow::bail!("failed to register any Kraivcode launch hotkey");
     }
 
     let exe_path = std::env::current_exe()
@@ -1161,7 +1165,7 @@ pub fn record_launch_hotkey_use(chord: &str) {
 #[cfg(target_os = "macos")]
 fn macos_hotkey_log(message: &str) {
     jcode_logging::info(message);
-    eprintln!("[jcode hotkey] {message}");
+    eprintln!("[Kraivcode hotkey] {message}");
 }
 
 /// Decide what macOS hotkey listener action a launch should take, given the
@@ -1322,16 +1326,20 @@ pub fn maybe_show_setup_hints() -> Option<StartupHints> {
     // On Windows, desktop shortcut creation shells out to PowerShell/COM and can
     // take tens of seconds or hang in some Windows Terminal/WSL launch contexts.
     // Do not run it on the critical startup path. Users can still run
-    // `jcode setup-launcher` explicitly.
+    // `kraivcode setup-launcher` explicitly.
 
     let startup_hints = startup_hints_for_launch(&state);
 
     #[cfg(target_os = "macos")]
     let startup_hints = startup_hints.or_else(|| macos_launch_hotkeys_notice(&state));
 
+    // Each platform block below yields the function result. Exactly one of them
+    // survives cfg-stripping, and the early `return`s inside them are genuine
+    // function returns, so clippy's needless_return only ever sees a genuine
+    // trailing expression.
     #[cfg(target_os = "macos")]
-    {
-        if state.launch_count % 3 != 0 {
+    let result = {
+        if !state.launch_count.is_multiple_of(3) {
             return startup_hints;
         }
 
@@ -1350,29 +1358,29 @@ pub fn maybe_show_setup_hints() -> Option<StartupHints> {
             return nudge_macos_ghostty(&mut state);
         }
 
-        return startup_hints;
-    }
+        startup_hints
+    };
 
     #[cfg(windows)]
-    {
+    let result = {
         let startup_hints =
             startup_hints.or_else(|| windows_setup::windows_launch_hotkeys_notice(&state));
-        return maybe_show_windows_setup_hints(&mut state, startup_hints);
-    }
+        maybe_show_windows_setup_hints(&mut state, startup_hints)
+    };
 
     #[cfg(not(any(windows, target_os = "macos")))]
-    {
-        startup_hints.or_else(|| {
-            #[cfg(target_os = "linux")]
-            {
-                linux_launch_hotkeys_notice(&state)
-            }
-            #[cfg(not(target_os = "linux"))]
-            {
-                None
-            }
-        })
-    }
+    let result = startup_hints.or_else(|| {
+        #[cfg(target_os = "linux")]
+        {
+            linux_launch_hotkeys_notice(&state)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            None
+        }
+    });
+
+    result
 }
 
 #[cfg(target_os = "macos")]
@@ -2140,7 +2148,7 @@ fn backup_compositor_config(config_path: &std::path::Path) {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "config".to_string());
-    let backup = config_path.with_file_name(format!("{file_name}.bak-jcode-hotkeys-{ts}"));
+    let backup = config_path.with_file_name(format!("{file_name}.bak-kraivcode-hotkeys-{ts}"));
     if let Err(err) = std::fs::copy(config_path, &backup) {
         jcode_logging::warn(&format!(
             "failed to back up compositor config before hotkey install: {err}"
@@ -2417,8 +2425,8 @@ pub(crate) fn glyph_safe_notice_for(
         "Glyph-safe mode: colors quantized to 256 to avoid this terminal's glyph corruption."
             .to_string();
     let display = "This terminal (VS Code integrated terminal / Apple Terminal on macOS) corrupts \
-its glyph cache under jcode's full-color animations, rendering letters as boxes. \
-jcode automatically quantizes colors to the 256-palette here to keep text readable; \
+its glyph cache under Kraivcode's full-color animations, rendering letters as boxes. \
+Kraivcode automatically quantizes colors to the 256-palette here to keep text readable; \
 the only tradeoff is slightly reduced color fidelity. Animations still run. \
 For full color, use Ghostty, iTerm2, kitty, or WezTerm, or set JCODE_GLYPH_SAFE_MODE=off."
         .to_string();
@@ -2430,12 +2438,16 @@ For full color, use Ghostty, iTerm2, kitty, or WezTerm, or set JCODE_GLYPH_SAFE_
     )
 }
 
-/// Manual `jcode setup-launcher` command.
+/// Manual `kraivcode setup-launcher` command.
 pub fn run_setup_launcher() -> Result<()> {
+    // Each platform block below yields the command result. Exactly one of them
+    // survives cfg-stripping, and the `bail!`/`return`s inside them are genuine
+    // function returns rather than a trailing `return`, which is what
+    // clippy::needless_return objects to on whichever platform compiles last.
     #[cfg(target_os = "macos")]
-    {
+    let result = {
         let mut state = SetupHintsState::load();
-        eprintln!("\x1b[1mjcode setup-launcher\x1b[0m");
+        eprintln!("\x1b[1mkraivcode setup-launcher\x1b[0m");
         eprintln!();
 
         let removed = macos_launcher::remove_legacy_macos_bundles();
@@ -2453,44 +2465,45 @@ pub fn run_setup_launcher() -> Result<()> {
                     "  \x1b[32m✓\x1b[0m Installed turn-notification helper: {}",
                     broker_dir.display()
                 );
-                eprintln!();
                 eprintln!(
-                    "  Launch Jcode from the Jcode Desktop app, a terminal, or the Cmd+; hotkey."
+                    "  Launch Kraivcode from the Jcode Desktop app, a terminal, or the Cmd+; hotkey."
                 );
-                return Ok(());
+                Ok(())
             }
             Err(e) => {
                 eprintln!("  \x1b[31m✗\x1b[0m Failed: {}", e);
                 anyhow::bail!("macOS launcher setup failed: {}", e);
             }
         }
-    }
+    };
 
     #[cfg(windows)]
-    {
+    let result = {
         let mut state = SetupHintsState::load();
-        eprintln!("\x1b[1mjcode setup-launcher\x1b[0m");
+        eprintln!("\x1b[1mkraivcode setup-launcher\x1b[0m");
         eprintln!();
         match create_windows_desktop_shortcut(&mut state) {
             Ok(()) => {
-                eprintln!("  \x1b[32m✓\x1b[0m Created desktop shortcut: jcode.lnk");
-                return Ok(());
+                eprintln!("  \x1b[32m✓\x1b[0m Created desktop shortcut: kraivcode.lnk");
+                Ok(())
             }
             Err(e) => {
                 eprintln!("  \x1b[31m✗\x1b[0m Failed: {}", e);
                 anyhow::bail!("Windows launcher setup failed: {}", e);
             }
         }
-    }
+    };
 
     #[cfg(not(any(windows, target_os = "macos")))]
-    {
+    let result = {
         eprintln!("Launcher setup is currently only supported on macOS and Windows.");
         Ok(())
-    }
+    };
+
+    result
 }
 
-/// Create a desktop shortcut/launcher for jcode.
+/// Create a desktop shortcut/launcher for Kraivcode.
 ///
 /// - macOS: installs the hidden notification helper and removes the legacy
 ///   CLI launcher bundles. Jcode Desktop is the only macOS app launcher.
@@ -2533,7 +2546,8 @@ fn uninstall_macos_hotkey_listener() -> Result<()> {
     let _ = std::process::Command::new("launchctl")
         .args(["unload", plist_path.to_string_lossy().as_ref()])
         .status();
-    std::fs::remove_file(&plist_path).context("failed to remove jcode hotkey LaunchAgent plist")?;
+    std::fs::remove_file(&plist_path)
+        .context("failed to remove Kraivcode hotkey LaunchAgent plist")?;
     jcode_logging::info("Removed macOS launch-hotkey LaunchAgent (launch_hotkeys.enabled = false)");
     Ok(())
 }

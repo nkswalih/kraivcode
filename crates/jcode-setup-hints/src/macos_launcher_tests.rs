@@ -32,8 +32,8 @@ fn legacy_cli_launchers_and_old_broker_location_are_found() {
     assert_eq!(
         found,
         vec![
-            apps.join("Kraivcode Notifications.app"),
-            apps.join("Jcode.app")
+            apps.join("Jcode.app"),
+            apps.join("Kraivcode Notifications.app")
         ]
     );
 }

@@ -19,11 +19,11 @@ impl Config {
     /// Exposed separately so tests can check that the template we ship actually
     /// parses and documents the options it claims to.
     pub fn default_config_file_contents() -> String {
-        let default_content = r##"# jcode configuration file
+        let default_content = r##"# Kraivcode configuration file
 # Location: ~/.jcode/config.toml
 #
 # Environment variables override these settings.
-# Run `/config` in jcode to see current settings.
+# Run `/config` in Kraivcode to see current settings.
 
 [keybindings]
 # Scroll keys (vim-style by default)
@@ -85,14 +85,14 @@ info_widget_toggle = "alt+i"
 # Active only with agents.swarm_spawn_mode = "inline".
 swarm_panel_focus = "alt+n"
 
-# Spawn a fresh jcode session in a new terminal window, reusing the current
+# Spawn a fresh Kraivcode session in a new terminal window, reusing the current
 # session's working directory. Companion to the system-wide launch hotkeys.
 # `kraivcode setup-hotkey` installs these three global launch hotkeys on macOS,
 # Linux niri/Hyprland/sway/i3, and Windows. The Cmd modifier maps to Super on
 # Linux and Alt on Windows. Windows also adds the physical Copilot key:
-#   Cmd+;        new jcode in your home directory
-#   Cmd+'        new jcode in your last project directory
-#   Cmd+Shift+'  new jcode self-dev session (last Kraivcode repo)
+#   Cmd+;        new Kraivcode session in your home directory
+#   Cmd+'        new Kraivcode session in your last project directory
+#   Cmd+Shift+'  new Kraivcode self-dev session (last Kraivcode repo)
 # Default: Cmd+Shift+; on macOS, Alt+Shift+; elsewhere. Set "" to disable.
 # Note: some macOS terminals intercept Cmd combos; if so, pick another binding.
 # new_terminal = "cmd+shift+;"
@@ -130,7 +130,7 @@ key = "off"
 timeout_secs = 90
 
 # Extra names or terms to help built-in voice transcription recognize them.
-# Jcode's own product names are always included.
+# Kraivcode's own product names are always included.
 # vocabulary = ["Kubernetes", "Alice Zhang"]
 
 # Microphone recorder for built-in voice input (keybindings.voice_input).
@@ -228,7 +228,7 @@ prompt_entry_animation = true
 
 # Include transcripts from other agent CLIs (Claude Code, Codex, Pi, OpenCode,
 # Cursor) in the session picker so they can be resumed or imported
-# (default: true). Set false to list only jcode's own sessions.
+# (default: true). Set false to list only Kraivcode's own sessions.
 # external_sessions = true
 
 # Disable specific animation variants by name.
@@ -351,7 +351,7 @@ mcp_tools_token_threshold = 8000
 # standard emits only spec-compatible ACP messages.
 # extended/full additionally emit ignorable _jcode/* extension notifications.
 profile = "standard"
-# Tool profile requested when `jcode acp` starts the daemon itself.
+# Tool profile requested when `kraivcode acp` starts the daemon itself.
 # Existing daemons keep their current server-wide tool config.
 tool_profile = "acp"
 
@@ -505,17 +505,17 @@ swarm_max_concurrent_agents = 32
 # External command that takes over headed session spawns (swarm agents,
 # resume-in-new-terminal, self-dev windows, restart restores).
 #
-# When set, jcode runs `<spawn_hook> <jcode-binary> <args...>` instead of
+# When set, Kraivcode runs `<spawn_hook> <kraivcode-binary> <args...>` instead of
 # opening a terminal emulator itself. The hook receives JCODE_SPAWN_* env vars
 # describing the spawn so multiplexers/wrappers can decide where it appears:
 #   JCODE_SPAWN_KIND        - "swarm-agent", "resume", "selfdev", "restart", ...
 #   JCODE_SPAWN_SESSION_ID  - session the window will run
 #   JCODE_SPAWN_TITLE       - suggested window/tab title
 #   JCODE_SPAWN_CWD         - session working directory (also the hook's cwd)
-#   JCODE_SPAWN_PROGRAM     - jcode binary path
+#   JCODE_SPAWN_PROGRAM     - kraivcode binary path
 #   JCODE_SPAWN_COMMAND     - full shell-escaped command line
 #   JCODE_SPAWN_SWARM_ID / JCODE_SPAWN_COORDINATOR_SESSION_ID (swarm spawns)
-# If the hook fails to start, jcode falls back to built-in terminal detection.
+# If the hook fails to start, Kraivcode falls back to built-in terminal detection.
 # Env override: JCODE_SPAWN_HOOK (set empty to disable a config hook).
 #
 # Examples:
@@ -535,7 +535,7 @@ swarm_max_concurrent_agents = 32
 # focus_hook = ""
 #
 # macOS only: terminal that the Cmd+; launch hotkey and in-app session spawns
-# open jcode into. One of: ghostty, iterm2, wezterm, warp, alacritty, vscode,
+# open Kraivcode into. One of: ghostty, iterm2, wezterm, warp, alacritty, vscode,
 # terminal (Apple Terminal). Preferred over the legacy
 # ~/.jcode/preferred_terminal.json file. After changing this, re-run
 # `kraivcode setup-hotkey` so the generated launcher script (Cmd+;) picks it up.
@@ -568,7 +568,7 @@ swarm_max_concurrent_agents = 32
 # retain the original input. Transformers run before pre_tool policy gates.
 # pre_tool_transform = ["~/.jcode/plugins/rtk-transform"]
 # pre_tool_transform_timeout_ms = 500
-# Lifecycle hooks: external commands jcode runs at well-defined points so other
+# Lifecycle hooks: external commands Kraivcode runs at well-defined points so other
 # programs can observe or gate agent behavior. Commands are parsed shell-style
 # (quotes work) but executed directly, with JCODE_HOOK_* env vars describing
 # the event:
@@ -577,7 +577,7 @@ swarm_max_concurrent_agents = 32
 #   JCODE_HOOK_SESSION_ID  - the session the event belongs to
 #   JCODE_HOOK_CWD         - session working directory (also the hook's cwd)
 #   JCODE_HOOK_PAYLOAD     - JSON mirror of all fields
-# Hook processes get JCODE_HOOKS_DISABLED=1 so nested jcode calls don't recurse.
+# Hook processes get JCODE_HOOKS_DISABLED=1 so nested Kraivcode calls don't recurse.
 #
 # All hooks except pre_tool are observers: detached, fire-and-forget, failures
 # only logged. Env overrides: JCODE_HOOK_TURN_START, JCODE_HOOK_TURN_END,
@@ -650,7 +650,7 @@ port = 7643
 bind_addr = "0.0.0.0"
 
 [power]
-# Prevent automatic system sleep while any jcode session is actively working.
+# Prevent automatic system sleep while any Kraivcode session is actively working.
 # Linux also blocks lid-switch suspend. On Windows and macOS see block_lid_close.
 # The display may sleep.
 # The guard is held only for as long as work is in flight. (default: true)
@@ -676,7 +676,7 @@ desktop_notifications = true
 # Email notifications via SMTP
 # email_enabled = false
 # email_to = "you@example.com"
-# email_from = "jcode@example.com"
+# email_from = "kraivcode@example.com"
 # email_smtp_host = "smtp.gmail.com"
 # email_smtp_port = 587
 # Password via env: JCODE_SMTP_PASSWORD (preferred) or config below
@@ -712,7 +712,7 @@ desktop_notifications = true
 # [sponsors] # Legacy config section name retained for compatibility.
 # Integration discovery (enabled by default; set enabled = false to opt out).
 # When enabled, the agent gains a `discover_tools` tool listing third-party
-# developer tools from Jcode's hosted integration directory. These providers
+# developer tools from Kraivcode's hosted integration directory. These providers
 # have integrated with the agent to make setup and use seamless. Some providers
 # may share revenue with Jcode when a referred user becomes a customer, but
 # commercial relationships never influence recommendations.
@@ -738,7 +738,7 @@ mod tests {
     use super::*;
 
     /// The shipped template is a hand-maintained string, so a typo in it ships
-    /// a config file that jcode itself cannot read. Parse it here.
+    /// a config file that Kraivcode itself cannot read. Parse it here.
     #[test]
     fn default_config_template_parses() {
         let template = Config::default_config_file_contents();

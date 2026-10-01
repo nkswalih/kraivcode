@@ -14,10 +14,10 @@ use super::SetupHintsState;
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
-const MACOS_APP_ICON_FILE_NAME: &str = "Jcode.icns";
+const MACOS_APP_ICON_FILE_NAME: &str = "Kraivcode.icns";
 const MACOS_APP_ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../assets/app-icons/Jcode.icns"
+    "/../../assets/app-icons/Kraivcode.icns"
 ));
 const MACOS_NOTIFICATION_APP_NAME: &str = "Kraivcode Notifications.app";
 const MACOS_NOTIFICATION_EXECUTABLE: &str = "jcode-notification-broker";
