@@ -43,11 +43,11 @@ pub(crate) struct Args {
     #[arg(long, global = true)]
     pub(crate) remote_working_dir: Option<String>,
 
-    /// Run the UI locally and attach to the persistent Jcode server on this SSH host
+    /// Run the UI locally and attach to the persistent Kraivcode server on this SSH host
     #[arg(long, global = true, conflicts_with = "socket", value_name = "HOST")]
     pub(crate) ssh: Option<String>,
 
-    /// Remote Jcode executable name or literal path (requires --ssh)
+    /// Remote Kraivcode executable name or literal path (requires --ssh)
     #[arg(long, global = true, requires = "ssh", value_name = "PATH")]
     pub(crate) ssh_binary: Option<String>,
 
@@ -167,10 +167,10 @@ pub(crate) enum Command {
         server_name: Option<String>,
     },
 
-    /// Run as an Agent Client Protocol (ACP) adapter backed by the Jcode daemon
+    /// Run as an Agent Client Protocol (ACP) adapter backed by the Kraivcode daemon
     Acp,
 
-    /// Manage the background server daemon (e.g. `jcode server stop`).
+    /// Manage the background server daemon (e.g. `kraivcode server stop`).
     Server {
         #[command(subcommand)]
         action: ServerCommand,
@@ -195,7 +195,7 @@ pub(crate) enum Command {
 
     /// Login to a provider via OAuth, API key, or local credentials
     Login {
-        /// Provider to log in to. Equivalent to --provider for this command, e.g. `jcode login google`.
+        /// Provider to log in to. Equivalent to --provider for this command, e.g. `kraivcode login google`.
         // Distinct clap id: the global `--provider` flag also has id "provider";
         // sharing the id makes clap drop the flag inside `login` (so
         // `kraivcode login --provider x` errors) and propagate the global default
@@ -252,7 +252,7 @@ pub(crate) enum Command {
         #[arg(long)]
         api_base: Option<String>,
 
-        /// OpenAI-compatible API key. If omitted, jcode prompts securely when needed.
+        /// OpenAI-compatible API key. If omitted, Kraivcode prompts securely when needed.
         #[arg(long)]
         api_key: Option<String>,
 
@@ -270,7 +270,7 @@ pub(crate) enum Command {
     /// Run in simple REPL mode (no TUI)
     Repl,
 
-    /// Update jcode to the latest version
+    /// Update Kraivcode to the latest version
     Update,
 
     /// Show build/version information in human or JSON form
@@ -299,7 +299,7 @@ pub(crate) enum Command {
         build: bool,
     },
 
-    /// Debug socket CLI - interact with running jcode server
+    /// Debug socket CLI - interact with running Kraivcode server
     Debug {
         /// Debug command to run (list, start, sessions, create_session, message, tool, state, history, etc.)
         #[arg(default_value = "help")]
@@ -360,12 +360,12 @@ pub(crate) enum Command {
     /// Review and respond to pending ambient permission requests
     Permissions,
 
-    /// Inject externally transcribed text into the active Jcode TUI
+    /// Inject externally transcribed text into the active Kraivcode TUI
     Transcript {
         /// Transcript text. If omitted, reads from stdin.
         text: Option<String>,
 
-        /// How to apply the transcript inside Jcode
+        /// How to apply the transcript inside Kraivcode
         #[arg(long, value_enum, default_value = "send")]
         mode: TranscriptModeArg,
 
@@ -374,14 +374,14 @@ pub(crate) enum Command {
         session: Option<String>,
     },
 
-    /// Run configured dictation: send to last-focused jcode client or type raw text
+    /// Run configured dictation: send to last-focused Kraivcode client or type raw text
     Dictate {
-        /// Type the transcript into the focused app instead of sending to jcode
+        /// Type the transcript into the focused app instead of sending to Kraivcode
         #[arg(long)]
         r#type: bool,
     },
 
-    /// Set up the platform global hotkey to launch jcode
+    /// Set up the platform global hotkey to launch Kraivcode
     SetupHotkey {
         /// Internal: run as the macOS hotkey listener process.
         #[arg(long, hide = true)]
@@ -553,7 +553,7 @@ pub(crate) enum Command {
         coverage_limit: usize,
     },
 
-    /// Save or restore the current set of open jcode windows across a system reboot
+    /// Save or restore the current set of open Kraivcode windows across a system reboot
     Restart {
         #[command(subcommand)]
         action: RestartCommand,
@@ -651,7 +651,7 @@ pub(crate) enum ServerCommand {
     /// Pin the shared server channel to an installed version.
     ///
     /// Defaults to the active `current` version. This only selects the daemon's
-    /// binary; run `jcode server reload` separately to apply it.
+    /// binary; run `kraivcode server reload` separately to apply it.
     Promote {
         /// Installed version to promote (defaults to the current channel)
         version: Option<String>,
@@ -705,7 +705,7 @@ pub(crate) enum CloudCommand {
 
     /// Move a live session (transcript, repo state, env notes) to a cloud host
     /// and keep working there. Your local files stay editable. Git reconciles
-    /// both sides when the session comes back with `jcode cloud return`.
+    /// both sides when the session comes back with `kraivcode cloud return`.
     Move {
         /// Session ID or name. Defaults to the session this command runs in.
         #[arg(long)]
@@ -840,7 +840,7 @@ pub(crate) enum CloudSessionsCommand {
 
     /// Upload a specific local session JSON file to Jade cloud storage
     Upload {
-        /// Path to a local Jcode session JSON file
+        /// Path to a local Kraivcode session JSON file
         session_file: String,
 
         /// Upload without Jade's redaction pass
@@ -851,7 +851,7 @@ pub(crate) enum CloudSessionsCommand {
         jade: JadeCloudOptions,
     },
 
-    /// Upload the newest local Jcode session to Jade cloud storage
+    /// Upload the newest local Kraivcode session to Jade cloud storage
     UploadLatest {
         /// Directory containing local Jcode session JSON files
         #[arg(long, default_value = "~/.jcode/sessions")]
@@ -867,7 +867,7 @@ pub(crate) enum CloudSessionsCommand {
 
     /// Sync new or changed local sessions to Jade cloud storage (idempotent; safe to schedule)
     Sync {
-        /// Directory containing local Jcode session JSON files (default: ~/.jcode/sessions)
+        /// Directory containing local Kraivcode session JSON files (default: ~/.jcode/sessions)
         #[arg(long)]
         sessions_dir: Option<String>,
 
@@ -1012,9 +1012,9 @@ impl CloudSessionViewFormat {
 
 #[derive(Subcommand, Debug)]
 pub(crate) enum RestartCommand {
-    /// Save a reboot snapshot of currently active jcode windows
+    /// Save a reboot snapshot of currently active Kraivcode windows
     Save {
-        /// Restore this reboot snapshot automatically the next time plain `jcode` starts
+        /// Restore this reboot snapshot automatically the next time plain `kraivcode` starts
         #[arg(long)]
         auto_restore: bool,
     },
@@ -1098,11 +1098,11 @@ pub(crate) enum ProviderCommand {
         #[arg(long, conflicts_with = "no_api_key")]
         api_key_env: Option<String>,
 
-        /// API key value to store in jcode's private provider env file. Prefer --api-key-stdin for shell history safety.
+        /// API key value to store in Kraivcode's private provider env file. Prefer --api-key-stdin for shell history safety.
         #[arg(long, conflicts_with_all = ["api_key_stdin", "no_api_key"])]
         api_key: Option<String>,
 
-        /// Read the API key from stdin and store it in jcode's private provider env file
+        /// Read the API key from stdin and store it in Kraivcode's private provider env file
         #[arg(long, conflicts_with = "no_api_key")]
         api_key_stdin: bool,
 
@@ -1118,7 +1118,7 @@ pub(crate) enum ProviderCommand {
         #[arg(long)]
         auth_header: Option<String>,
 
-        /// Private env file name under jcode's app config directory for stored API keys
+        /// Private env file name under Kraivcode's app config directory for stored API keys
         #[arg(long)]
         env_file: Option<String>,
 
