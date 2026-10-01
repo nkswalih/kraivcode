@@ -396,7 +396,7 @@ pub(crate) fn model_picker_rows_geometry() -> Option<ModelPickerRowsGeometry> {
     #[cfg(not(test))]
     {
         let guard = model_picker_rows_geometry_slot().lock().ok()?;
-        guard.clone()
+        *guard
     }
     #[cfg(test)]
     {

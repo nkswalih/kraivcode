@@ -347,10 +347,11 @@ fn todo_change_lines(
     super::todo_changes::render_todo_change_lines(prev.as_deref(), &next, width)
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "User prompt rendering updates the prepared-line side tables together"
-)]
+// Upstream renders a per-prompt number into the gutter and passes it in as
+// an eighth parameter, which needs `#[expect(clippy::too_many_arguments)]`
+// to get past `-D warnings`. Kraivcode draws a fixed gutter prefix instead,
+// so the parameter is gone and the function takes exactly seven arguments:
+// `unfulfilled_lint_expectations`.
 fn push_user_prompt_lines(
     lines: &mut Vec<Line<'static>>,
     raw_plain_lines: &mut Vec<String>,
@@ -373,7 +374,7 @@ fn push_user_prompt_lines(
         content
     };
     let normalized = content.replace("\r\n", "\n").replace('\r', "\n");
-    for (_line_idx, content_line) in normalized.split('\n').enumerate() {
+    for content_line in normalized.split('\n') {
         let raw_line = raw_plain_lines.len();
         raw_plain_lines.push(content_line.to_string());
         let prompt_width = unicode_width::UnicodeWidthStr::width(content_line);

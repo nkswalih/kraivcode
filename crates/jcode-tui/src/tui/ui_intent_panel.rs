@@ -23,7 +23,7 @@ pub(crate) fn draw_compact_panel(frame: &mut Frame, area: Rect, app: &dyn TuiSta
     // failed workers. Completed-only state collapses to nothing.
     let has_active_todos = app
         .pinned_todos_payload()
-        .and_then(|c| super::messages::todos_payload_parts(c))
+        .and_then(super::messages::todos_payload_parts)
         .map(|(todos, _, _)| todos.iter().any(|t| t.status != "completed"))
         .unwrap_or(false);
     let has_active_workers = app

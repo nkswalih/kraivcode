@@ -299,10 +299,10 @@ pub(in crate::tui::app) fn allow_plan_read_path(path: &str) {
         return;
     }
     store.plan_read_allowlist.push(path.to_string());
-    if let Ok(json) = serde_json::to_vec_pretty(&store) {
-        if let Some(path_buf) = agent_persona_path() {
-            let _ = std::fs::write(path_buf, json);
-        }
+    if let Ok(json) = serde_json::to_vec_pretty(&store)
+        && let Some(path_buf) = agent_persona_path()
+    {
+        let _ = std::fs::write(path_buf, json);
     }
 }
 
