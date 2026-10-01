@@ -31,16 +31,16 @@ done
 [ -z "${DOWNLOAD_URL_LOG:-}" ] || printf '%s\n' "$url" >> "$DOWNLOAD_URL_LOG"
 case "$url" in
   *telemetry.jcode.sh*) printf '%s\n' "$payload" >> "$INSTALL_TELEMETRY_LOG" ;;
-  *jcode.sh/releases/latest/version)
+  *github.com*/releases/latest/version)
     [ "${FAIL_RELEASE:-0}" != "1" ] || exit 22
     [ "${FAIL_METADATA_RELEASE:-0}" != "1" ] || exit 22
     printf 'v1.2.3\n'
     ;;
-  *jcode.sh/releases/v1.2.3/download-bases)
+  *github.com*/releases/v1.2.3/download-bases)
     printf 'https://mirror.invalid/releases/v1.2.3\n'
     printf 'https://github.com/nkswalih/kraivcode/releases/download/v1.2.3\n'
     ;;
-  *jcode.sh/releases/v1.2.3/SHA256SUMS)
+  *github.com*/releases/v1.2.3/SHA256SUMS)
     if [ "${METADATA_CHECKSUM_HTML:-0}" = "1" ]; then
       printf '<!doctype html><title>fallback page</title>\n'
       exit 0
@@ -107,8 +107,8 @@ grep -q '"stage":"installer_start".*"outcome":"success"' "$telemetry_log"
 grep -q '"stage":"installer_finish".*"outcome":"success"' "$telemetry_log"
 test "$(cat "$hotkey_setup_log")" = "setup-hotkey"
 
-# If GitHub's release page is blocked, the static jcode.sh version endpoint
-# must keep the complete install path working.
+# If GitHub's release-page redirect is blocked, the release metadata endpoint
+# on the fork's own release surface must keep the install path working.
 PATH="$tmp/bin:$PATH" \
 HOME="$tmp/home-metadata-fallback" \
 JCODE_HOME="$tmp/home-metadata-fallback/.jcode" \
