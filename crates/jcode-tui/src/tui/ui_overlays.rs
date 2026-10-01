@@ -1067,13 +1067,14 @@ pub(super) fn draw_model_detail_popup(
         ])
     };
 
-    let mut lines: Vec<Line<'static>> = Vec::new();
-    lines.push(kv("Model", popup.model_name.as_str()));
-    lines.push(kv("Spec", popup.model_spec.as_str()));
-    lines.push(kv("Provider", popup.provider_label.as_str()));
-    lines.push(kv("Login", popup.login_method.as_str()));
-    lines.push(kv("API", popup.api_method.as_str()));
-    lines.push(kv("Base URL", popup.base_url.as_deref().unwrap_or("—")));
+    let mut lines: Vec<Line<'static>> = vec![
+        kv("Model", popup.model_name.as_str()),
+        kv("Spec", popup.model_spec.as_str()),
+        kv("Provider", popup.provider_label.as_str()),
+        kv("Login", popup.login_method.as_str()),
+        kv("API", popup.api_method.as_str()),
+        kv("Base URL", popup.base_url.as_deref().unwrap_or("—")),
+    ];
     let default_suffix = if popup.is_default {
         "  ◆ current default"
     } else {
@@ -1283,22 +1284,23 @@ pub(super) fn draw_ask_user_popup(
         for (index, (label, _value)) in popup.options.iter().enumerate() {
             let selected = index == popup.selected;
             if selected {
-                let mut spans: Vec<Span> = Vec::new();
-                spans.push(Span::styled("  ", Style::default().bg(SELECTED_BG)));
-                spans.push(Span::styled(
-                    "❯ ",
-                    Style::default()
-                        .fg(ACCENT)
-                        .bg(SELECTED_BG)
-                        .add_modifier(Modifier::BOLD),
-                ));
-                spans.push(Span::styled(
-                    label.clone(),
-                    Style::default()
-                        .fg(Color::White)
-                        .bg(SELECTED_BG)
-                        .add_modifier(Modifier::BOLD),
-                ));
+                let spans: Vec<Span> = vec![
+                    Span::styled("  ", Style::default().bg(SELECTED_BG)),
+                    Span::styled(
+                        "❯ ",
+                        Style::default()
+                            .fg(ACCENT)
+                            .bg(SELECTED_BG)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        label.clone(),
+                        Style::default()
+                            .fg(Color::White)
+                            .bg(SELECTED_BG)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ];
                 lines.push(Line::from(spans));
             } else {
                 lines.push(Line::from(vec![

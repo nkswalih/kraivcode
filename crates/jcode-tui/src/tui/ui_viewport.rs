@@ -956,8 +956,9 @@ pub(super) fn draw_messages(
         let fill_width = content_area.width as usize;
         let prompt_start_idx = lower_bound(wrapped_user_prompt_starts, scroll);
         let prompt_end_idx = lower_bound(wrapped_user_prompt_starts, visible_end);
-        for prompt_i in prompt_start_idx..prompt_end_idx {
-            let abs_start = wrapped_user_prompt_starts[prompt_i];
+        for (prompt_i, &abs_start) in (prompt_start_idx..prompt_end_idx)
+            .zip(&wrapped_user_prompt_starts[prompt_start_idx..prompt_end_idx])
+        {
             let abs_end = wrapped_user_prompt_ends
                 .get(prompt_i)
                 .copied()
