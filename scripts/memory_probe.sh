@@ -38,7 +38,7 @@ set -euo pipefail
 SESSION_ID="session_hog_1783086065415_4ad4ae66cd43dd5b"
 IDLE_SECS=30
 JCODE_BIN="${JCODE_BIN:-$HOME/.local/bin/jcode}"
-CLIENT_BIN="$HOME/.jcode/builds/current/jcode"
+CLIENT_BIN="$HOME/.jcode/builds/current/kraivcode"
 TESTER_CWD="$HOME"
 SKIP_TRIM=0
 KEEP_TESTER=0
@@ -64,7 +64,7 @@ die() { log "FATAL: $*"; exit 1; }
 
 command -v jq >/dev/null || die "jq is required"
 [[ -x "$JCODE_BIN" ]] || die "jcode CLI not found at $JCODE_BIN"
-[[ -x "$CLIENT_BIN" ]] || CLIENT_BIN="$(command -v jcode)" || die "client binary not found"
+[[ -x "$CLIENT_BIN" ]] || CLIENT_BIN="$(command -v kraivcode)" || die "client binary not found"
 [[ -f "$HOME/.jcode/sessions/${SESSION_ID}.json" ]] \
     || log "WARN: $HOME/.jcode/sessions/${SESSION_ID}.json not found; resume may create a new session"
 

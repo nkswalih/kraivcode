@@ -22,8 +22,8 @@ npm --prefix "$sdk_dir" run build --silent
 
 # The full binary, for the `launch()` checks: those start a real instance via
 # `jcode api-bridge`, which only the shipped binary provides.
-echo "== building jcode =="
-cargo build --profile selfdev -p jcode --bin jcode
+echo "== building Kraivcode =="
+cargo build --profile selfdev -p kraivcode --bin kraivcode
 jcode_bin="$repo_root/target/selfdev/jcode"
 
 echo "== building bridge =="

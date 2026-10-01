@@ -50,7 +50,7 @@ clear_input() {
     sleep 0.2
 }
 
-echo "🎬 jcode Demo Capture"
+echo "🎬 Kraivcode Demo Capture"
 echo "   Window ID: $WINDOW_ID"
 echo "   Output: $OUTPUT_DIR"
 echo ""

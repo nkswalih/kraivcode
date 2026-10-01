@@ -48,7 +48,7 @@ trap 'rm -f "$before_file" "$after_file"' EXIT
 # no networking, account, payment, or order-placement implementation.
 kitty \
   --class jcode-agentcard-demo \
-  --title "Jcode AgentCard Discovery Demo" \
+  --title "Kraivcode AgentCard Discovery Demo" \
   --directory "$DEMO_DIR" \
   "$JCODE_BIN" \
   --no-selfdev \
@@ -95,7 +95,7 @@ PY
 done
 
 if [[ -z "$session_id" ]]; then
-  notify-send "AgentCard demo could not start" "Jcode did not register a fresh demo session. See $LOG_FILE" 2>/dev/null || true
+  notify-send "AgentCard demo could not start" "Kraivcode did not register a fresh demo session. See $LOG_FILE" 2>/dev/null || true
   exit 1
 fi
 
@@ -107,5 +107,5 @@ for _ in $(seq 1 25); do
   sleep 0.2
 done
 
-notify-send "AgentCard demo prompt failed" "The Jcode window opened, but prompt delivery failed. See $LOG_FILE" 2>/dev/null || true
+notify-send "AgentCard demo prompt failed" "The Kraivcode window opened, but prompt delivery failed. See $LOG_FILE" 2>/dev/null || true
 exit 1

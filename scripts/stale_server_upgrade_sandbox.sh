@@ -13,22 +13,22 @@
 #   cargo build -p jcode --bin jcode
 #   scripts/stale_server_upgrade_sandbox.sh
 #
-# Linux x86_64 only (uses the published jcode-linux-x86_64 release asset).
+# Linux x86_64 only (uses the published kraivcode-linux-x86_64 release asset).
 set -uo pipefail
 
 REPO_ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
-NEW_BIN="${NEW_BIN:-$REPO_ROOT/target/debug/jcode}"
+NEW_BIN="${NEW_BIN:-$REPO_ROOT/target/debug/kraivcode}"
 OLD_VERSION="${OLD_VERSION:-v0.14.6}"
 OLD_DIR="${OLD_DIR:-/tmp/jcode-sandbox}"
-OLD_WRAP="$OLD_DIR/jcode-linux-x86_64"
+OLD_WRAP="$OLD_DIR/kraivcode-linux-x86_64"
 
-[ -x "$NEW_BIN" ] || { echo "missing new client binary: $NEW_BIN (run: cargo build -p jcode --bin jcode)"; exit 2; }
+[ -x "$NEW_BIN" ] || { echo "missing new client binary: $NEW_BIN (run: cargo build -p kraivcode --bin kraivcode)"; exit 2; }
 
 # Fetch + extract the real old release binary if it is not already present.
 if [ ! -x "$OLD_WRAP" ]; then
   mkdir -p "$OLD_DIR"
   url="$(curl -fsSL "https://api.github.com/repos/nkswalih/kraivcode/releases/tags/$OLD_VERSION" \
-        | grep -o 'https://[^"]*jcode-linux-x86_64.tar.gz' | head -1)"
+        | grep -o 'https://[^"]*kraivcode-linux-x86_64.tar.gz' | head -1)"
   [ -n "$url" ] || { echo "could not resolve $OLD_VERSION linux asset URL"; exit 2; }
   echo "Downloading old server $OLD_VERSION ..."
   curl -fsSL "$url" -o "$OLD_DIR/old.tar.gz"
@@ -53,7 +53,7 @@ mkdir -p "$BUILDS/versions/0.14.6" "$BUILDS/versions/0.22.0" \
 log() { printf '\n=== %s ===\n' "$*"; }
 
 # --- Install the OLD binary (with bundled libs) as version 0.14.6 ----------
-cp "$OLD_DIR/jcode-linux-x86_64.bin" "$OLD_DIR/libssl.so.10" \
+cp "$OLD_DIR/kraivcode-linux-x86_64.bin" "$OLD_DIR/libssl.so.10" \
    "$OLD_DIR/libcrypto.so.10" "$BUILDS/versions/0.14.6/"
 cat > "$BUILDS/versions/0.14.6/jcode" <<'WRAP'
 #!/usr/bin/env sh
@@ -65,7 +65,7 @@ if command -v readlink >/dev/null 2>&1; then
 fi
 self_dir=$(CDPATH= cd -- "$(dirname -- "$real")" && pwd)
 export LD_LIBRARY_PATH="$self_dir:${LD_LIBRARY_PATH:-}"
-exec "$self_dir/jcode-linux-x86_64.bin" "$@"
+exec "$self_dir/kraivcode-linux-x86_64.bin" "$@"
 WRAP
 chmod +x "$BUILDS/versions/0.14.6/jcode"
 
@@ -89,7 +89,7 @@ SERVER_PID=""
 cleanup() {
   [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true
   "$NEW_BIN" --no-update server stop >/dev/null 2>&1 || true
-  pkill -f "$BUILDS/versions/0.14.6/jcode-linux-x86_64.bin" 2>/dev/null || true
+  pkill -f "$BUILDS/versions/0.14.6/kraivcode-linux-x86_64.bin" 2>/dev/null || true
   pkill -f "$BUILDS/versions/0.22.0/jcode" 2>/dev/null || true
   rm -rf "$SANDBOX"
 }
@@ -118,7 +118,7 @@ BEFORE="$(server_version_via_socket)"
 echo "server version BEFORE (via socket): ${BEFORE:-<none>}"
 
 # --- 2) New client: jcode server reload (repairs channel, then reloads) ----
-log "Running NEW client: jcode server reload"
+log "Running NEW client: kraivcode server reload"
 "$NEW_BIN" --no-update server reload 2>&1 | sed 's/^/[server reload] /' || true
 echo "shared-server-version after repair: $(cat "$BUILDS/shared-server-version")"
 
