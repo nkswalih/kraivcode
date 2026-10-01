@@ -1537,7 +1537,7 @@ async fn run_ambient_visible() -> Result<()> {
 
     let _ = crossterm::execute!(
         std::io::stdout(),
-        crossterm::terminal::SetTitle(terminal_title("🤖 jcode ambient cycle"))
+        crossterm::terminal::SetTitle(terminal_title("🤖 Kraivcode ambient cycle"))
     );
 
     let result = app.run(terminal).await;
@@ -1871,7 +1871,7 @@ pub fn run_pair_command(list: bool, revoke: Option<String>) -> Result<()> {
         eprintln!("    \x1b[2m[gateway]\x1b[0m");
         eprintln!("    \x1b[2menabled = true\x1b[0m");
         eprintln!("    \x1b[2mport = {}\x1b[0m\n", gw_config.port);
-        eprintln!("  Then restart the jcode server.\n");
+        eprintln!("  Then restart the Kraivcode server.\n");
     }
 
     let code = registry.generate_pairing_code();
@@ -2011,7 +2011,7 @@ pub async fn run_browser(action: &str, requested: Option<&str>) -> Result<()> {
                 println!("\nBuilt-in browser tool is ready.");
             } else if status.responding && !status.compatible {
                 println!(
-                    "\nThe browser bridge is connected, but the installed extension is out of date for this jcode build. Run `jcode browser setup` to repair or update it."
+                    "\nThe browser bridge is connected, but the installed extension is out of date for this Kraivcode build. Run `jcode browser setup` to repair or update it."
                 );
             } else if status.binary_installed && !browser::is_browser_running(target.kind) {
                 println!(
@@ -2181,7 +2181,7 @@ fn validate_server_reload_report(report: &ServerReloadReport) -> Result<()> {
     // genuinely not serving yet, reports failure.
     if report.had_listener && !report.already_current && !report.handoff_ready {
         anyhow::bail!(
-            "jcode server reload was requested but the new server never became ready: {}",
+            "Kraivcode server reload was requested but the new server never became ready: {}",
             report.detail
         );
     }
@@ -2238,9 +2238,9 @@ async fn run_server_reload_command_to(
         // cleanly instead of wedging in a connect-retry loop.
         let reaped = crate::server::reap_stale_socket_if_dead(&socket).await;
         let detail = if reaped {
-            "No running jcode server found; cleared a stale socket.".to_string()
+            "No running Kraivcode server found; cleared a stale socket.".to_string()
         } else {
-            "No running jcode server found; nothing to reload.".to_string()
+            "No running Kraivcode server found; nothing to reload.".to_string()
         };
         return emit(ServerReloadReport {
             socket: socket.display().to_string(),
@@ -2330,7 +2330,7 @@ async fn run_server_reload_command_to(
             reloaded: false,
             already_current: true,
             handoff_ready: true,
-            detail: "jcode server is already running the newest binary; no reload needed."
+            detail: "Kraivcode server is already running the newest binary; no reload needed."
                 .to_string(),
         });
     }
@@ -2343,9 +2343,9 @@ async fn run_server_reload_command_to(
     );
 
     let detail = if handoff_ready {
-        "jcode server reloaded onto the newest binary.".to_string()
+        "Kraivcode server reloaded onto the newest binary.".to_string()
     } else {
-        "jcode server reload requested; the new server is still coming up.".to_string()
+        "Kraivcode server reload requested; the new server is still coming up.".to_string()
     };
 
     emit(ServerReloadReport {
@@ -2420,10 +2420,10 @@ Re-run with `--force` if you really want to stop the server.";
                 match crate::platform::signal_detached_process_group(pid, libc::SIGTERM) {
                     Ok(()) => {
                         signaled_pid = Some(pid);
-                        detail = format!("Sent SIGTERM to jcode server (pid {pid}).");
+                        detail = format!("Sent SIGTERM to the Kraivcode server (pid {pid}).");
                     }
                     Err(e) => {
-                        detail = format!("Failed to signal jcode server (pid {pid}): {e}");
+                        detail = format!("Failed to signal the Kraivcode server (pid {pid}): {e}");
                     }
                 }
             }
@@ -2432,15 +2432,15 @@ Re-run with `--force` if you really want to stop the server.";
                 match crate::platform::signal_detached_process_group(pid, 0) {
                     Ok(()) => {
                         signaled_pid = Some(pid);
-                        detail = format!("Terminated jcode server (pid {pid}).");
+                        detail = format!("Terminated the Kraivcode server (pid {pid}).");
                     }
                     Err(e) => {
-                        detail = format!("Failed to terminate jcode server (pid {pid}): {e}");
+                        detail = format!("Failed to terminate the Kraivcode server (pid {pid}): {e}");
                     }
                 }
             }
         } else {
-            detail = format!("Registered jcode server (pid {pid}) is not running.");
+            detail = format!("Registered Kraivcode server (pid {pid}) is not running.");
         }
     } else if had_listener {
         // A listener answers but no registry entry maps to it. We deliberately
@@ -2504,16 +2504,16 @@ Re-run with `--force` if you really want to stop the server.";
             println!("{detail}");
         }
         if stopped && signaled_pid.is_some() {
-            println!("jcode server stopped.");
+            println!("Kraivcode server stopped.");
         } else if stopped && !had_listener && signaled_pid.is_none() {
             // Nothing was running; this is still a success for an installer.
         } else if !stopped {
             println!(
-                "jcode server did not exit cleanly; it may still be shutting down. Re-run if needed."
+                "Kraivcode server did not exit cleanly; it may still be shutting down. Re-run if needed."
             );
         }
         if reaped {
-            println!("Cleared a stale jcode socket.");
+            println!("Cleared a stale Kraivcode socket.");
         }
     }
 
@@ -2666,7 +2666,7 @@ async fn wait_for_cold_cache_mcp_tools(registry: &crate::tool::Registry) {
         return;
     }
     crate::logging::info(&format!(
-        "jcode run: waiting up to {}ms for cold-cache MCP server(s) to register tools: {}",
+        "Kraivcode run: waiting up to {}ms for cold-cache MCP server(s) to register tools: {}",
         budget.as_millis(),
         cold_servers.join(", ")
     ));
@@ -2679,7 +2679,7 @@ async fn wait_for_cold_cache_mcp_tools(registry: &crate::tool::Registry) {
         });
         if covered {
             crate::logging::info(
-                "jcode run: cold-cache MCP server(s) registered tools; proceeding",
+                "Kraivcode run: cold-cache MCP server(s) registered tools; proceeding",
             );
             return;
         }

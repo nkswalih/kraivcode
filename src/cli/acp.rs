@@ -236,10 +236,10 @@ impl DaemonSession {
         let mut reader = self.reader.lock().await;
         let n = reader.read_line(&mut line).await?;
         if n == 0 {
-            anyhow::bail!("Jcode daemon disconnected");
+            anyhow::bail!("Kraivcode daemon disconnected");
         }
         let event = serde_json::from_str(&line)
-            .with_context(|| format!("failed to decode Jcode daemon event: {}", line.trim_end()))?;
+            .with_context(|| format!("failed to decode Kraivcode daemon event: {}", line.trim_end()))?;
         Ok(event)
     }
 }
@@ -353,7 +353,7 @@ impl AcpRuntime {
                     self.write_error_value(
                         id,
                         JSONRPC_METHOD_NOT_FOUND,
-                        format!("Unsupported Jcode ACP extension method: {method}"),
+                        format!("Unsupported Kraivcode ACP extension method: {method}"),
                     )
                     .await?;
                 }
@@ -408,7 +408,7 @@ impl AcpRuntime {
                 self.write_error_value(
                     id,
                     JSONRPC_INTERNAL_ERROR,
-                    format!("Failed to create Jcode session: {err:#}"),
+                    format!("Failed to create Kraivcode session: {err:#}"),
                 )
                 .await?;
             }
@@ -465,7 +465,7 @@ impl AcpRuntime {
                 self.write_error_value(
                     id,
                     JSONRPC_INTERNAL_ERROR,
-                    format!("Failed to attach Jcode session '{session_id}': {err:#}"),
+                    format!("Failed to attach Kraivcode session '{session_id}': {err:#}"),
                 )
                 .await?;
             }
@@ -1578,7 +1578,7 @@ impl EventMapper {
                 "sessionUpdate": "agent_message_chunk",
                 "content": {
                     "type": "text",
-                    "text": format!("\n[Jcode compacted context: {trigger}]\n"),
+                    "text": format!("\n[Kraivcode compacted context: {trigger}]\n"),
                 }
             })],
             ServerEvent::SessionRenamed { display_title, .. } => vec![json!({
@@ -1589,7 +1589,7 @@ impl EventMapper {
                 "sessionUpdate": "agent_message_chunk",
                 "content": {
                     "type": "text",
-                    "text": format!("\n[Jcode MCP status: {}]\n", servers.join(", ")),
+                    "text": format!("\n[Kraivcode MCP status: {}]\n", servers.join(", ")),
                 }
             })],
             _ => {
@@ -1672,8 +1672,8 @@ fn initialize_result(params: &Value, profile: AcpProfile) -> Value {
         "protocolVersion": protocol_version,
         "agentCapabilities": agent_capabilities,
         "agentInfo": {
-            "name": "jcode",
-            "title": "Jcode",
+            "name": "kraivcode",
+            "title": "Kraivcode",
             "version": jcode_build_meta::pkg_version(),
         },
         "authMethods": [],

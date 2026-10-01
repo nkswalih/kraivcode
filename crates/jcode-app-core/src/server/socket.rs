@@ -205,7 +205,7 @@ pub(super) fn acquire_daemon_lock() -> Result<DaemonLockGuard> {
     let path = daemon_lock_path();
     try_acquire_daemon_lock(&path)?.ok_or_else(|| {
         anyhow::anyhow!(
-            "Another jcode server process is already running for runtime dir {}",
+            "Another Kraivcode server process is already running for runtime dir {}",
             crate::storage::runtime_dir().display()
         )
     })
@@ -379,7 +379,7 @@ pub(super) fn take_server_start_stderr(child: &mut std::process::Child) -> Strin
 
 #[cfg(unix)]
 pub(super) fn server_start_matches_existing_server(stderr_output: &str) -> bool {
-    stderr_output.contains("Another jcode server process is already running")
+    stderr_output.contains("Another Kraivcode server process is already running")
         || stderr_output.contains("Refusing to replace active server socket")
 }
 

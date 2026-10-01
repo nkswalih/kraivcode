@@ -119,7 +119,7 @@ session_picker_enter = "current-terminal"
 # command = "~/.local/bin/my-whisper-script --grammar-target code"
 command = ""
 
-# How to apply the transcript inside jcode: insert|append|replace|send
+# How to apply the transcript inside kraivcode: insert|append|replace|send
 mode = "send"
 
 # Optional in-app hotkey to trigger dictation. Set to "off" to disable.

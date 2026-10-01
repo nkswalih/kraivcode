@@ -1046,7 +1046,7 @@ impl Agent {
         let is_desktop = self.is_desktop_selfdev();
         if is_desktop && matches!(name, "selfdev" | "debug_socket") {
             return Err(anyhow::anyhow!(
-                "Tool '{}' targets Jcode CLI, not Desktop. Use 'desktop_selfdev' in Desktop self-development mode.",
+                "Tool '{}' targets Kraivcode CLI, not Desktop. Use 'desktop_selfdev' in Desktop self-development mode.",
                 name
             ));
         }

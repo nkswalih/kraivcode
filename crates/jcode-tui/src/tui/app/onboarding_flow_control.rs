@@ -262,7 +262,7 @@ impl App {
         // (`onboarding_welcome_kind`) so it survives in remote mode.
         if had_imports {
             self.set_status_notice(
-                "Welcome to jcode: review detected logins (arrows/hl to move, Enter to choose)",
+                "Welcome to Kraivcode: review detected logins (arrows/hl to move, Enter to choose)",
             );
         } else {
             self.set_status_notice(

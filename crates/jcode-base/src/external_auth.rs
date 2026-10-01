@@ -428,7 +428,7 @@ fn approve_external_auth_review_candidate(candidate: &ExternalAuthReviewCandidat
             auth::claude::trust_native_source()?;
             if let Err(err) = auth::claude::import_native_credentials_into_account() {
                 crate::logging::warn(&format!(
-                    "Trusted Claude Code native credentials but could not snapshot them into jcode: {err}"
+                    "Trusted Claude Code native credentials but could not snapshot them into Kraivcode: {err}"
                 ));
             }
         }

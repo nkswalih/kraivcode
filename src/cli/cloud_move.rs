@@ -136,7 +136,7 @@ impl Target {
                         "jcode on `{host}` does not support `cloud move` yet. Update jcode on the cloud host (or pass --remote-binary / set JCODE_CLOUD_REMOTE_BINARY to a newer build)"
                     );
                 }
-                Err(error.context(format!("could not run jcode on `{host}`")))
+                Err(error.context(format!("could not run Kraivcode on `{host}`")))
             }
         }
     }
@@ -548,7 +548,7 @@ pub(crate) fn run_receive() -> Result<()> {
     let manifest: MoveManifest = read_json(&stage.join("manifest.json"))?;
     if manifest.format_version != FORMAT_VERSION {
         bail!(
-            "move format {} not supported by this jcode (expects {FORMAT_VERSION}); update jcode on the cloud host",
+            "move format {} not supported by this Kraivcode (expects {FORMAT_VERSION}); update Kraivcode on the cloud host",
             manifest.format_version
         );
     }
@@ -1418,7 +1418,7 @@ fn append_arrival(sess: &mut session::Session, dangling: &[String], host: &str, 
         .map(|id| crate::message::ContentBlock::ToolResult {
             tool_use_id: id.clone(),
             content: format!(
-                "jcode cloud move completed. This session now runs on cloud host `{host}`. This tool call was interrupted by the move; rerun it here if its result still matters."
+                "Kraivcode cloud move completed.  This session now runs on cloud host `{host}`. This tool call was interrupted by the move; rerun it here if its result still matters."
             ),
             is_error: None,
         })

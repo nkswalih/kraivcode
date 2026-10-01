@@ -12,7 +12,7 @@ pub(super) fn cap_tool_output_for_history(tool_name: &str, mut output: ToolOutpu
     let original_chars = output.output.chars().count();
     let kept = crate::util::truncate_str(&output.output, MAX_TOOL_OUTPUT_CHARS_FOR_HISTORY);
     output.output = format!(
-        "{}\n\n[Tool output truncated by jcode: tool `{}` produced {} chars; kept first {} chars to protect the remote protocol, session history, and prompt cache. Redirect large logs to a file and read targeted sections.]",
+        "{}\n\n[Tool output truncated by Kraivcode: tool `{}` produced {} chars; kept first {} chars to protect the remote protocol, session history, and prompt cache. Redirect large logs to a file and read targeted sections.]",
         kept, tool_name, original_chars, MAX_TOOL_OUTPUT_CHARS_FOR_HISTORY,
     );
     output
@@ -25,7 +25,7 @@ pub(super) fn cap_sdk_tool_content_for_history(tool_name: &str, content: String)
     let original_chars = content.chars().count();
     let kept = crate::util::truncate_str(&content, MAX_TOOL_OUTPUT_CHARS_FOR_HISTORY);
     format!(
-        "{}\n\n[Tool output truncated by jcode: tool `{}` produced {} chars; kept first {} chars to protect the remote protocol, session history, and prompt cache. Redirect large logs to a file and read targeted sections.]",
+        "{}\n\n[Tool output truncated by Kraivcode: tool `{}` produced {} chars; kept first {} chars to protect the remote protocol, session history, and prompt cache. Redirect large logs to a file and read targeted sections.]",
         kept, tool_name, original_chars, MAX_TOOL_OUTPUT_CHARS_FOR_HISTORY,
     )
 }

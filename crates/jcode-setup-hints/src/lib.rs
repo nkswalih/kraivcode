@@ -1066,9 +1066,9 @@ fn run_macos_hotkey_listener() -> Result<()> {
             {
                 Ok(true) => {}
                 Ok(false) => {
-                    macos_hotkey_log("failed to launch jcode: no terminal candidate worked")
+                    macos_hotkey_log("failed to launch kraivcode: no terminal candidate worked")
                 }
-                Err(err) => macos_hotkey_log(&format!("failed to launch jcode: {err}")),
+                Err(err) => macos_hotkey_log(&format!("failed to launch kraivcode: {err}")),
             }
         }
     }));

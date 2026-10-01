@@ -19,7 +19,7 @@ const MACOS_APP_ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../assets/app-icons/Jcode.icns"
 ));
-const MACOS_NOTIFICATION_APP_NAME: &str = "Jcode Notifications.app";
+const MACOS_NOTIFICATION_APP_NAME: &str = "Kraivcode Notifications.app";
 const MACOS_NOTIFICATION_EXECUTABLE: &str = "jcode-notification-broker";
 const MACOS_NOTIFICATION_VERSION_MARKER: &str = "jcode-broker-version";
 const MACOS_NOTIFICATION_BUNDLE_ID: &str = "com.jcode.notifications";
@@ -165,7 +165,7 @@ fn install_macos_notification_broker(jcode_executable: &Path) -> Result<PathBuf>
     std::fs::create_dir_all(parent)?;
 
     let staging = parent.join(format!(
-        ".Jcode Notifications.app.installing-{}",
+        ".Kraivcode Notifications.app.installing-{}",
         std::process::id()
     ));
     remove_path_if_exists(&staging)?;
@@ -225,9 +225,9 @@ fn macos_notification_info_plist() -> String {
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Jcode Notifications</string>
+    <string>Kraivcode Notifications</string>
     <key>CFBundleDisplayName</key>
-    <string>Jcode Notifications</string>
+    <string>Kraivcode Notifications</string>
     <key>CFBundleIdentifier</key>
     <string>{bundle_id}</string>
     <key>CFBundleVersion</key>
