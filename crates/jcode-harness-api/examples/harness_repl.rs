@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 //! Reference harness API client.
 //!
 //! Connects to a harness API endpoint over a Unix socket, performs the
