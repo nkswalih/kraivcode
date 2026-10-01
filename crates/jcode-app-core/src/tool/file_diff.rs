@@ -132,6 +132,7 @@ mod tests {
         let _home = Home(std::env::var_os("JCODE_HOME"));
         crate::env::set_var("JCODE_HOME", home.path());
         let ctx = ToolContext {
+            ask_user_request_tx: None,
             session_id: "file_diff_test".into(),
             message_id: "m".into(),
             tool_call_id: "t".into(),

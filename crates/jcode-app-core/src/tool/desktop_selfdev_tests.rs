@@ -6,6 +6,7 @@ fn input(action: &str) -> Input {
 
 fn context(working_dir: Option<PathBuf>) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "desktop-test".into(),
         message_id: "test".into(),
         tool_call_id: "test".into(),

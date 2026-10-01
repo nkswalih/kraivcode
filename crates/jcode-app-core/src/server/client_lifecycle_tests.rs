@@ -948,8 +948,11 @@ fn reload_starting_rejects_new_turn_without_spawning_processing_task() {
         let event_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
         let (swarm_event_tx, _) = broadcast::channel(8);
 
+        let ask_user_responses = Arc::new(Mutex::new(HashMap::new()));
+
         start_processing_message(
             ProcessingMessage {
+                persona: None,
                 id: 42,
                 content: "do not start during reload".to_string(),
                 images: Vec::new(),
@@ -963,6 +966,7 @@ fn reload_starting_rejects_new_turn_without_spawning_processing_task() {
                 session_id: &mut processing_session_id,
                 task: &mut processing_task,
             },
+            &ask_user_responses,
             &agent,
             &client_event_tx,
             &processing_done_tx,
@@ -1048,9 +1052,11 @@ async fn client_initiated_turn_fans_out_stream_and_terminal_events_to_live_attac
     let mut processing_message_id = None;
     let mut processing_session_id = None;
     let mut processing_task = None;
+    let ask_user_responses = Arc::new(Mutex::new(HashMap::new()));
 
     start_processing_message(
         ProcessingMessage {
+            persona: None,
             id: 479,
             content: "stream to every attachment".to_string(),
             images: Vec::new(),
@@ -1064,6 +1070,7 @@ async fn client_initiated_turn_fans_out_stream_and_terminal_events_to_live_attac
             session_id: &mut processing_session_id,
             task: &mut processing_task,
         },
+        &ask_user_responses,
         &agent,
         &origin_tx,
         &processing_done_tx,
@@ -1172,10 +1179,13 @@ fn accepted_reload_recovery_continuation_marks_intent_delivered() -> anyhow::Res
         let swarms_by_id = Arc::new(RwLock::new(HashMap::new()));
         let event_history = Arc::new(RwLock::new(std::collections::VecDeque::new()));
         let event_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let ask_user_responses = Arc::new(Mutex::new(HashMap::new()));
+
         let (swarm_event_tx, _) = broadcast::channel(8);
 
         start_processing_message(
             ProcessingMessage {
+                persona: None,
                 id: 77,
                 content: "continue after reload".to_string(),
                 images: Vec::new(),
@@ -1189,6 +1199,7 @@ fn accepted_reload_recovery_continuation_marks_intent_delivered() -> anyhow::Res
                 session_id: &mut processing_session_id,
                 task: &mut processing_task,
             },
+            &ask_user_responses,
             &agent,
             &client_event_tx,
             &processing_done_tx,
@@ -1271,11 +1282,14 @@ fn reload_starting_rejects_new_turns_for_multiple_sessions() {
             let (processing_done_tx, mut processing_done_rx) = mpsc::unbounded_channel();
             let mut client_is_processing = false;
             let mut processing_message_id = None;
+            let ask_user_responses = Arc::new(Mutex::new(HashMap::new()));
+
             let mut processing_session_id = None;
             let mut processing_task = None;
 
             start_processing_message(
                 ProcessingMessage {
+                    persona: None,
                     id: message_id,
                     content: format!("do not start {session_id} during reload"),
                     images: Vec::new(),
@@ -1289,6 +1303,7 @@ fn reload_starting_rejects_new_turns_for_multiple_sessions() {
                     session_id: &mut processing_session_id,
                     task: &mut processing_task,
                 },
+                &ask_user_responses,
                 &agent,
                 &client_event_tx,
                 &processing_done_tx,

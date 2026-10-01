@@ -92,6 +92,7 @@ async fn desktop_selfdev_is_automatic_separate_and_restored() {
                 name,
                 serde_json::json!({"action": "status"}),
                 ToolContext {
+                    ask_user_request_tx: None,
                     session_id: agent.session_id().to_string(),
                     message_id: "test".into(),
                     tool_call_id: name.into(),

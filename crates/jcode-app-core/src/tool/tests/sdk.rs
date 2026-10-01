@@ -12,6 +12,7 @@ fn custom(name: &str) -> SessionToolDefinition {
 }
 fn ctx(session: &str) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: session.into(),
         message_id: "sdk-test".into(),
         tool_call_id: "sdk-parent".into(),

@@ -32,6 +32,7 @@ impl Drop for EnvVarGuard {
 
 fn create_test_context(session_id: &str, working_dir: Option<std::path::PathBuf>) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: session_id.to_string(),
         message_id: "test-message".to_string(),
         tool_call_id: "test-tool-call".to_string(),

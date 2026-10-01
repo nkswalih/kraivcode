@@ -4,6 +4,7 @@ use std::fs;
 
 fn test_ctx(root: &Path) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "test".to_string(),
         message_id: "test".to_string(),
         tool_call_id: "test".to_string(),

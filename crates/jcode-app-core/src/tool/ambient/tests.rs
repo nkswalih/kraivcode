@@ -267,6 +267,7 @@ async fn test_request_permission_rejects_non_ambient_session() {
         "rationale": "Fix typo"
     });
     let ctx = ToolContext {
+        ask_user_request_tx: None,
         session_id: "normal_session_test".to_string(),
         message_id: "msg_1".to_string(),
         tool_call_id: "call_1".to_string(),
@@ -424,6 +425,7 @@ async fn test_schedule_tool_defaults_to_resuming_originating_session() {
         "wake_in_minutes": 5
     });
     let ctx = ToolContext {
+        ask_user_request_tx: None,
         session_id: "origin_session".to_string(),
         message_id: "msg_1".to_string(),
         tool_call_id: "call_1".to_string(),
@@ -481,6 +483,7 @@ async fn test_schedule_tool_requires_time() {
         "task": "Do something eventually"
     });
     let ctx = ToolContext {
+        ask_user_request_tx: None,
         session_id: "test_session".to_string(),
         message_id: "msg_1".to_string(),
         tool_call_id: "call_1".to_string(),

@@ -494,6 +494,7 @@ mod tests {
 
     fn test_ctx(working_dir: Option<std::path::PathBuf>) -> ToolContext {
         ToolContext {
+            ask_user_request_tx: None,
             session_id: "test-session".to_string(),
             message_id: "test-message".to_string(),
             tool_call_id: "test-tool-call".to_string(),
