@@ -7,7 +7,7 @@
     By default user data under %USERPROFILE%\.jcode is kept.
 
     One-liner uninstall:
-      irm https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/uninstall.ps1 | iex
+      irm https://raw.githubusercontent.com/nkswalih/kraivcode/dev/scripts/uninstall.ps1 | iex
 .PARAMETER InstallDir
     Override the launcher directory (default: $env:LOCALAPPDATA\jcode\bin)
 .PARAMETER Purge
@@ -404,7 +404,7 @@ if ($pathUpdate.Changed) {
 }
 
 Write-Info "jcode uninstalled."
-Write-Info "Reinstall with: irm https://jcode.sh/install.ps1 | iex"
+Write-Info "Reinstall with: irm https://raw.githubusercontent.com/nkswalih/kraivcode/dev/scripts/install.ps1 | iex"
 
 
     return 0

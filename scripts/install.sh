@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="1jehuang/jcode"
-RELEASE_METADATA_BASE="${JCODE_RELEASE_METADATA_BASE:-https://jcode.sh/releases}"
+REPO="nkswalih/kraivcode"
+RELEASE_METADATA_BASE="${JCODE_RELEASE_METADATA_BASE:-https://github.com/nkswalih/kraivcode/releases}"
 IS_WINDOWS=false
 IS_TERMUX=false
 INSTALL_STAGE="startup"
@@ -149,7 +149,7 @@ else
 fi
 
 # Prefer GitHub's stable redirect when it is reachable so publication changes
-# are visible immediately. jcode.sh keeps a static copy of the latest published
+# are visible immediately. A metadata mirror can keep a static copy of the latest published
 # tag as an independent fallback for GitHub outages, blocks, and shared-network
 # throttling. Neither path uses the rate-limited unauthenticated GitHub API.
 INSTALL_STAGE="release_lookup"
@@ -167,7 +167,7 @@ if [ -z "$VERSION" ]; then
     VERSION="$GITHUB_VERSION"
   elif valid_release_tag "$METADATA_VERSION"; then
     VERSION="$METADATA_VERSION"
-    info "GitHub release lookup unavailable; using cached jcode.sh metadata ($VERSION)."
+    info "GitHub release lookup unavailable; using cached release metadata ($VERSION)."
   fi
 fi
 valid_release_tag "$VERSION" || err "Failed to determine latest version"
@@ -194,12 +194,12 @@ fi
 
 if [ -n "$EXISTING" ]; then
   if echo "$EXISTING" | grep -qF "${VERSION#v}"; then
-    info "jcode $VERSION is already installed — reinstalling"
+    info "Kraivcode $VERSION is already installed — reinstalling"
   else
-    info "Updating jcode $EXISTING → $VERSION"
+    info "Updating Kraivcode $EXISTING → $VERSION"
   fi
 else
-  info "Installing jcode $VERSION"
+  info "Installing Kraivcode $VERSION"
 fi
 info "  launcher: $launcher_path"
 
@@ -283,7 +283,7 @@ else
   cargo build --release --manifest-path "$src_dir/Cargo.toml" \
     || err "cargo build failed while building $REPO from source"
 
-  src_bin="$src_dir/target/release/$bin_name"
+  src_bin="$src_dir/target/release/kraivcode"
   [ -f "$src_bin" ] || err "Built binary not found at $src_bin"
   cp "$src_bin" "$dest_version_dir/$bin_name"
 fi
@@ -301,13 +301,13 @@ if [ "$IS_TERMUX" = true ] && [ "$IS_WINDOWS" = false ]; then
     if [ -x "$termux_glibc_linker" ]; then
       if command -v patchelf >/dev/null 2>&1; then
         patchelf --set-interpreter "$termux_glibc_linker" "$dest_version_dir/$bin_name" \
-          || err "Failed to patch jcode ELF interpreter for Termux glibc"
+          || err "Failed to patch Kraivcode ELF interpreter for Termux glibc"
         info "Patched Termux glibc ELF interpreter: $termux_glibc_linker"
       else
-        info "Termux detected: install patchelf with 'pkg install patchelf' and rerun this installer if jcode fails to start."
+        info "Termux detected: install patchelf with 'pkg install patchelf' and rerun this installer if Kraivcode fails to start."
       fi
     else
-      info "Termux detected: install glibc with 'pkg install glibc' if jcode fails due to a missing dynamic linker."
+      info "Termux detected: install glibc with 'pkg install glibc' if Kraivcode fails due to a missing dynamic linker."
     fi
   fi
 fi
@@ -365,7 +365,7 @@ if [ "${JCODE_SKIP_SERVER_RELOAD:-}" != "1" ]; then
   [ -x "$reload_bin" ] || reload_bin="$stable_dir/$bin_name"
   if [ -x "$reload_bin" ]; then
     if "$reload_bin" server reload </dev/null >/dev/null 2>&1; then
-      info "Reloaded the running jcode server onto $VERSION (if one was active)."
+      info "Reloaded the running Kraivcode server onto $VERSION (if one was active)."
     fi
   fi
 fi
@@ -417,10 +417,10 @@ JCODE_PS_BROADCAST_EOF
   fi
 
   echo ""
-  info "✅ jcode $VERSION installed successfully!"
+  info "✅ Kraivcode $VERSION installed successfully!"
   echo ""
   if [ "$win_path_persisted" = true ]; then
-    info "Added $win_install_dir to your user PATH. New terminals will find jcode automatically."
+    info "Added $win_install_dir to your user PATH. New terminals will find Kraivcode automatically."
   fi
   if command -v jcode >/dev/null 2>&1; then
     info "Run 'jcode' to get started."
@@ -455,7 +455,7 @@ else
       mkdir -p "$(dirname "$rc")"
     fi
     if ! grep -qF "$INSTALL_DIR" "$rc" 2>/dev/null; then
-      printf '\n# Added by jcode installer\n%s\n' "$PATH_LINE" >> "$rc"
+      printf '\n# Added by Kraivcode installer\n%s\n' "$PATH_LINE" >> "$rc"
       added_to="$added_to $rc"
     fi
   }
@@ -470,7 +470,7 @@ else
     fi
     if ! grep -qF "$INSTALL_DIR" "$rc" 2>/dev/null; then
       {
-        printf '\n# Added by jcode installer\n'
+        printf '\n# Added by Kraivcode installer\n'
         printf 'if not contains "%s" $PATH\n' "$INSTALL_DIR"
         printf '    set -gx PATH "%s" $PATH\n' "$INSTALL_DIR"
         printf 'end\n'
@@ -509,14 +509,14 @@ else
   fi
 
   echo ""
-  info "✅ jcode $VERSION installed successfully!"
+  info "✅ Kraivcode $VERSION installed successfully!"
   echo ""
 
   if [ "$(uname -s)" = "Darwin" ]; then
     if [ "$hotkey_setup_ready" = true ]; then
-      info "Global hotkey ready: Cmd+; launches a new jcode from anywhere, system-wide"
+      info "Global hotkey ready: Cmd+; launches a new Kraivcode from anywhere, system-wide"
     else
-      info "Tip: run 'jcode setup-hotkey' so Cmd+; launches jcode system-wide on macOS"
+      info "Tip: run 'jcode setup-hotkey' so Cmd+; launches Kraivcode system-wide on macOS"
     fi
   fi
 
@@ -527,7 +527,7 @@ else
     echo ""
     printf '    \033[1;32mexport PATH="%s:\$PATH" && jcode\033[0m\n' "$INSTALL_DIR"
     echo ""
-    echo "  Future terminal sessions will have jcode on PATH automatically."
+    echo "  Future terminal sessions will have Kraivcode on PATH automatically."
   fi
 fi
 

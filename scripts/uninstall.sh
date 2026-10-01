@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Uninstall jcode binaries and (optionally) all user data.
+# Uninstall Kraivcode binaries and (optionally) all user data.
 #
 # Default: removes installed binaries, build channels, and the launcher
 # symlink, but keeps user data (config, auth, sessions, logs) so a clean
@@ -11,7 +11,7 @@
 #   --yes       Skip the confirmation prompt.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/uninstall.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/nkswalih/kraivcode/dev/scripts/uninstall.sh | bash
 #   bash scripts/uninstall.sh --purge
 set -euo pipefail
 
@@ -67,12 +67,12 @@ TARGETS=()
 if [ "$OS" = "Darwin" ]; then
   # Only CLI-generated bundles. A Jcode Desktop app placed in ~/Applications
   # has a different bundle identifier and is left alone.
-  for app in "$HOME/Applications/Jcode.app" "$HOME/Applications/jcode.app" "$HOME/Applications/Jcode Notifications.app"; do
+  for app in "$HOME/Applications/Jcode.app" "$HOME/Applications/jcode.app" "$HOME/Applications/Kraivcode Notifications.app"; do
     if is_cli_bundle "$app"; then
       TARGETS+=("$app (legacy CLI launcher)")
     fi
   done
-  [ -d "$HOME/.jcode/notifications/macos/Jcode Notifications.app" ] && TARGETS+=("$HOME/.jcode/notifications/macos/Jcode Notifications.app (notification helper)")
+  [ -d "$HOME/.jcode/notifications/macos/Kraivcode Notifications.app" ] && TARGETS+=("$HOME/.jcode/notifications/macos/Kraivcode Notifications.app (notification helper)")
 fi
 if [ "$PURGE" = true ] && [ -d "$USER_DATA_DIR" ]; then
   TARGETS+=("$USER_DATA_DIR (ALL user data: config, auth, sessions, logs, memory)")
@@ -132,12 +132,12 @@ remove() {
 
 remove "$LAUNCHER"
 if [ "$OS" = "Darwin" ]; then
-  for app in "$HOME/Applications/Jcode.app" "$HOME/Applications/jcode.app" "$HOME/Applications/Jcode Notifications.app"; do
+  for app in "$HOME/Applications/Jcode.app" "$HOME/Applications/jcode.app" "$HOME/Applications/Kraivcode Notifications.app"; do
     if is_cli_bundle "$app"; then
       remove "$app"
     fi
   done
-  remove "$HOME/.jcode/notifications/macos/Jcode Notifications.app"
+  remove "$HOME/.jcode/notifications/macos/Kraivcode Notifications.app"
 fi
 if [ "$PURGE" = true ]; then
   remove "$USER_DATA_DIR"
@@ -179,9 +179,9 @@ case "$OS" in
     ;;
 esac
 
-info "jcode uninstalled."
+info "Kraivcode uninstalled."
 if [ "$PURGE" = false ]; then
-  info "Reinstall with: curl -fsSL https://jcode.sh/install | bash"
+  info "Reinstall with: curl -fsSL https://raw.githubusercontent.com/nkswalih/kraivcode/dev/scripts/install.sh | bash"
 else
-  info "All jcode data wiped. Reinstall with: curl -fsSL https://jcode.sh/install | bash"
+  info "All Kraivcode data wiped. Reinstall with: curl -fsSL https://raw.githubusercontent.com/nkswalih/kraivcode/dev/scripts/install.sh | bash"
 fi

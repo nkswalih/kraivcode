@@ -5,10 +5,10 @@
     Downloads the latest jcode release and installs it to %LOCALAPPDATA%\jcode\bin.
 
     One-liner install:
-      irm https://jcode.sh/install.ps1 | iex
+      irm https://raw.githubusercontent.com/nkswalih/kraivcode/dev/scripts/install.ps1 | iex
 
     Or download and run (allows parameters):
-      & ([scriptblock]::Create((irm https://jcode.sh/install.ps1)))
+      & ([scriptblock]::Create((irm https://raw.githubusercontent.com/nkswalih/kraivcode/dev/scripts/install.ps1)))
 .PARAMETER InstallDir
     Override the installation directory (default: $env:LOCALAPPDATA\jcode\bin)
 .PARAMETER Version
@@ -48,11 +48,11 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
     exit 1
 }
 
-$Repo = "1jehuang/jcode"
+$Repo = "nkswalih/kraivcode"
 $ReleaseMetadataBase = if ($env:JCODE_RELEASE_METADATA_BASE) {
     $env:JCODE_RELEASE_METADATA_BASE.TrimEnd('/')
 } else {
-    "https://jcode.sh/releases"
+    "https://github.com/nkswalih/kraivcode/releases"
 }
 
 if (-not $InstallDir) {
@@ -80,7 +80,7 @@ function ConvertFrom-JcodeWebContent($Content) {
     if ($null -eq $Content) { return "" }
 
     # Windows PowerShell 5.1 returns Byte[] for some text responses when the
-    # server uses application/octet-stream (including jcode.sh metadata and
+    # server uses application/octet-stream (including the release metadata mirror and
     # GitHub release checksum manifests). Casting Byte[] directly to [string]
     # produces a space-separated list of decimal bytes instead of the text.
     if ($Content -is [byte[]]) {
@@ -140,7 +140,7 @@ function Get-LatestJcodeReleaseTag {
     }
 
     if ($metadataTag) {
-        Write-Warn "GitHub release lookup unavailable; using cached jcode.sh metadata ($metadataTag)."
+        Write-Warn "GitHub release lookup unavailable; using cached release metadata ($metadataTag)."
         return $metadataTag
     }
     Write-Err "Failed to determine latest version"
