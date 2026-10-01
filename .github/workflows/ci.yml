@@ -1,10 +1,12 @@
 name: CI
 
 on:
+  # `dev` is this fork's default branch (and therefore where PRs are opened).
+  # Without it in these lists no CI runs at all on fork pull requests.
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, dev]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
