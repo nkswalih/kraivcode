@@ -74,6 +74,12 @@ use std::time::Duration;
 pub type EventStream = Pin<Box<dyn Stream<Item = Result<StreamEvent>> + Send>>;
 
 /// Provider trait for LLM backends.
+
+// `#[async_trait]` emits a bare `#[must_use]` on each desugared method, and the
+// pinned `dyn Future` it returns is already `#[must_use]` in its own right, so
+// clippy reports the pairing as `double_must_use`. The attribute is generated
+// inside the macro expansion, leaving nowhere here to give it a reason.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait Provider: Send + Sync {
     /// Prepare provider-specific request state before the foreground completion.

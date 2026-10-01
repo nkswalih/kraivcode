@@ -180,6 +180,11 @@ impl ToolContext {
 }
 
 /// A tool that can be executed by the agent.
+// `#[async_trait]` emits a bare `#[must_use]` on each desugared method, and the
+// pinned `dyn Future` it returns is already `#[must_use]` in its own right, so
+// clippy reports the pairing as `double_must_use`. The attribute is generated
+// inside the macro expansion, leaving nowhere here to give it a reason.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait Tool: Send + Sync {
     /// Tool name (must match what's sent to the API).
