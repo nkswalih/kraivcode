@@ -99,7 +99,13 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      # The cargo git dependencies are public HTTPS repos, so SSH is only
+      # required when a deploy key actually exists. Skip the step otherwise
+      # instead of hard-failing a job that legitimately has no secret.
       - name: Configure SSH for cargo git dependencies
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        if: env.DEPLOY_KEY != ''
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_KEY }}
