@@ -10,11 +10,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
 
-/// Get the jcode repository directory
+/// Get the Kraivcode repository directory
 pub fn get_repo_dir() -> Option<PathBuf> {
     if let Ok(path) = std::env::var("JCODE_REPO_DIR") {
         let path = PathBuf::from(path);
-        if is_jcode_repo(&path) {
+        if is_kraivcode_repo(&path) {
             return Some(path);
         }
     }
@@ -33,7 +33,7 @@ pub fn get_repo_dir() -> Option<PathBuf> {
             .parent()
             .and_then(|p| p.parent())
             .and_then(|p| p.parent())
-            && is_jcode_repo(repo)
+            && is_kraivcode_repo(repo)
         {
             return Some(repo.to_path_buf());
         }
@@ -54,7 +54,7 @@ pub fn get_repo_dir() -> Option<PathBuf> {
 
 pub fn find_repo_in_ancestors(start: &Path) -> Option<PathBuf> {
     for dir in start.ancestors() {
-        if is_jcode_repo(dir) {
+        if is_kraivcode_repo(dir) {
             return Some(dir.to_path_buf());
         }
     }
@@ -595,9 +595,9 @@ pub fn preferred_reload_candidate(is_selfdev_session: bool) -> Option<(PathBuf, 
     }
 }
 
-/// Check if a directory is the jcode repository
-pub fn is_jcode_repo(dir: &Path) -> bool {
-    // Check for Cargo.toml with name = "jcode"
+/// Check if a directory is the Kraivcode repository
+pub fn is_kraivcode_repo(dir: &Path) -> bool {
+    // Check for Cargo.toml with name = "kraivcode"
     let cargo_toml = dir.join("Cargo.toml");
     if !cargo_toml.exists() {
         return false;
@@ -610,7 +610,7 @@ pub fn is_jcode_repo(dir: &Path) -> bool {
 
     // Read Cargo.toml and check package name
     if let Ok(content) = std::fs::read_to_string(&cargo_toml)
-        && content.contains("name = \"jcode\"")
+        && content.contains("name = \"kraivcode\"")
     {
         return true;
     }
@@ -632,7 +632,7 @@ mod tests {
         }
         std::fs::write(
             temp.path().join("Cargo.toml"),
-            "[package]\nname = \"jcode\"\nversion = \"0.1.0\"\n",
+            "[package]\nname = \"kraivcode\"\nversion = \"0.1.0\"\n",
         )
         .expect("Cargo.toml");
         temp
@@ -805,9 +805,9 @@ mod tests {
     }
 
     #[test]
-    fn is_jcode_repo_accepts_git_file_for_worktree() {
+    fn is_kraivcode_repo_accepts_git_file_for_worktree() {
         let repo = repo_fixture(true);
-        assert!(is_jcode_repo(repo.path()));
+        assert!(is_kraivcode_repo(repo.path()));
     }
 
     /// Build a release-style install dir: `jcode` wrapper script + payload.

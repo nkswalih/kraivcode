@@ -576,7 +576,7 @@ impl BridgeState {
                     self.pending_create_dir = working_dir.clone();
                     if working_dir
                         .as_deref()
-                        .is_some_and(Self::path_is_inside_jcode_repo)
+                        .is_some_and(Self::path_is_inside_kraivcode_repo)
                     {
                         subscribe["selfdev"] = json!(true);
                     }
@@ -2412,7 +2412,7 @@ impl BridgeState {
     ///
     /// Matched by content (a workspace manifest next to the crates directory)
     /// rather than by name, so a clone in any directory is recognised.
-    fn path_is_inside_jcode_repo(path: &str) -> bool {
+    fn path_is_inside_kraivcode_repo(path: &str) -> bool {
         let mut current = Some(std::path::Path::new(path));
         while let Some(dir) = current {
             if dir.join("Cargo.toml").is_file() && dir.join("crates/jcode-base").is_dir() {

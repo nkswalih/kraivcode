@@ -92,7 +92,7 @@ swarm_panel_focus = "alt+n"
 # Linux and Alt on Windows. Windows also adds the physical Copilot key:
 #   Cmd+;        new jcode in your home directory
 #   Cmd+'        new jcode in your last project directory
-#   Cmd+Shift+'  new jcode self-dev session (last jcode repo)
+#   Cmd+Shift+'  new jcode self-dev session (last Kraivcode repo)
 # Default: Cmd+Shift+; on macOS, Alt+Shift+; elsewhere. Set "" to disable.
 # Note: some macOS terminals intercept Cmd combos; if so, pick another binding.
 # new_terminal = "cmd+shift+;"

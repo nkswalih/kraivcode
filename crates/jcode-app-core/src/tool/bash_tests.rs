@@ -81,9 +81,9 @@ async fn bash_executes_with_null_optional_arguments() {
 fn repository_commands_export_a_logged_cargo_function() {
     let repo =
         crate::build::find_repo_in_ancestors(std::path::Path::new(env!("CARGO_MANIFEST_DIR")))
-            .expect("test runs inside the jcode repository");
+            .expect("test runs inside the Kraivcode repository");
     let wrapped = wrap_repo_cargo_commands("cargo test -p demo && echo done", Some(&repo))
-        .expect("jcode repository has dev_cargo.sh");
+        .expect("Kraivcode repository has dev_cargo.sh");
 
     assert!(wrapped.contains("export JCODE_DEV_CARGO_SCRIPT="));
     assert!(wrapped.contains("JCODE_IN_DEV_CARGO=1 \"$JCODE_DEV_CARGO_SCRIPT\" \"$@\""));
@@ -92,7 +92,7 @@ fn repository_commands_export_a_logged_cargo_function() {
 }
 
 #[test]
-fn cargo_routing_is_limited_to_the_jcode_repository() {
+fn cargo_routing_is_limited_to_the_kraivcode_repository() {
     assert!(wrap_repo_cargo_commands("cargo test", Some(std::path::Path::new("/"))).is_none());
     assert!(wrap_repo_cargo_commands("cargo test", None).is_none());
 }
