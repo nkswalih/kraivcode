@@ -14,7 +14,7 @@ MAIN_SOCK="/run/user/$(id -u)/jcode.sock"
 DEBUG_SOCK="/run/user/$(id -u)/jcode-debug.sock"
 
 echo "========================================="
-echo " jcode Stress Test: $NUM_INSTANCES instances"
+echo " Kraivcode Stress Test: $NUM_INSTANCES instances"
 echo "========================================="
 echo "Binary: $JCODE_BIN"
 echo "Log dir: $LOG_DIR"
@@ -125,8 +125,8 @@ echo "=== Pre-flight checks ==="
 
 # Check if server is running
 if ! [ -S "$MAIN_SOCK" ]; then
-    echo "ERROR: No jcode server running at $MAIN_SOCK"
-    echo "Start one with: jcode serve &"
+    echo "ERROR: No Kraivcode server running at $MAIN_SOCK"
+    echo "Start one with: kraivcode serve &"
     exit 1
 fi
 
@@ -174,7 +174,7 @@ echo "Monitor PID: $MONITOR_PID"
 echo ""
 
 # --- Spawn instances ---
-echo "=== Spawning $NUM_INSTANCES jcode instances ==="
+echo "=== Spawning $NUM_INSTANCES Kraivcode instances ==="
 PIDS=()
 SPAWN_TIMES=()
 

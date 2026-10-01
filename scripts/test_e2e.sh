@@ -10,14 +10,14 @@ run_cargo() {
     (cd "$repo_root" && "$cargo_exec" "$@")
 }
 
-echo "=== E2E Testing Script for jcode ==="
+echo "=== E2E Testing Script for Kraivcode ==="
 echo ""
 
 # Test 1: Check binary exists and runs
-echo "Test 1: Check jcode binary..."
-if command -v jcode &> /dev/null; then
+echo "Test 1: Check Kraivcode binary..."
+if command -v kraivcode &> /dev/null; then
     echo "✓ jcode binary found"
-    jcode --version
+    kraivcode --version
 else
     echo "✗ jcode binary not found"
     exit 1
@@ -71,6 +71,6 @@ echo ""
 echo "=== All tests passed! ==="
 echo ""
 echo "To test interactively:"
-echo "  jcode        # Start TUI mode"
-echo "  jcode server # Start server mode"
-echo "  jcode client # Connect to server"
+echo "  kraivcode    # Start TUI mode"
+echo "  kraivcode server # Start server mode"
+echo "  kraivcode client # Connect to server"

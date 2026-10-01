@@ -20,20 +20,20 @@ SOCK=$(ls /tmp/kitty.sock* 2>/dev/null | head -1)
 
 mkdir -p "$DEMO_DIR" "$OUTPUT_DIR"
 
-echo "=== jcode Demo Recorder ==="
+echo "=== Kraivcode Demo Recorder ==="
 echo "Demo: $DEMO_NAME"
 echo "Prompt: $PROMPT"
 echo "Working dir: $DEMO_DIR"
 echo ""
 
 # Step 1: Launch jcode in a new kitty OS window
-echo "[1/5] Launching jcode..."
+echo "[1/5] Launching Kraivcode..."
 kitten @ --to unix:$SOCK launch --type=os-window \
     --cwd "$DEMO_DIR" \
     --title "jcode-demo-$DEMO_NAME" \
-    "$repo_root/target/release/jcode"
+    "$repo_root/target/release/kraivcode"
 
-sleep 3  # Let jcode fully start
+sleep 3  # Let Kraivcode fully start
 
 # Step 2: Find the window
 DEMO_WIN_ID=$(niri msg windows 2>/dev/null | grep -B5 "jcode-demo-$DEMO_NAME" | grep "Window ID" | awk '{print $3}' | tr -d ':')

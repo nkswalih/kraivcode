@@ -9,7 +9,7 @@ usage() {
 Usage:
   scripts/compile_time_probe.sh [options]
 
-Runs a full-feature selfdev jcode build with Cargo timings enabled and summarizes
+Runs a full-feature selfdev Kraivcode build with Cargo timings enabled and summarizes
 critical-path-ish rustc units from target/cargo-timings/cargo-timing.html.
 
 Options:
@@ -17,8 +17,8 @@ Options:
   --timing-html <path>      Parse a specific cargo timing HTML file
   --touch <path>            Touch a file before building to simulate an edit
   --profile <name>          Cargo profile to build (default: selfdev)
-  --package <name>          Cargo package to build (default: jcode)
-  --bin <name>              Cargo binary to build (default: jcode)
+  --package <name>          Cargo package to build (default: kraivcode)
+  --bin <name>              Cargo binary to build (default: kraivcode)
   --feature-profile <name>  JCODE_DEV_FEATURE_PROFILE for dev_cargo.sh (default: default)
   --json <path>             Write the parsed summary JSON to this path
   --top <n>                 Number of slowest units to print (default: 12)
@@ -32,9 +32,9 @@ Examples:
 Notes:
   - This intentionally defaults to the full/default feature set. It is for
     compile-time isolation work that keeps debug/selfdev behavior production-like.
-  - The "jcode serial stack" summary is not a formal Cargo critical path. It is a
+  - The "Kraivcode serial stack" summary is not a formal Cargo critical path. It is a
     focused view of the known long-pole crates: jcode-base, jcode-app-core,
-    jcode-tui, root jcode lib, and jcode bin.
+    jcode-tui, root Kraivcode lib, and Kraivcode bin.
 USAGE
 }
 
@@ -42,8 +42,8 @@ skip_build=0
 timing_html=""
 touch_path=""
 profile="selfdev"
-package="jcode"
-bin="jcode"
+package="kraivcode"
+bin="kraivcode"
 feature_profile="default"
 json_path=""
 top_n=12
@@ -251,7 +251,7 @@ def is_jcode_stack_unit(unit: dict[str, Any]) -> bool:
     target = unit.get("target") or ""
     if name in {"jcode-base", "jcode-app-core", "jcode-tui"} and "build script" not in target:
         return True
-    if name == "jcode" and (target == "" or f'bin "{bin_name}"' in target):
+    if name == "kraivcode" and (target == "" or f'bin "{bin_name}"' in target):
         return True
     return False
 
@@ -316,7 +316,7 @@ print(f"  cargo timing wall: {fmt_seconds(summary['wall_seconds_from_cargo_timin
 if summary["wall_seconds_measured_by_probe"] is not None:
     print(f"  measured wall: {fmt_seconds(summary['wall_seconds_measured_by_probe'])}")
 print(f"  units: {len(units)}")
-print("  jcode serial stack:")
+print("  Kraivcode serial stack:")
 print(f"    span: {fmt_seconds(stack_span)}")
 print(f"    sum: {stack_sum:.2f}s (frontend {stack_frontend_sum:.2f}s, codegen {stack_codegen_sum:.2f}s)")
 for unit in jcode_stack:

@@ -27,7 +27,7 @@ Commands:
   reset-sandbox                Remove only the current sandbox JCODE_HOME
   delete <name>                Delete a saved fixture
   env <name>                   Print exports for running against a loaded fixture
-  run <name> -- <args...>      Load fixture, then run jcode with args in sandbox
+  run <name> -- <args...>      Load fixture, then run Kraivcode with args in sandbox
   help                         Show this help
 
 Environment overrides:
@@ -87,7 +87,7 @@ copy_dir_contents() {
 }
 
 run_jcode() {
-  local binary_path="$repo_root/target/debug/jcode"
+  local binary_path="$repo_root/target/debug/kraivcode"
   (
     cd "$repo_root"
     if [[ -x "$binary_path" ]]; then
