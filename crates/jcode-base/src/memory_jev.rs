@@ -19,6 +19,11 @@ const MODEL: &str = "typesafe/jev-1.13";
 
 /// Injectable decision transport. Errors abort the entire selection, including
 /// already-scored batches. Implementations must return the full response object.
+// `#[async_trait]` emits a bare `#[must_use]` on each desugared method, and the
+// pinned `dyn Future` it returns is already `#[must_use]` in its own right, so
+// clippy reports the pairing as `double_must_use`. The attribute is generated
+// inside the macro expansion, leaving nowhere here to give it a reason.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait RelevanceTransport: Send + Sync {
     async fn evaluate(&self, state: Value, questions: Map<String, Value>) -> Result<Value>;
