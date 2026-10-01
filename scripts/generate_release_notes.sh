@@ -33,7 +33,7 @@ repo_slug() {
         echo "${BASH_REMATCH[1]%.git}"
         return
     fi
-    echo "1jehuang/jcode"
+    echo "nkswalih/kraivcode"
 }
 
 REPO="$(repo_slug)"

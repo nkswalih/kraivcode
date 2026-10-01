@@ -15,6 +15,9 @@ permissions:
 
 jobs:
   publish:
+    # Fork guard: the npm scope @1jehuang belongs to upstream. Do not attempt
+    # to publish into it from this repository.
+    if: github.repository == '1jehuang/jcode'
     name: Publish @1jehuang/jcode-sdk
     runs-on: ubuntu-latest
     permissions:
