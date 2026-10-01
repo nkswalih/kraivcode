@@ -1750,7 +1750,7 @@ fn credential_failure_wave_detected_for_recent_auth_failed_workers() {
     assert!(message.contains("paused dispatching"));
     assert!(message.contains("3 worker(s)"));
     assert!(message.contains("401 Unauthorized"));
-    assert!(message.contains("`jcode login --provider claude`"));
+    assert!(message.contains("`kraivcode login --provider claude`"));
 }
 
 #[test]
@@ -1826,19 +1826,19 @@ fn credential_failure_wave_ignores_foreign_members() {
 fn credential_login_fix_hint_maps_provider_names() {
     assert_eq!(
         super::credential_login_fix_hint(Some("anthropic")),
-        "`jcode login --provider claude`"
+        "`kraivcode login --provider claude`"
     );
     assert_eq!(
         super::credential_login_fix_hint(Some("OpenAI")),
-        "`jcode login --provider openai`"
+        "`kraivcode login --provider openai`"
     );
     assert_eq!(
         super::credential_login_fix_hint(Some("copilot")),
-        "`jcode login --provider copilot`"
+        "`kraivcode login --provider copilot`"
     );
     assert_eq!(
         super::credential_login_fix_hint(None),
-        "`jcode login --provider <provider>`"
+        "`kraivcode login --provider <provider>`"
     );
 }
 

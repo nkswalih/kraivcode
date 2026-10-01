@@ -529,7 +529,7 @@ pub(crate) fn resolve_auth_test_targets(
         let targets = configured_auth_test_targets(&status);
         if targets.is_empty() {
             anyhow::bail!(
-                "No configured supported auth providers found. Run `jcode login --provider <provider>` first, or choose an explicit --provider."
+                "No configured supported auth providers found. Run `kraivcode login --provider <provider>` first, or choose an explicit --provider."
             );
         }
         return Ok(targets);

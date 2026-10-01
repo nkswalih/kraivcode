@@ -102,7 +102,7 @@ pub fn auth_failure_recovery_hint(provider_id: &str, reason: AuthFailureReason) 
         | AuthFailureReason::CallbackTimeout
         | AuthFailureReason::CallbackPortUnavailable
         | AuthFailureReason::NonInteractiveTerminal => format!(
-            "Try a manual-safe fallback: `jcode login --provider {} --print-auth-url`, then complete with `--callback-url` or `--auth-code`.",
+            "Try a manual-safe fallback: `kraivcode login --provider {} --print-auth-url`, then complete with `--callback-url` or `--auth-code`.",
             provider
         ),
         AuthFailureReason::ManualInputMissing => {
@@ -129,11 +129,11 @@ pub fn auth_failure_recovery_hint(provider_id: &str, reason: AuthFailureReason) 
             provider
         ),
         AuthFailureReason::OAuthExchangeFailed => format!(
-            "Retry the OAuth flow, and if it keeps failing use `jcode login --provider {} --print-auth-url` so the callback can be completed manually.",
+            "Retry the OAuth flow, and if it keeps failing use `kraivcode login --provider {} --print-auth-url` so the callback can be completed manually.",
             provider
         ),
         AuthFailureReason::Unknown => {
-            "Run `jcode auth status`, then `jcode auth doctor` for a structured diagnosis.".to_string()
+            "Run `kraivcode auth status`, then `jcode auth doctor` for a structured diagnosis.".to_string()
         }
     };
 

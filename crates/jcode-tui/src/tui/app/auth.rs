@@ -575,7 +575,7 @@ impl App {
                     provider.auth_kind.label(),
                 );
                 self.push_display_message(DisplayMessage::error(
-                    "Google/Gmail login is only available from the CLI right now. Run jcode login --provider google."
+                    "Google/Gmail login is only available from the CLI right now. Run kraivcode login --provider google."
                         .to_string(),
                 ));
             }
@@ -2416,7 +2416,7 @@ impl App {
                                 )
                             }
                         } else if key_name == crate::provider::bedrock::API_KEY_ENV {
-                            "You can now use /model to switch to Bedrock models. TUI onboarding saved region us-east-2; for a different region, run jcode login --provider bedrock from a terminal.".to_string()
+                            "You can now use /model to switch to Bedrock models. TUI onboarding saved region us-east-2; for a different region, run kraivcode login --provider bedrock from a terminal.".to_string()
                         } else if key_name == "OPENROUTER_API_KEY" {
                             "You can now use /model to switch to OpenRouter models. If the model list looks stale, run /refresh-model-list.".to_string()
                         } else {

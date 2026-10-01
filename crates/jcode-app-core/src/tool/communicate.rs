@@ -1174,7 +1174,7 @@ fn credential_login_fix_hint(provider: Option<&str>) -> String {
         Some(other) if !other.trim().is_empty() => other,
         _ => "<provider>",
     };
-    format!("`jcode login --provider {target}`")
+    format!("`kraivcode login --provider {target}`")
 }
 
 /// Actionable pause message for a credential-failure wave: names the failed

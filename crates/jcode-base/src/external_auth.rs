@@ -91,7 +91,7 @@ impl ExternalAuthReviewCandidate {
     }
 
     /// Canonical Jcode provider ids (`claude`, `openai`, ...) this source would
-    /// sign in, matching `jcode auth status --json` ids. Lets a UI tell which
+    /// sign in, matching `kraivcode auth status --json` ids. Lets a UI tell which
     /// detected logins Jcode already has.
     pub fn provider_ids(&self) -> Vec<&'static str> {
         self.provider_summary

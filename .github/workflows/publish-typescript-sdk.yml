@@ -58,12 +58,12 @@ jobs:
         run: |
           mkdir -p sdk-runtime-assets
           gh release download "${{ inputs.jcode_release_tag }}" --dir sdk-runtime-assets \
-            --pattern 'jcode-linux-x86_64.tar.gz' \
-            --pattern 'jcode-linux-aarch64.tar.gz' \
-            --pattern 'jcode-macos-x86_64.tar.gz' \
-            --pattern 'jcode-macos-aarch64.tar.gz' \
-            --pattern 'jcode-windows-x86_64.tar.gz' \
-            --pattern 'jcode-windows-aarch64.tar.gz'
+            --pattern 'kraivcode-linux-x86_64.tar.gz' \
+            --pattern 'kraivcode-linux-aarch64.tar.gz' \
+            --pattern 'kraivcode-macos-x86_64.tar.gz' \
+            --pattern 'kraivcode-macos-aarch64.tar.gz' \
+            --pattern 'kraivcode-windows-x86_64.tar.gz' \
+            --pattern 'kraivcode-windows-aarch64.tar.gz'
 
       - name: Prepare platform packages
         working-directory: ${{ github.workspace }}

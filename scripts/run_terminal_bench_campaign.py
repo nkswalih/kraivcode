@@ -64,7 +64,7 @@ def load_tasks(args: argparse.Namespace) -> list[str]:
 
 def ensure_binary(root: Path, env: dict[str, str]) -> Path:
     binary_dir = Path(env.get("JCODE_HARBOR_BINARY_DIR", "/tmp/jcode-compat-dist")).expanduser()
-    binary_path = Path(env.get("JCODE_HARBOR_BINARY", str(binary_dir / "jcode-linux-x86_64"))).expanduser()
+    binary_path = Path(env.get("JCODE_HARBOR_BINARY", str(binary_dir / "kraivcode-linux-x86_64"))).expanduser()
     if not (binary_path.exists() and os.access(binary_path, os.X_OK)):
         run([str(root / "scripts" / "build_linux_compat.sh"), str(binary_dir)], env=env, cwd=root)
     return binary_path.resolve()

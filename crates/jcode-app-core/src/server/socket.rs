@@ -56,7 +56,7 @@ pub async fn connect_socket(path: &std::path::Path) -> Result<Stream> {
         Ok(stream) => Ok(stream),
         Err(err) if err.kind() == std::io::ErrorKind::ConnectionRefused && path.exists() => {
             Err(anyhow::Error::new(err).context(format!(
-                "Socket exists but refused the connection at {}. Retry, or remove it after confirming no jcode server is running.",
+                "Socket exists but refused the connection at {}. Retry, or remove it after confirming no Kraivcode server is running.",
                 path.display()
             )))
         }
@@ -129,7 +129,7 @@ pub async fn reap_stale_socket_if_dead(path: &std::path::Path) -> bool {
     }
 
     crate::logging::warn(&format!(
-        "Reaping stale jcode socket with no live listener at {}",
+        "Reaping stale Kraivcode socket with no live listener at {}",
         path.display()
     ));
     cleanup_socket_pair(path);

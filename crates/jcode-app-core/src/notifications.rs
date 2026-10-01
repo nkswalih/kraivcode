@@ -1152,7 +1152,7 @@ mod tests {
         let envelope = MacosNotificationEnvelope {
             schema_version: MACOS_NOTIFICATION_SCHEMA_VERSION,
             notification_id: "kraivcode-turn-test".to_string(),
-            title: "jcode · done".to_string(),
+            title: "kraivcode · done".to_string(),
             subtitle: Some("2/2 todos".to_string()),
             body: "Finished broker".to_string(),
             sound: Some("Glass".to_string()),

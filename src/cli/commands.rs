@@ -1959,7 +1959,7 @@ pub async fn run_browser(action: &str, requested: Option<&str>) -> Result<()> {
             if let Some(saved) = browser::saved_browser_preference() {
                 println!("  configured by setup: {}", saved.id());
             }
-            println!("\nOverride with `jcode browser setup <browser>` or JCODE_BROWSER=<browser>.");
+            println!("\nOverride with `kraivcode browser setup <browser>` or JCODE_BROWSER=<browser>.");
         }
         "status" => {
             let target = browser::resolve_target_browser(requested)?;
@@ -2011,7 +2011,7 @@ pub async fn run_browser(action: &str, requested: Option<&str>) -> Result<()> {
                 println!("\nBuilt-in browser tool is ready.");
             } else if status.responding && !status.compatible {
                 println!(
-                    "\nThe browser bridge is connected, but the installed extension is out of date for this Kraivcode build. Run `jcode browser setup` to repair or update it."
+                    "\nThe browser bridge is connected, but the installed extension is out of date for this Kraivcode build. Run `kraivcode browser setup` to repair or update it."
                 );
             } else if status.binary_installed && !browser::is_browser_running(target.kind) {
                 println!(
@@ -2020,12 +2020,12 @@ pub async fn run_browser(action: &str, requested: Option<&str>) -> Result<()> {
                 );
             } else if status.binary_installed {
                 println!(
-                    "\n{} is running, but the bridge is not responding. Check that the Browser Agent Bridge extension is enabled ({}). Run `jcode browser setup` only to repair the install.",
+                    "\n{} is running, but the bridge is not responding. Check that the Browser Agent Bridge extension is enabled ({}). Run `kraivcode browser setup` only to repair the install.",
                     name,
                     target.kind.extensions_page()
                 );
             } else {
-                println!("\nRun `jcode browser setup` to install or repair it.");
+                println!("\nRun `kraivcode browser setup` to install or repair it.");
             }
         }
         other => {

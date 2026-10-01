@@ -198,7 +198,7 @@ pub(crate) enum Command {
         /// Provider to log in to. Equivalent to --provider for this command, e.g. `jcode login google`.
         // Distinct clap id: the global `--provider` flag also has id "provider";
         // sharing the id makes clap drop the flag inside `login` (so
-        // `jcode login --provider x` errors) and propagate the global default
+        // `kraivcode login --provider x` errors) and propagate the global default
         // into this positional.
         #[arg(value_enum, id = "login_provider", value_name = "PROVIDER")]
         provider: Option<ProviderChoice>,

@@ -205,7 +205,7 @@ impl App {
 
     /// Whether this is a self-dev / canary session.
     ///
-    /// These are launched by developers working on jcode itself (for example the
+    /// These are launched by developers working on Kraivcode itself (for example the
     /// niri `jcode self-dev` hotkey). That launch path bypasses
     /// `maybe_show_setup_hints`, so `launch_count` never advances and the
     /// new-user heuristic above would otherwise treat every spawn as a first run.
