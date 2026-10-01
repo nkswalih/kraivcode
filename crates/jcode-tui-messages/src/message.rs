@@ -485,6 +485,8 @@ mod tests {
                 intent: None,
                 thought_signature: None,
             }),
+            pasted_segments: None,
+
         }
     }
 
