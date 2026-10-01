@@ -114,11 +114,11 @@ function New-IsolatedWindowsProfile([string]$Name) {
         JcodeHome = $jcodeHome
         Temp = $temp
         InstallDir = Join-Path $local 'jcode\bin'
-        LauncherPath = Join-Path $local 'jcode\bin\jcode.exe'
+        LauncherPath = Join-Path $local 'jcode\bin\kraivcode.exe'
         BuildsDir = Join-Path $local 'jcode\builds'
         SetupHintsPath = Join-Path $jcodeHome 'setup_hints.json'
         HotkeyDir = Join-Path $jcodeHome 'hotkey'
-        StartupShortcutPath = Join-Path $appData 'Microsoft\Windows\Start Menu\Programs\Startup\jcode-hotkey.lnk'
+        StartupShortcutPath = Join-Path $appData 'Microsoft\Windows\Start Menu\Programs\Startup\kraivcode-hotkey.lnk'
     }
 }
 
@@ -158,7 +158,7 @@ try {
         Assert-Equal $false (Test-JcodeReleaseTag 'latest') 'unversioned release labels should not validate'
         $scriptText = Get-Content -LiteralPath $installScript -Raw
         Assert-NotContains $scriptText 'api.github.com/repos/$Repo/releases/latest' 'installer should not use the rate-limited unauthenticated GitHub API'
-        Assert-Contains $scriptText 'jcode.sh/releases' 'installer should include independent static release metadata'
+        Assert-Contains $scriptText 'github.com/nkswalih/kraivcode/releases' 'installer should include independent static release metadata'
 
         $script:releaseLookupRequests = @()
         function Invoke-WebRequest {
@@ -169,10 +169,10 @@ try {
                 [string]$OutFile
             )
             $script:releaseLookupRequests += $Uri
-            if ($Uri -eq 'https://jcode.sh/releases/latest/version') {
+            if ($Uri -eq 'https://github.com/nkswalih/kraivcode/releases/latest/version') {
                 return [pscustomobject]@{ Content = "v1.2.3`n" }
             }
-            if ($Uri -eq 'https://jcode.sh/releases/v1.2.3/download-bases') {
+            if ($Uri -eq 'https://github.com/nkswalih/kraivcode/releases/v1.2.3/download-bases') {
                 return [pscustomobject]@{ Content = "https://mirror.example/releases/v1.2.3`n" }
             }
             if ($Uri -eq 'https://github.com/nkswalih/kraivcode/releases/latest') {
@@ -196,8 +196,8 @@ try {
         $currentPath = "C:\Tools;$installVariant;$($profile.InstallDir);C:\Tools\;C:\Other"
         $pathUpdate = Resolve-JcodePathUpdate -InstallDir $profile.InstallDir -CurrentPath $currentPath
         Assert-Equal "$($profile.InstallDir);C:\Tools;C:\Tools\;C:\Other" $pathUpdate.Path 'install PATH update should prepend the canonical launcher dir without rewriting unrelated entries'
-        Assert-PathCount $pathUpdate.Path $profile.InstallDir 1 'updated PATH should contain exactly one jcode launcher dir'
-        Assert-Equal 2 $pathUpdate.RemovedManagedEntries 'PATH update should remove both stale jcode launcher entries before re-adding one'
+        Assert-PathCount $pathUpdate.Path $profile.InstallDir 1 'updated PATH should contain exactly one Kraivcode launcher dir'
+        Assert-Equal 2 $pathUpdate.RemovedManagedEntries 'PATH update should remove both stale Kraivcode launcher entries before re-adding one'
         Assert-Equal 0 $pathUpdate.RemovedDuplicateEntries 'PATH update should preserve unrelated duplicate entries'
 
         $script:setCalls = 0
@@ -253,7 +253,7 @@ try {
     Invoke-Case 'clean_install_isolated_profile_and_opt_out' {
         $profile = New-IsolatedWindowsProfile 'clean-install'
         Set-InstallScriptProfileGlobals $profile
-        $source = Join-Path $profile.Root 'jcode-v1.exe'
+        $source = Join-Path $profile.Root 'kraivcode-v1.exe'
         Set-Content -Path $source -Value 'version-one' -NoNewline
         $script:mockUserPath = 'C:\Tools'
         $script:pathWrites = 0
@@ -269,8 +269,8 @@ try {
 
         Assert-PathExists $profile.LauncherPath 'clean install should create the launcher in the isolated LOCALAPPDATA tree'
         Assert-Equal 'version-one' (Get-Content -LiteralPath $profile.LauncherPath -Raw) 'launcher should contain the local artifact contents'
-        Assert-PathExists (Join-Path $profile.BuildsDir 'stable\jcode.exe') 'clean install should populate the stable build channel'
-        Assert-PathExists (Join-Path $profile.BuildsDir 'versions\0.0.1-eval\jcode.exe') 'clean install should populate the immutable versioned build'
+        Assert-PathExists (Join-Path $profile.BuildsDir 'stable\kraivcode.exe') 'clean install should populate the stable build channel'
+        Assert-PathExists (Join-Path $profile.BuildsDir 'versions\0.0.1-eval\kraivcode.exe') 'clean install should populate the immutable versioned build'
         Assert-PathCount $script:mockUserPath $profile.InstallDir 1 'clean install should persist exactly one launcher PATH entry in the mocked user PATH'
         Assert-Equal 1 $script:pathWrites 'clean install should write mocked user PATH once'
         Assert-Equal 1 $script:pathBroadcasts 'clean install should broadcast exactly once for a PATH change'
@@ -286,8 +286,8 @@ try {
     Invoke-Case 'upgrade_and_idempotency_do_not_duplicate_path' {
         $profile = New-IsolatedWindowsProfile 'upgrade-install'
         Set-InstallScriptProfileGlobals $profile
-        $sourceV1 = Join-Path $profile.Root 'jcode-v1.exe'
-        $sourceV2 = Join-Path $profile.Root 'jcode-v2.exe'
+        $sourceV1 = Join-Path $profile.Root 'kraivcode-v1.exe'
+        $sourceV2 = Join-Path $profile.Root 'kraivcode-v2.exe'
         Set-Content -Path $sourceV1 -Value 'version-one' -NoNewline
         Set-Content -Path $sourceV2 -Value 'version-two' -NoNewline
         $script:mockUserPath = 'C:\Tools'
@@ -321,7 +321,7 @@ try {
         $profile = New-IsolatedWindowsProfile 'hotkey-spaces-nonascii'
         Set-InstallScriptProfileGlobals $profile
         $env:JCODE_WINDOWS_SETUP_SKIP_EXTERNALS = '1'
-        $jcodeExe = Join-Path $profile.Root '路径 With Spaces\jcode.exe'
+        $jcodeExe = Join-Path $profile.Root '路径 With Spaces\kraivcode.exe'
         New-Item -ItemType Directory -Path (Split-Path -Parent $jcodeExe) -Force | Out-Null
         Set-Content -Path $jcodeExe -Value 'fake exe' -NoNewline
         New-Item -ItemType Directory -Path $profile.HotkeyDir -Force | Out-Null
@@ -331,14 +331,14 @@ try {
         Assert-Equal $true $ok 'hotkey install should succeed using the deterministic external-command skip hook'
         $vbsPath = Join-Path $profile.HotkeyDir 'jcode-hotkey-launcher.vbs'
         Assert-PathMissing $vbsPath 'hotkey install should remove the legacy hidden VBScript trampoline'
-        $shortcutScriptPath = Join-Path $profile.HotkeyDir 'jcode-hotkey-shortcut.ps1'
+        $shortcutScriptPath = Join-Path $profile.HotkeyDir 'kraivcode-hotkey-shortcut.ps1'
         Assert-PathExists $shortcutScriptPath 'hotkey install should render the deterministic Startup shortcut script under the isolated JCODE_HOME'
         $shortcutScript = Get-Content -LiteralPath $shortcutScriptPath -Raw
         Assert-Contains $shortcutScript 'powershell.exe' 'Startup shortcut should target PowerShell directly'
         Assert-Contains $shortcutScript 'ExecutionPolicy RemoteSigned' 'Startup shortcut should use RemoteSigned execution policy'
         Assert-NotContains $shortcutScript 'ExecutionPolicy Bypass' 'Startup shortcut should not bypass execution policy'
         Assert-Contains $shortcutScript 'setup-hotkey --listen-windows-hotkey' 'Startup shortcut should start the native Windows hotkey listener'
-        Assert-Contains $shortcutScript $jcodeExe 'Startup shortcut should preserve spaces and non-ASCII characters in the jcode path'
+        Assert-Contains $shortcutScript $jcodeExe 'Startup shortcut should preserve spaces and non-ASCII characters in the Kraivcode path'
         Assert-PathMissing (Join-Path $profile.HotkeyDir 'jcode-hotkey.ps1') 'hotkey upgrade should remove the legacy PowerShell listener'
         $scriptText = Get-Content -LiteralPath $installScript -Raw
         Assert-Contains $scriptText 'Configured Alt+; and the Copilot key' 'installer should document both Windows launch-key mappings'
@@ -375,7 +375,7 @@ try {
         }
         Assert-Equal $true $threw 'launcher install should surface copy failures'
         Assert-Equal 'known-good' (Get-Content -LiteralPath $profile.LauncherPath -Raw) 'failed launcher install should preserve the existing launcher'
-        $tempLaunchers = @(Get-ChildItem -LiteralPath $profile.InstallDir -Filter '.jcode-launcher-*.tmp.exe' -Force -ErrorAction SilentlyContinue)
+        $tempLaunchers = @(Get-ChildItem -LiteralPath $profile.InstallDir -Filter '.kraivcode-launcher-*.tmp.exe' -Force -ErrorAction SilentlyContinue)
         Assert-Equal 0 $tempLaunchers.Count 'failed launcher install should not leave temporary launcher files behind'
         $script:coveredScenarios.rollback_failure = $true
     }
@@ -425,9 +425,9 @@ try {
         New-Item -ItemType Directory -Path $profile.HotkeyDir -Force | Out-Null
         New-Item -ItemType Directory -Path (Split-Path -Parent $profile.StartupShortcutPath) -Force | Out-Null
         Set-Content -Path $profile.LauncherPath -Value 'installed launcher' -NoNewline
-        $oldLauncherPath = Join-Path $profile.InstallDir '.jcode-launcher-old-a1b2c3.exe'
+        $oldLauncherPath = Join-Path $profile.InstallDir '.kraivcode-launcher-old-a1b2c3.exe'
         Set-Content -Path $oldLauncherPath -Value 'previous running launcher' -NoNewline
-        Set-Content -Path (Join-Path $profile.BuildsDir 'stable\jcode.exe') -Value 'stable build' -NoNewline
+        Set-Content -Path (Join-Path $profile.BuildsDir 'stable\kraivcode.exe') -Value 'stable build' -NoNewline
         Set-Content -Path (Join-Path $profile.JcodeHome 'config.toml') -Value 'kept = true' -NoNewline
         Set-Content -Path (Join-Path $profile.HotkeyDir 'jcode-hotkey.ps1') -Value 'legacy listener' -NoNewline
         Set-Content -Path $profile.StartupShortcutPath -Value 'startup shortcut' -NoNewline
@@ -449,7 +449,7 @@ try {
         $setupHints = Get-Content -LiteralPath $profile.SetupHintsPath -Raw | ConvertFrom-Json
         Assert-Equal $false $setupHints.hotkey_configured 'uninstall should clear the persisted hotkey-configured state'
         Assert-Equal $true $setupHints.hotkey_dismissed 'uninstall should keep the removed hotkey prompt dismissed'
-        Assert-Equal 'C:\Keep' $script:uninstallUserPath 'uninstall should remove all jcode-managed PATH variants and keep unrelated entries'
+        Assert-Equal 'C:\Keep' $script:uninstallUserPath 'uninstall should remove all Kraivcode-managed PATH variants and keep unrelated entries'
         Assert-Equal 1 $script:uninstallSetCalls 'uninstall should write mocked user PATH once when cleanup changes it'
         Assert-Equal 1 $script:uninstallBroadcasts 'uninstall should broadcast once after PATH cleanup'
         $script:coveredScenarios.uninstall_cleanup = $true
