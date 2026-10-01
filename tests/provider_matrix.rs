@@ -1,18 +1,18 @@
 use anyhow::Result;
-use jcode::auth::{AuthState, AuthStatus};
-use jcode::cli::provider_init::{
+use jcode_provider_openrouter_runtime::OpenRouterProvider;
+use kraivcode::auth::{AuthState, AuthStatus};
+use kraivcode::cli::provider_init::{
     ProviderChoice, apply_login_provider_profile_env, choice_for_login_provider,
     init_provider_for_validation,
 };
-use jcode::provider::Provider;
-use jcode::provider_catalog::{
+use kraivcode::provider::Provider;
+use kraivcode::provider_catalog::{
     LoginProviderDescriptor, LoginProviderTarget, OPENAI_COMPAT_PROFILE, OpenAiCompatibleProfile,
     apply_openai_compatible_profile_env, load_api_key_from_env_or_config, login_providers,
     openai_compatible_profile_is_configured, openai_compatible_profiles,
     resolve_openai_compatible_profile, save_env_value_to_env_file,
     server_bootstrap_login_providers,
 };
-use jcode_provider_openrouter_runtime::OpenRouterProvider;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -98,13 +98,13 @@ impl TestEnv {
             .collect::<Vec<_>>();
 
         for (key, _) in &saved {
-            jcode::env::remove_var(key);
+            kraivcode::env::remove_var(key);
         }
 
         let config_root = temp.path().join("config").join("jcode");
         std::fs::create_dir_all(&config_root)?;
-        jcode::env::set_var("JCODE_HOME", temp.path());
-        jcode::config::invalidate_config_cache();
+        kraivcode::env::set_var("JCODE_HOME", temp.path());
+        kraivcode::config::invalidate_config_cache();
         apply_openai_compatible_profile_env(None);
         AuthStatus::invalidate_cache();
 
@@ -124,9 +124,9 @@ impl TestEnv {
     }
 
     fn clear_profile_keys(&self) {
-        jcode::env::remove_var("OPENROUTER_API_KEY");
+        kraivcode::env::remove_var("OPENROUTER_API_KEY");
         for profile in openai_compatible_profiles() {
-            jcode::env::remove_var(profile.api_key_env);
+            kraivcode::env::remove_var(profile.api_key_env);
         }
         AuthStatus::invalidate_cache();
     }
@@ -136,16 +136,16 @@ impl Drop for TestEnv {
     fn drop(&mut self) {
         apply_openai_compatible_profile_env(None);
         AuthStatus::invalidate_cache();
-        jcode::config::invalidate_config_cache();
+        kraivcode::config::invalidate_config_cache();
         for (key, value) in &self.saved {
             if let Some(value) = value {
-                jcode::env::set_var(key, value);
+                kraivcode::env::set_var(key, value);
             } else {
-                jcode::env::remove_var(key);
+                kraivcode::env::remove_var(key);
             }
         }
         AuthStatus::invalidate_cache();
-        jcode::config::invalidate_config_cache();
+        kraivcode::config::invalidate_config_cache();
     }
 }
 
@@ -196,7 +196,7 @@ fn clear_openai_compatible_runtime_env() {
         "JCODE_PROVIDER_PROFILE_NAME",
         "JCODE_NAMED_PROVIDER_PROFILE",
     ] {
-        jcode::env::remove_var(key);
+        kraivcode::env::remove_var(key);
     }
     AuthStatus::invalidate_cache();
 }
@@ -249,7 +249,7 @@ fn write_profile_api_key_file(
     let path = env.config_dir().join(&resolved.env_file);
     std::fs::create_dir_all(env.config_dir())?;
     std::fs::write(&path, format!("{}={value}\n", resolved.api_key_env))?;
-    jcode::env::remove_var(&resolved.api_key_env);
+    kraivcode::env::remove_var(&resolved.api_key_env);
     AuthStatus::invalidate_cache();
     Ok(())
 }
@@ -307,7 +307,7 @@ fn apply_competing_compatible_state(
                     env.config_file(),
                     format!("[provider]\ndefault_provider = \"{default_provider}\"\n"),
                 )?;
-                jcode::config::invalidate_config_cache();
+                kraivcode::config::invalidate_config_cache();
             }
         }
     }
@@ -387,23 +387,23 @@ fn assert_no_active_compatible_profile_lock(context: &str) {
 fn seed_non_compatible_auto_auth(provider: LoginProviderDescriptor) -> bool {
     match provider.target {
         LoginProviderTarget::Claude => {
-            jcode::env::set_var("ANTHROPIC_API_KEY", "test-anthropic-key");
+            kraivcode::env::set_var("ANTHROPIC_API_KEY", "test-anthropic-key");
             true
         }
         LoginProviderTarget::OpenAiApiKey => {
-            jcode::env::set_var("OPENAI_API_KEY", "sk-test-openai-key");
+            kraivcode::env::set_var("OPENAI_API_KEY", "sk-test-openai-key");
             true
         }
         LoginProviderTarget::OpenRouter => {
-            jcode::env::set_var("OPENROUTER_API_KEY", "sk-test-openrouter-key");
+            kraivcode::env::set_var("OPENROUTER_API_KEY", "sk-test-openrouter-key");
             true
         }
         LoginProviderTarget::Copilot => {
-            jcode::env::set_var("COPILOT_GITHUB_TOKEN", "gho_test-copilot-token");
+            kraivcode::env::set_var("COPILOT_GITHUB_TOKEN", "gho_test-copilot-token");
             true
         }
         LoginProviderTarget::Cursor => {
-            jcode::env::set_var("CURSOR_API_KEY", "sk-test-cursor-key");
+            kraivcode::env::set_var("CURSOR_API_KEY", "sk-test-cursor-key");
             true
         }
         _ => false,
@@ -723,7 +723,7 @@ fn provider_matrix_openai_compatible_auth_state_space_material_states_preserve_l
                         "runtime no-auth flag mismatch for {state_label}"
                     );
                     assert_eq!(
-                        jcode::provider::openrouter::has_credentials(),
+                        kraivcode::provider::openrouter::has_credentials(),
                         expected_configured,
                         "runtime credentials mismatch for {state_label}"
                     );
@@ -778,7 +778,7 @@ fn provider_matrix_env_credentials_activate_openrouter_runtime() -> Result<()> {
         env.clear_profile_keys();
         apply_openai_compatible_profile_env(Some(profile));
         let resolved = resolve_openai_compatible_profile(profile);
-        jcode::env::set_var(&resolved.api_key_env, "matrix-env-secret");
+        kraivcode::env::set_var(&resolved.api_key_env, "matrix-env-secret");
         AuthStatus::invalidate_cache();
 
         assert_eq!(
@@ -808,7 +808,7 @@ fn provider_matrix_env_credentials_activate_openrouter_runtime() -> Result<()> {
             Some("0")
         );
         assert!(
-            jcode::provider::openrouter::has_credentials(),
+            kraivcode::provider::openrouter::has_credentials(),
             "expected credentials for {}",
             resolved.id
         );
@@ -819,7 +819,7 @@ fn provider_matrix_env_credentials_activate_openrouter_runtime() -> Result<()> {
             "direct compatible runtime must not report native OpenRouter auth"
         );
 
-        jcode::env::remove_var(&resolved.api_key_env);
+        kraivcode::env::remove_var(&resolved.api_key_env);
     }
 
     Ok(())
@@ -841,7 +841,7 @@ fn provider_matrix_file_credentials_activate_openrouter_runtime() -> Result<()> 
         AuthStatus::invalidate_cache();
 
         assert!(
-            jcode::provider::openrouter::has_credentials(),
+            kraivcode::provider::openrouter::has_credentials(),
             "expected file credentials for {}",
             resolved.id
         );
@@ -863,13 +863,13 @@ fn provider_matrix_custom_compat_overrides_flow_into_runtime() -> Result<()> {
     let env = TestEnv::new()?;
     env.clear_profile_keys();
 
-    jcode::env::set_var(
+    kraivcode::env::set_var(
         "JCODE_OPENAI_COMPAT_API_BASE",
         "https://api.groq.com/openai/v1/",
     );
-    jcode::env::set_var("JCODE_OPENAI_COMPAT_API_KEY_NAME", "GROQ_API_KEY");
-    jcode::env::set_var("JCODE_OPENAI_COMPAT_ENV_FILE", "groq.env");
-    jcode::env::set_var("JCODE_OPENAI_COMPAT_DEFAULT_MODEL", "openai/gpt-oss-120b");
+    kraivcode::env::set_var("JCODE_OPENAI_COMPAT_API_KEY_NAME", "GROQ_API_KEY");
+    kraivcode::env::set_var("JCODE_OPENAI_COMPAT_ENV_FILE", "groq.env");
+    kraivcode::env::set_var("JCODE_OPENAI_COMPAT_DEFAULT_MODEL", "openai/gpt-oss-120b");
 
     apply_openai_compatible_profile_env(Some(OPENAI_COMPAT_PROFILE));
     let resolved = resolve_openai_compatible_profile(OPENAI_COMPAT_PROFILE);
@@ -897,7 +897,7 @@ fn provider_matrix_custom_compat_overrides_flow_into_runtime() -> Result<()> {
         std::env::var("JCODE_OPENROUTER_ENV_FILE").ok().as_deref(),
         Some("groq.env")
     );
-    assert!(jcode::provider::openrouter::has_credentials());
+    assert!(kraivcode::provider::openrouter::has_credentials());
     OpenRouterProvider::new()?;
     assert_eq!(
         AuthStatus::check().openrouter,
@@ -914,7 +914,7 @@ fn provider_matrix_custom_local_compat_without_api_key_activates_openrouter_runt
     let env = TestEnv::new()?;
     env.clear_profile_keys();
 
-    jcode::env::set_var("JCODE_OPENAI_COMPAT_API_BASE", "http://localhost:11434/v1");
+    kraivcode::env::set_var("JCODE_OPENAI_COMPAT_API_BASE", "http://localhost:11434/v1");
 
     apply_openai_compatible_profile_env(Some(OPENAI_COMPAT_PROFILE));
     let resolved = resolve_openai_compatible_profile(OPENAI_COMPAT_PROFILE);
@@ -928,7 +928,7 @@ fn provider_matrix_custom_local_compat_without_api_key_activates_openrouter_runt
             .as_deref(),
         Some("1")
     );
-    assert!(jcode::provider::openrouter::has_credentials());
+    assert!(kraivcode::provider::openrouter::has_credentials());
     OpenRouterProvider::new()?;
     assert_eq!(
         AuthStatus::check().openrouter,

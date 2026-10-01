@@ -140,7 +140,7 @@ async fn binary_integration_reload_handoff() -> Result<()> {
     let _env = setup_test_env()?;
 
     let release_binary =
-        jcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        kraivcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
     if !release_binary.exists() {
         anyhow::bail!(
             "release binary missing at {} (run `cargo build --release` first)",
@@ -213,7 +213,7 @@ async fn binary_integration_reload_handoff() -> Result<()> {
         );
 
         let marker_deadline = Instant::now() + Duration::from_secs(20);
-        while jcode::server::reload_marker_active(Duration::from_secs(30)) {
+        while kraivcode::server::reload_marker_active(Duration::from_secs(30)) {
             if Instant::now() >= marker_deadline {
                 anyhow::bail!("reload marker remained active too long after restart");
             }
@@ -268,7 +268,7 @@ async fn binary_integration_selfdev_reload_reconnects_quickly() -> Result<()> {
     let _env = setup_test_env()?;
 
     let release_binary =
-        jcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        kraivcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
     if !release_binary.exists() {
         anyhow::bail!(
             "release binary missing at {} (run `cargo build --release` first)",
@@ -374,7 +374,7 @@ async fn binary_integration_selfdev_client_reload_resumes_session() -> Result<()
     let _env = setup_test_env()?;
 
     let release_binary =
-        jcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        kraivcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
     if !release_binary.exists() {
         anyhow::bail!(
             "release binary missing at {} (run `cargo build --release` first)",
@@ -536,7 +536,7 @@ async fn binary_integration_selfdev_full_reload_resumes_session_quickly() -> Res
     let _env = setup_test_env()?;
 
     let release_binary =
-        jcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        kraivcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
     if !release_binary.exists() {
         anyhow::bail!(
             "release binary missing at {} (run `cargo build --release` first)",

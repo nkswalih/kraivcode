@@ -2,9 +2,9 @@
 //!
 //! Faithful offline harness for measuring memory retrieval accuracy. Reuses the
 //! REAL jcode retrieval primitives:
-//!   - `jcode::memory_graph::MemoryGraph` deserialization (real on-disk graphs)
-//!   - `jcode::embedding::embed` (real all-MiniLM-L6-v2 ONNX model)
-//!   - `jcode::memory::format_context_for_relevance` (real live query window)
+//!   - `kraivcode::memory_graph::MemoryGraph` deserialization (real on-disk graphs)
+//!   - `kraivcode::embedding::embed` (real all-MiniLM-L6-v2 ONNX model)
+//!   - `kraivcode::memory::format_context_for_relevance` (real live query window)
 //!   - a faithful re-implementation of `score_and_filter` (cosine + gap filter)
 //!
 //! Privacy: all data lives OUTSIDE the repo (default `~/jcode-memory-bench`).
@@ -21,10 +21,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use jcode::embedding;
-use jcode::memory::format_context_for_relevance;
-use jcode::memory_graph::MemoryGraph;
-use jcode::session::Session;
+use kraivcode::embedding;
+use kraivcode::memory::format_context_for_relevance;
+use kraivcode::memory_graph::MemoryGraph;
+use kraivcode::session::Session;
 use serde::{Deserialize, Serialize};
 
 // ---- Tunables that mirror production retrieval (memory.rs) ----
@@ -522,7 +522,7 @@ fn cmd_queries(args: &[String]) -> Result<()> {
         let user_turns: Vec<usize> = messages
             .iter()
             .enumerate()
-            .filter(|(_, m)| matches!(m.role, jcode::message::Role::User))
+            .filter(|(_, m)| matches!(m.role, kraivcode::message::Role::User))
             .map(|(i, _)| i)
             // Skip the first two user turns: they are dominated by the session
             // bootstrap (system reminder + opening ask) and carry little
@@ -736,10 +736,10 @@ fn parse_judge_response(resp: &str, n: usize) -> Vec<usize> {
 
 // ---- Listwise LLM reranker (recall-5, Mode-2) ----------------------------
 //
-// The prompt/parse/rerank logic lives in the shared `jcode::memory_rerank`
+// The prompt/parse/rerank logic lives in the shared `kraivcode::memory_rerank`
 // module so the benchmark and the live memory agent use ONE implementation
 // (bench == prod). This file only orchestrates running it over the gold set.
-use jcode::memory_rerank::{LLM_RERANK_SYSTEM, build_rerank_prompt, parse_rerank_response};
+use kraivcode::memory_rerank::{LLM_RERANK_SYSTEM, build_rerank_prompt, parse_rerank_response};
 
 /// STRICT precision variant of the listwise rerank system prompt. Pushes the
 /// model to keep ONLY memories it is near-certain are useful for THIS request,
@@ -921,9 +921,9 @@ fn cmd_judge(args: &[String]) -> Result<()> {
                         } else {
                             Some(reasoning)
                         };
-                        jcode::sidecar::Sidecar::with_openai_model(&model, eff)
+                        kraivcode::sidecar::Sidecar::with_openai_model(&model, eff)
                     } else {
-                        jcode::sidecar::Sidecar::with_claude_model(&model)
+                        kraivcode::sidecar::Sidecar::with_claude_model(&model)
                     };
                     let prompt = build_judge_prompt(&input);
                     let n = input.candidates.len();
@@ -1037,7 +1037,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
         // SAFETY: single-threaded setup before any embedding work.
         unsafe { std::env::set_var("JCODE_HOME", &tmp) };
         let project_dir = "/bench/prod-validate";
-        let mgr = jcode::memory::MemoryManager::new().with_project_dir(project_dir);
+        let mgr = kraivcode::memory::MemoryManager::new().with_project_dir(project_dir);
         let graph = load_graph(Path::new(&graph_file))?;
         mgr.save_project_graph(&graph)?;
         Some(mgr)
@@ -1050,7 +1050,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
     // prefix. Used by the *_alt configs.
     let alt_embedder = opts.get("embedder").map(|dir| {
         eprintln!("Loading alt embedder from {dir}");
-        jcode::embedding::Embedder::load_from_dir(Path::new(dir)).expect("load alt embedder")
+        kraivcode::embedding::Embedder::load_from_dir(Path::new(dir)).expect("load alt embedder")
     });
     let query_prefix = opts.get("query_prefix").cloned().unwrap_or_default();
     let passage_prefix = opts.get("passage_prefix").cloned().unwrap_or_default();
@@ -1081,7 +1081,9 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
     // would use. Requires OPENAI_API_KEY (or --openai_key=...). Model/base via
     // --openai_model / --openai_base.
     let openai_backend = if config == "openai_dense" || config == "openai_hybrid" {
-        use jcode::embedding_backend::{DEFAULT_OPENAI_EMBEDDING_MODEL, OpenAiEmbeddingBackend};
+        use kraivcode::embedding_backend::{
+            DEFAULT_OPENAI_EMBEDDING_MODEL, OpenAiEmbeddingBackend,
+        };
         let model = opts
             .get("openai_model")
             .cloned()
@@ -1091,7 +1093,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
             .cloned()
             .or_else(|| std::env::var("OPENAI_API_KEY").ok())
             .or_else(|| {
-                jcode::provider_catalog::load_api_key_from_env_or_config(
+                kraivcode::provider_catalog::load_api_key_from_env_or_config(
                     "OPENAI_API_KEY",
                     "openai.env",
                 )
@@ -1109,7 +1111,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
     // amortize HTTP round-trips. id -> vector.
     let openai_corpus_emb: Vec<(String, Vec<f32>)> = match openai_backend.as_ref() {
         Some(b) => {
-            use jcode::embedding_backend::EmbeddingBackend;
+            use kraivcode::embedding_backend::EmbeddingBackend;
             let items: Vec<(String, String)> = corpus
                 .active()
                 .map(|m| (m.id.clone(), m.content.clone()))
@@ -1136,7 +1138,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
     // Optional cross-encoder reranker for ce_rerank config.
     let ce_reranker = opts.get("reranker").map(|dir| {
         eprintln!("Loading cross-encoder reranker from {dir}");
-        jcode::embedding::CrossEncoder::load_from_dir(Path::new(dir)).expect("load reranker")
+        kraivcode::embedding::CrossEncoder::load_from_dir(Path::new(dir)).expect("load reranker")
     });
     let rerank_pool: usize = opts
         .get("rerank_pool")
@@ -1285,9 +1287,9 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
                             } else {
                                 Some(reasoning)
                             };
-                            jcode::sidecar::Sidecar::with_openai_model(&model, eff)
+                            kraivcode::sidecar::Sidecar::with_openai_model(&model, eff)
                         } else {
-                            jcode::sidecar::Sidecar::with_claude_model(&model)
+                            kraivcode::sidecar::Sidecar::with_claude_model(&model)
                         };
                         let n = cands.len();
                         // Prompt + system for cost accounting (char proxy for tokens).
@@ -1496,9 +1498,9 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
                     let backend = backend.clone();
                     async move {
                         let sidecar = if backend == "openai" {
-                            jcode::sidecar::Sidecar::with_openai_model(&model, None)
+                            kraivcode::sidecar::Sidecar::with_openai_model(&model, None)
                         } else {
-                            jcode::sidecar::Sidecar::with_claude_model(&model)
+                            kraivcode::sidecar::Sidecar::with_claude_model(&model)
                         };
                         let n = cands.len();
                         let prompt = build_rerank_prompt(&query, &cands);
@@ -1638,7 +1640,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
                         let mut votes: HashMap<usize, usize> = HashMap::new();
                         let mut out_chars = 0usize;
                         for _ in 0..n_ens {
-                            let sidecar = jcode::sidecar::Sidecar::with_claude_model(&model);
+                            let sidecar = kraivcode::sidecar::Sidecar::with_claude_model(&model);
                             for attempt in 0..2 {
                                 match sidecar.complete(JUDGE_SYSTEM, &prompt).await {
                                     Ok(resp) => {
@@ -1784,7 +1786,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
                 .unwrap_or_default()
         });
         let q_emb_openai = openai_backend.as_ref().map(|b| {
-            use jcode::embedding_backend::EmbeddingBackend;
+            use kraivcode::embedding_backend::EmbeddingBackend;
             b.embed_query(&q.query)
                 .expect("OpenAI query embedding failed")
         });
@@ -2158,7 +2160,7 @@ fn cmd_probe(args: &[String]) -> Result<()> {
     let dir = opts.get("embedder").cloned().expect("--embedder required");
     let qp = opts.get("query_prefix").cloned().unwrap_or_default();
     let pp = opts.get("passage_prefix").cloned().unwrap_or_default();
-    let e = jcode::embedding::Embedder::load_from_dir(Path::new(&dir))?;
+    let e = kraivcode::embedding::Embedder::load_from_dir(Path::new(&dir))?;
     let a = e.embed(&format!("{qp}cargo build profile"))?;
     let b = e.embed(&format!("{pp}The build uses cargo profile selfdev"))?;
     let c = e.embed(&format!("{pp}coffee brewing temperature guide"))?;
@@ -2300,7 +2302,7 @@ fn cmd_gate(args: &[String]) -> Result<()> {
         let user_turns: Vec<usize> = messages
             .iter()
             .enumerate()
-            .filter(|(_, m)| matches!(m.role, jcode::message::Role::User))
+            .filter(|(_, m)| matches!(m.role, kraivcode::message::Role::User))
             .map(|(i, _)| i)
             .skip(2)
             .collect();
