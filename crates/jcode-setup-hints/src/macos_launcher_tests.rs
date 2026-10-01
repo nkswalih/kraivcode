@@ -31,7 +31,10 @@ fn legacy_cli_launchers_and_old_broker_location_are_found() {
     let found = legacy_macos_bundles(apps);
     assert_eq!(
         found,
-        vec![apps.join("Kraivcode Notifications.app"), apps.join("Jcode.app")]
+        vec![
+            apps.join("Kraivcode Notifications.app"),
+            apps.join("Jcode.app")
+        ]
     );
 }
 

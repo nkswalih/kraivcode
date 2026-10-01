@@ -1001,7 +1001,9 @@ pub fn load_claude_tokens() -> Result<OAuthTokens> {
         });
     }
 
-    anyhow::bail!("No Claude Max OAuth credentials found. Run 'kraivcode login --provider claude'.");
+    anyhow::bail!(
+        "No Claude Max OAuth credentials found. Run 'kraivcode login --provider claude'."
+    );
 }
 
 /// Load Claude tokens for a specific stored account label.

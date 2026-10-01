@@ -1546,8 +1546,9 @@ impl NativeProviderKind {
                 Ok("Cursor credential resolved".to_string())
             }
             Self::Copilot => {
-                let token = jcode_base::auth::copilot::load_github_token()
-                    .context("load GitHub Copilot token (run `kraivcode login --provider copilot`)")?;
+                let token = jcode_base::auth::copilot::load_github_token().context(
+                    "load GitHub Copilot token (run `kraivcode login --provider copilot`)",
+                )?;
                 if token.trim().is_empty() {
                     anyhow::bail!("resolved an empty GitHub Copilot token");
                 }

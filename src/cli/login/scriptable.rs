@@ -919,7 +919,10 @@ pub(super) fn scriptable_resume_command(
                 provider
             )
         }
-        "auth_code" => format!("kraivcode login --provider {} --auth-code '<code>'", provider),
+        "auth_code" => format!(
+            "kraivcode login --provider {} --auth-code '<code>'",
+            provider
+        ),
         "complete" => format!("kraivcode login --provider {} --complete", provider),
         _ => format!(
             "kraivcode login --provider {} --callback-url '<url>'  # or --auth-code '<code>'",

@@ -486,7 +486,6 @@ mod tests {
                 thought_signature: None,
             }),
             pasted_segments: None,
-
         }
     }
 

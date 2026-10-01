@@ -543,7 +543,10 @@ fn test_selfdev_prompt_prefers_publish_flow_for_active_builds() {
     assert!(prompt.contains("cancel-build"));
     assert!(prompt.contains("selfdev reload"));
     assert!(prompt.contains("fallback when `selfdev build` is not appropriate"));
-    assert!(prompt.contains("scripts/dev_cargo.sh build --profile selfdev -p kraivcode --bin kraivcode"));
+    assert!(
+        prompt
+            .contains("scripts/dev_cargo.sh build --profile selfdev -p kraivcode --bin kraivcode")
+    );
     assert!(prompt.contains("remote build host is configured"));
     assert!(prompt.contains("Do not wait for user input"));
 }

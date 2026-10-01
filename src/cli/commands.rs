@@ -1959,7 +1959,9 @@ pub async fn run_browser(action: &str, requested: Option<&str>) -> Result<()> {
             if let Some(saved) = browser::saved_browser_preference() {
                 println!("  configured by setup: {}", saved.id());
             }
-            println!("\nOverride with `kraivcode browser setup <browser>` or JCODE_BROWSER=<browser>.");
+            println!(
+                "\nOverride with `kraivcode browser setup <browser>` or JCODE_BROWSER=<browser>."
+            );
         }
         "status" => {
             let target = browser::resolve_target_browser(requested)?;
@@ -2435,7 +2437,8 @@ Re-run with `--force` if you really want to stop the server.";
                         detail = format!("Terminated the Kraivcode server (pid {pid}).");
                     }
                     Err(e) => {
-                        detail = format!("Failed to terminate the Kraivcode server (pid {pid}): {e}");
+                        detail =
+                            format!("Failed to terminate the Kraivcode server (pid {pid}): {e}");
                     }
                 }
             }

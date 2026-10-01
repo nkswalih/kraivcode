@@ -256,7 +256,10 @@ mod tests {
             brief.contains("jcode auth-test --provider openai --json"),
             "{brief}"
         );
-        assert!(brief.contains("kraivcode login --provider openai"), "{brief}");
+        assert!(
+            brief.contains("kraivcode login --provider openai"),
+            "{brief}"
+        );
         assert!(brief.contains("--api-key-stdin"), "{brief}");
         assert!(brief.contains("jcode provider add"), "{brief}");
         // Points at the logs.

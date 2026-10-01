@@ -1261,11 +1261,15 @@ mod tests {
         );
         let parsed = parse_sha256sums(&contents).unwrap();
         assert_eq!(
-            parsed.get("kraivcode-linux-x86_64.tar.gz").map(String::as_str),
+            parsed
+                .get("kraivcode-linux-x86_64.tar.gz")
+                .map(String::as_str),
             Some(digest_a.as_str())
         );
         assert_eq!(
-            parsed.get("kraivcode-windows-x86_64.exe").map(String::as_str),
+            parsed
+                .get("kraivcode-windows-x86_64.exe")
+                .map(String::as_str),
             Some(digest_b_lower.as_str())
         );
     }
