@@ -4,6 +4,7 @@ use crate::side_panel::SidePanelSnapshot;
 
 fn context(dir: &std::path::Path, session: &str) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: session.into(),
         message_id: "msg".into(),
         tool_call_id: uuid::Uuid::new_v4().to_string(),

@@ -35,8 +35,8 @@ pub async fn run_debug_command(
         eprintln!("  2. debug_socket is enabled in ~/.jcode/config.toml");
         eprintln!("     [display]");
         eprintln!("     debug_socket = true");
-        eprintln!("\nOr use 'jcode debug start' to start a server.");
-        eprintln!("Use 'jcode debug list' to see running servers.");
+        eprintln!("\nOr use 'kraivcode debug start' to start a server.");
+        eprintln!("Use 'kraivcode debug list' to see running servers.");
         anyhow::bail!("Debug socket not available");
     }
 
@@ -130,7 +130,7 @@ async fn debug_list_servers() -> Result<()> {
 
     if servers.is_empty() {
         println!("No running jcode servers found.");
-        println!("\nStart one with: jcode debug start");
+        println!("\nStart one with: kraivcode debug start");
         return Ok(());
     }
 
@@ -178,7 +178,7 @@ async fn debug_list_servers() -> Result<()> {
     }
 
     println!("\nUse -s/--socket to target a specific server:");
-    println!("  jcode debug -s /path/to/socket.sock sessions");
+    println!("  kraivcode debug -s /path/to/socket.sock sessions");
 
     Ok(())
 }
@@ -236,7 +236,7 @@ async fn debug_start_server(arg: &str, socket_path: Option<String>) -> Result<()
             .is_ok()
     {
         eprintln!("Server already running at {}", socket);
-        eprintln!("Use 'jcode debug list' to see all servers.");
+        eprintln!("Use 'kraivcode debug list' to see all servers.");
         return Ok(());
     }
 

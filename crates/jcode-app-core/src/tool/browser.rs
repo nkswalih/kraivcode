@@ -126,6 +126,11 @@ struct ScrollTo {
     y: Option<f64>,
 }
 
+// `#[async_trait]` emits a bare `#[must_use]` on each desugared method, and the
+// pinned `dyn Future` it returns is already `#[must_use]` in its own right, so
+// clippy reports the pairing as `double_must_use`. The attribute is generated
+// inside the macro expansion, leaving nowhere here to give it a reason.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 trait BrowserProvider: Send + Sync {
     fn id(&self) -> &'static str;
@@ -624,7 +629,7 @@ async fn ensure_firefox_ready(
     }
 
     let mut message = String::from(
-        "Browser automation is not ready yet. Use the browser tool with action='status' to confirm current state. Only run action='setup' or `jcode browser setup` for first-time install or repair when the bridge is not already ready.\n",
+        "Browser automation is not ready yet. Use the browser tool with action='status' to confirm current state. Only run action='setup' or `kraivcode browser setup` for first-time install or repair when the bridge is not already ready.\n",
     );
     if !status.binary_installed {
         message.push_str("Browser bridge binary is not installed yet.\n");

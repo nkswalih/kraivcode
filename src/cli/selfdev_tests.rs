@@ -189,6 +189,7 @@ async fn test_selfdev_session_and_registry() {
         tool_call_id: "test".to_string(),
         working_dir: None,
         stdin_request_tx: None,
+        ask_user_request_tx: None,
         graceful_shutdown_signal: None,
         execution_mode: tool::ToolExecutionMode::Direct,
     };
@@ -299,9 +300,9 @@ fn test_selfdev_build_command_prefers_repo_wrapper_when_present() {
     assert_eq!(build.program, "bash");
     assert_eq!(build.args.first().map(String::as_str), Some("-lc"));
     let command = build.args.get(1).expect("shell command");
-    assert!(command.contains("dev_cargo.sh' build --profile selfdev -p jcode --bin jcode"));
+    assert!(command.contains("dev_cargo.sh' build --profile selfdev -p kraivcode --bin kraivcode"));
     assert!(!command.contains("jcode-desktop"));
-    assert!(build.display.contains("-p jcode --bin jcode"));
+    assert!(build.display.contains("-p kraivcode --bin kraivcode"));
     assert!(!build.display.contains("jcode-desktop"));
 }
 
@@ -312,7 +313,7 @@ fn test_selfdev_build_command_falls_back_to_cargo_when_wrapper_missing() {
     assert_eq!(build.program, "bash");
     assert_eq!(build.args.first().map(String::as_str), Some("-lc"));
     let command = build.args.get(1).expect("shell command");
-    assert!(command.contains("cargo build --profile selfdev -p jcode --bin jcode"));
+    assert!(command.contains("cargo build --profile selfdev -p kraivcode --bin kraivcode"));
     assert!(!command.contains("jcode-desktop"));
 }
 
@@ -321,8 +322,8 @@ fn test_selfdev_build_command_can_target_all() {
     let temp = tempfile::tempdir().expect("tempdir");
     let build =
         build::selfdev_build_command_for_target(temp.path(), build::SelfDevBuildTarget::All);
-    assert!(build.display.contains("-p jcode --bin jcode"));
-    assert!(build.display.contains("-p jcode --bin jcode"));
+    assert!(build.display.contains("-p kraivcode --bin kraivcode"));
+    assert!(build.display.contains("-p kraivcode --bin kraivcode"));
 }
 
 #[test]
@@ -330,6 +331,6 @@ fn test_selfdev_build_command_can_target_tui_only() {
     let temp = tempfile::tempdir().expect("tempdir");
     let build =
         build::selfdev_build_command_for_target(temp.path(), build::SelfDevBuildTarget::Tui);
-    assert!(build.display.contains("-p jcode --bin jcode"));
+    assert!(build.display.contains("-p kraivcode --bin kraivcode"));
     assert!(!build.display.contains("jcode-desktop"));
 }

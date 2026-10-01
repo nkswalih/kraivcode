@@ -1322,7 +1322,7 @@ pub(super) async fn handle_client(
                         active_skill,
                         persona: persona
                             .as_deref()
-                            .and_then(|key| crate::agent::persona::AgentPersona::from_key(key)),
+                            .and_then(crate::agent::persona::AgentPersona::from_key),
                     },
                     &client_session_id,
                     &mut ProcessingState {

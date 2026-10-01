@@ -630,7 +630,7 @@ impl AuthStatus {
                 if self.grok_build == AuthState::Available {
                     "Grok CLI subscription login (xAI OIDC, auto-refreshed)".to_string()
                 } else {
-                    "not configured (run `jcode login --provider grok-build`)".to_string()
+                    "not configured (run `kraivcode login --provider grok-build`)".to_string()
                 }
             }
             crate::provider_catalog::LoginProviderTarget::OpenAiCompatible(profile) => {
@@ -1057,7 +1057,7 @@ fn record_auth_probe_step(
 /// access tokens expire roughly hourly and the provider transparently
 /// refreshes them on the next request, so reporting `Expired` purely because
 /// the cached access token aged out makes a perfectly working provider look
-/// dead in `/login`, the header, onboarding, and `jcode auth status`.
+/// dead in `/login`, the header, onboarding, and `kraivcode auth status`.
 ///
 /// Only report `Expired` when the refresh token itself is missing or was
 /// already permanently rejected (revoked / `invalid_grant`), which is the case

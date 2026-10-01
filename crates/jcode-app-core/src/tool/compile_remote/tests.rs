@@ -112,6 +112,7 @@ fn build_request() -> BuildRequest {
 
 fn context(root: &Path) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "remote-test-session".into(),
         message_id: "message".into(),
         tool_call_id: "remote-test-call".into(),

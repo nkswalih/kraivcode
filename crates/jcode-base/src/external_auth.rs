@@ -91,7 +91,7 @@ impl ExternalAuthReviewCandidate {
     }
 
     /// Canonical Jcode provider ids (`claude`, `openai`, ...) this source would
-    /// sign in, matching `jcode auth status --json` ids. Lets a UI tell which
+    /// sign in, matching `kraivcode auth status --json` ids. Lets a UI tell which
     /// detected logins Jcode already has.
     pub fn provider_ids(&self) -> Vec<&'static str> {
         self.provider_summary
@@ -428,7 +428,7 @@ fn approve_external_auth_review_candidate(candidate: &ExternalAuthReviewCandidat
             auth::claude::trust_native_source()?;
             if let Err(err) = auth::claude::import_native_credentials_into_account() {
                 crate::logging::warn(&format!(
-                    "Trusted Claude Code native credentials but could not snapshot them into jcode: {err}"
+                    "Trusted Claude Code native credentials but could not snapshot them into Kraivcode: {err}"
                 ));
             }
         }

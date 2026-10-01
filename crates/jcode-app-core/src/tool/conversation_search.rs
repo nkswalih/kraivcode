@@ -337,6 +337,7 @@ mod tests {
         session.save().unwrap();
 
         let ctx = ToolContext {
+            ask_user_request_tx: None,
             session_id,
             message_id: "test-message".to_string(),
             tool_call_id: "test-tool-call".to_string(),

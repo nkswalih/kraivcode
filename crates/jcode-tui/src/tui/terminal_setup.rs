@@ -97,7 +97,7 @@ pub const APPLE_TERMINAL_SHIFT_RETURN_KEY: &str = "$\\015";
 /// encoding crossterm understands, and `terminal-features` is required for tmux
 /// to request extended keys from the outer terminal in the first place.
 pub const TMUX_CONFIG_BLOCK: &str = "\
-# jcode: let Shift+Enter reach the application instead of collapsing to Enter.
+# kraivcode: let Shift+Enter reach the application instead of collapsing to Enter.
 set -s extended-keys on
 set -s extended-keys-format csi-u
 set -as terminal-features 'xterm*:extkeys'
@@ -108,7 +108,7 @@ pub const WEZTERM_CONFIG_LINE: &str = "config.enable_kitty_keyboard = true";
 
 /// Marker used to detect a block this command already wrote, so re-running is
 /// idempotent instead of appending duplicates.
-pub const MANAGED_MARKER: &str = "# jcode: let Shift+Enter reach the application";
+pub const MANAGED_MARKER: &str = "# kraivcode: let Shift+Enter reach the application";
 
 /// Whether `config` already contains jcode's managed tmux block.
 pub fn tmux_config_is_configured(config: &str) -> bool {

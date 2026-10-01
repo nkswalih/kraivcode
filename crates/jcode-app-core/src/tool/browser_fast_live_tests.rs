@@ -16,6 +16,7 @@ fn fixture_context() -> ToolContext {
         "Set BROWSER_SESSION to the existing dedicated fixture session. Without it the bridge could create a window."
     );
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "browser-fast-live-acceptance".into(),
         message_id: "browser-fast-live-acceptance".into(),
         tool_call_id: "browser-fast-live-acceptance".into(),

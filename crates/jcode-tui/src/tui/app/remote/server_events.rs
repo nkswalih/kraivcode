@@ -1335,25 +1335,25 @@ pub(in crate::tui::app) fn handle_server_event(
             // marks the failing provider unavailable, so the re-send routes to
             // the offered candidate. Manual mode falls through to the raw
             // error below.
-            if let Some(prompt) = crate::provider::parse_failover_prompt_message(&message) {
-                if matches!(
+            if let Some(prompt) = crate::provider::parse_failover_prompt_message(&message)
+                && matches!(
                     crate::config::Config::load()
                         .provider
                         .cross_provider_failover,
                     crate::config::CrossProviderFailoverMode::Countdown
-                ) && let Some(payload) = failed_fallback_payload.clone()
-                {
-                    app.arm_remote_provider_failover_countdown(prompt, payload);
-                    app.is_processing = false;
-                    app.status = ProcessingStatus::Idle;
-                    app.stream_message_ended = false;
-                    app.processing_started = None;
-                    app.clear_visible_turn_started();
-                    app.current_message_id = None;
-                    remote.clear_pending();
-                    remote.reset_call_output_tokens_seen();
-                    return false;
-                }
+                )
+                && let Some(payload) = failed_fallback_payload.clone()
+            {
+                app.arm_remote_provider_failover_countdown(prompt, payload);
+                app.is_processing = false;
+                app.status = ProcessingStatus::Idle;
+                app.stream_message_ended = false;
+                app.processing_started = None;
+                app.clear_visible_turn_started();
+                app.current_message_id = None;
+                remote.clear_pending();
+                remote.reset_call_output_tokens_seen();
+                return false;
             }
             app.push_display_message(DisplayMessage {
                 role: "error".to_string(),

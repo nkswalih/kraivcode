@@ -56,7 +56,7 @@ pub async fn connect_socket(path: &std::path::Path) -> Result<Stream> {
         Ok(stream) => Ok(stream),
         Err(err) if err.kind() == std::io::ErrorKind::ConnectionRefused && path.exists() => {
             Err(anyhow::Error::new(err).context(format!(
-                "Socket exists but refused the connection at {}. Retry, or remove it after confirming no jcode server is running.",
+                "Socket exists but refused the connection at {}. Retry, or remove it after confirming no Kraivcode server is running.",
                 path.display()
             )))
         }
@@ -129,7 +129,7 @@ pub async fn reap_stale_socket_if_dead(path: &std::path::Path) -> bool {
     }
 
     crate::logging::warn(&format!(
-        "Reaping stale jcode socket with no live listener at {}",
+        "Reaping stale Kraivcode socket with no live listener at {}",
         path.display()
     ));
     cleanup_socket_pair(path);
@@ -205,7 +205,7 @@ pub(super) fn acquire_daemon_lock() -> Result<DaemonLockGuard> {
     let path = daemon_lock_path();
     try_acquire_daemon_lock(&path)?.ok_or_else(|| {
         anyhow::anyhow!(
-            "Another jcode server process is already running for runtime dir {}",
+            "Another Kraivcode server process is already running for runtime dir {}",
             crate::storage::runtime_dir().display()
         )
     })
@@ -379,7 +379,7 @@ pub(super) fn take_server_start_stderr(child: &mut std::process::Child) -> Strin
 
 #[cfg(unix)]
 pub(super) fn server_start_matches_existing_server(stderr_output: &str) -> bool {
-    stderr_output.contains("Another jcode server process is already running")
+    stderr_output.contains("Another Kraivcode server process is already running")
         || stderr_output.contains("Refusing to replace active server socket")
 }
 

@@ -272,6 +272,7 @@ async fn apply_patch_refuses_to_delete_a_protected_path() {
         .execute(
             serde_json::json!({ "patch_text": patch }),
             ToolContext {
+                ask_user_request_tx: None,
                 session_id: "patch-gate".to_string(),
                 message_id: "m".to_string(),
                 tool_call_id: "c".to_string(),
@@ -314,6 +315,7 @@ async fn apply_patch_still_deletes_ordinary_files() {
         .execute(
             serde_json::json!({ "patch_text": patch }),
             ToolContext {
+                ask_user_request_tx: None,
                 session_id: "patch-ok".to_string(),
                 message_id: "m".to_string(),
                 tool_call_id: "c".to_string(),

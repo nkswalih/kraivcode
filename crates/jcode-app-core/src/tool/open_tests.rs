@@ -2,6 +2,7 @@ use super::*;
 
 fn make_ctx() -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "test-session".to_string(),
         message_id: "test-msg".to_string(),
         tool_call_id: "test-call".to_string(),

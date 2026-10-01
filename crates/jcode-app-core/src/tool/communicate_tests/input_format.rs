@@ -199,6 +199,7 @@ fn format_tool_summary_includes_call_count() {
 #[test]
 fn format_members_includes_status_and_detail() {
     let ctx = ToolContext {
+        ask_user_request_tx: None,
         session_id: "sess-self".to_string(),
         message_id: "msg-1".to_string(),
         tool_call_id: "call-1".to_string(),

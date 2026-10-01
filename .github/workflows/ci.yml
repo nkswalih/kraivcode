@@ -1,10 +1,12 @@
 name: CI
 
 on:
+  # `dev` is this fork's default branch (and therefore where PRs are opened).
+  # Without it in these lists no CI runs at all on fork pull requests.
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, dev]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -26,7 +28,13 @@ jobs:
           ssh-key: ${{ secrets.DEPLOY_KEY }}
           submodules: recursive
 
+      # The cargo git dependencies are public HTTPS repos, so SSH is only
+      # required when a deploy key actually exists. Skip the step otherwise
+      # instead of hard-failing a job that legitimately has no secret.
       - name: Configure SSH for cargo git dependencies
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        if: env.DEPLOY_KEY != ''
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_KEY }}
@@ -152,7 +160,13 @@ jobs:
           ssh-key: ${{ secrets.DEPLOY_KEY }}
           submodules: recursive
 
+      # The cargo git dependencies are public HTTPS repos, so SSH is only
+      # required when a deploy key actually exists. Skip the step otherwise
+      # instead of hard-failing a job that legitimately has no secret.
       - name: Configure SSH for cargo git dependencies
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        if: env.DEPLOY_KEY != ''
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_KEY }}
@@ -392,7 +406,13 @@ jobs:
           ssh-key: ${{ secrets.DEPLOY_KEY }}
           submodules: recursive
 
+      # The cargo git dependencies are public HTTPS repos, so SSH is only
+      # required when a deploy key actually exists. Skip the step otherwise
+      # instead of hard-failing a job that legitimately has no secret.
       - name: Configure SSH for cargo git dependencies
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        if: env.DEPLOY_KEY != ''
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_KEY }}
@@ -645,7 +665,13 @@ jobs:
           ssh-key: ${{ secrets.DEPLOY_KEY }}
           submodules: recursive
 
+      # The cargo git dependencies are public HTTPS repos, so SSH is only
+      # required when a deploy key actually exists. Skip the step otherwise
+      # instead of hard-failing a job that legitimately has no secret.
       - name: Configure SSH for cargo git dependencies
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        if: env.DEPLOY_KEY != ''
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_KEY }}

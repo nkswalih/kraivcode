@@ -46,7 +46,7 @@ where
         let delay = backoff.delay();
         if tokio::time::Instant::now() + delay >= deadline {
             anyhow::bail!(
-                "Jcode account login timed out before browser approval. Run `jcode account login` to try again."
+                "Jcode account login timed out before browser approval. Run `kraivcode account login` to try again."
             );
         }
         tokio::select! {
@@ -75,7 +75,7 @@ where
                 return Ok(KeyPollCompletion::Approved(key));
             }
             Ok(TokenPollOutcome::Expired) => anyhow::bail!(
-                "The browser approval expired or was already exchanged. Run `jcode account login` to start a new single-use flow."
+                "The browser approval expired or was already exchanged. Run `kraivcode account login` to start a new single-use flow."
             ),
             Ok(TokenPollOutcome::Denied) => {
                 anyhow::bail!("Jcode account login was canceled or denied in the browser.")
@@ -195,13 +195,13 @@ pub(super) async fn login_jcode_device_flow(no_browser: bool) -> Result<LoginCom
         Some(ActivationOutcome::Revoked) => {
             crate::subscription_catalog::clear_account_credentials()?;
             anyhow::bail!(
-                "The newly issued account key was revoked before hosted billing activation. Local credentials were cleared; run `jcode account login` again."
+                "The newly issued account key was revoked before hosted billing activation. Local credentials were cleared; run `kraivcode account login` again."
             );
         }
         Some(ActivationOutcome::Denied) => {
             crate::subscription_catalog::clear_account_credentials()?;
             anyhow::bail!(
-                "The account server denied hosted billing checks. Local credentials were cleared; run `jcode account login` again."
+                "The account server denied hosted billing checks. Local credentials were cleared; run `kraivcode account login` again."
             );
         }
         None => {

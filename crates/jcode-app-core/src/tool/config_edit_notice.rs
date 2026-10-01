@@ -50,7 +50,7 @@ pub fn config_edit_notice(path: &Path, before: &str, after: &str) -> Option<Stri
     // in the file quietly stopped applying. Surface it instead.
     if let Err(error) = crate::config::Config::load_strict() {
         return Some(format!(
-            "\n\nWARNING: {} no longer parses as TOML, so jcode is falling back to \
+            "\n\nWARNING: {} no longer parses as TOML, so Kraivcode is falling back to \
              default settings and every setting in this file is being ignored. \
              Fix the syntax error: {error}",
             path.display()
