@@ -912,7 +912,7 @@ fn test_remote_final_catalog_replaces_post_login_loading_state_in_place() {
     app.handle_server_event(
         crate::protocol::ServerEvent::Notification {
             from_session: "jcode".to_string(),
-            from_name: Some("Jcode".to_string()),
+            from_name: Some("Kraivcode".to_string()),
             notification_type: crate::protocol::NotificationType::Message {
                 scope: Some("catalog_activity".to_string()),
                 channel: None,

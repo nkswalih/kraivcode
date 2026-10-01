@@ -723,7 +723,7 @@ pub fn shared_http_client() -> reqwest::Client {
                 .pool_max_idle_per_host(8)
                 .build()
                 .unwrap_or_else(|err| {
-                    eprintln!("jcode: failed to build shared provider HTTP client: {err}");
+                    eprintln!("kraivcode: failed to build shared provider HTTP client: {err}");
                     match reqwest::Client::builder()
                         .user_agent(JCODE_USER_AGENT)
                         .build()
@@ -731,7 +731,7 @@ pub fn shared_http_client() -> reqwest::Client {
                         Ok(client) => client,
                         Err(fallback_err) => {
                             eprintln!(
-                                "jcode: failed to build fallback provider HTTP client: {fallback_err}"
+                                "kraivcode: failed to build fallback provider HTTP client: {fallback_err}"
                             );
                             reqwest::Client::new()
                         }

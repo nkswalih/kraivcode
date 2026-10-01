@@ -2,7 +2,7 @@
 
 jcode collects **anonymous, minimal usage statistics** to help understand how many people use jcode, what providers/models are popular, whether onboarding works, which feature families are used, how often sessions succeed, and whether performance/regressions are improving. This data helps prioritize development. Ordinary telemetry does **not** contain prompts, source code, model responses, or conversation transcripts.
 
-Jcode also offers a separate, optional transcript-sharing program. It is off by
+Kraivcode also offers a separate, optional transcript-sharing program. It is off by
 default and requires choosing **Share full transcripts** in the telemetry
 settings. This consent is independent of ordinary usage telemetry and is
 versioned so an older preference cannot silently opt a user into a newly
@@ -12,12 +12,12 @@ introduced content program.
 
 When transcript sharing is explicitly enabled, one upload is queued when a
 non-empty session closes or crashes. The upload contains the complete structured
-conversation: user prompts, model responses and reasoning retained by Jcode,
+conversation: user prompts, model responses and reasoning retained by Kraivcode,
 source code present in messages, tool names and inputs, and tool results. Images
-remain represented by their transcript content-block metadata; Jcode does not
+remain represented by their transcript content-block metadata; Kraivcode does not
 add local files that were not already present in the conversation.
 
-Before upload, Jcode recursively replaces likely credentials with
+Before upload, Kraivcode recursively replaces likely credentials with
 `[REDACTED_SECRET]`. This covers sensitive JSON fields (API keys, tokens,
 passwords, authorization headers, cookies, private keys, and client secrets),
 known provider-token formats, bearer tokens, JWTs, AWS access-key IDs, private
@@ -105,7 +105,7 @@ telemetry is disabled. Its schema tells the agent to paraphrase, omit secrets an
 private data, and label whether the report originated with the user, the agent,
 or both. User-originated and mixed reports are rejected unless the user explicitly
 approved sharing them; agent-only technical observations do not need per-report
-approval. Jcode does not attach transcript content, repository files, or paths.
+approval. Kraivcode does not attach transcript content, repository files, or paths.
 
 ### Sponsored Discovery Event
 
@@ -399,7 +399,7 @@ sell or to train models. If that ever changes, it will be a separate, clearly di
 ### De-identified usage data for investor due diligence
 
 We may share de-identified, per-installation usage summaries with prospective investors
-under confidentiality, for evaluating Jcode only. These summaries contain a random label
+under confidentiality, for evaluating Kraivcode only. These summaries contain a random label
 for each installation (not the telemetry ID), and per day: session counts, token counts,
 and the estimated list-price value of model usage, plus the first day of activity. They
 contain no telemetry IDs, prompts, code, model responses, file paths, account details,

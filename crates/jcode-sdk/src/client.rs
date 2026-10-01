@@ -470,7 +470,7 @@ impl JcodeClient {
 
     /// Connect to the jcode running on this machine.
     ///
-    /// Use this to automate the user's own jcode: a desktop app, an editor
+    /// Use this to automate the user's own kraivcode: a desktop app, an editor
     /// plugin, a status dashboard. It shares the user's live sessions.
     pub fn connect(options: ConnectOptions) -> Result<Self> {
         let path = options.socket_path.clone().unwrap_or_else(api_socket_path);

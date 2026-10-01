@@ -192,13 +192,13 @@ async fn run_post_login_validation_inner(
         Ok(())
     } else if AuthTestTarget::from_provider_choice(&choice).is_some() {
         anyhow::bail!(
-            "Post-login validation failed for {}. Credentials were saved, but jcode could not verify runtime readiness. Re-run `jcode auth-test --provider {}` for details.",
+            "Post-login validation failed for {}. Credentials were saved, but Kraivcode could not verify runtime readiness. Re-run `jcode auth-test --provider {}` for details.",
             provider.display_name,
             choice.as_arg_value()
         )
     } else {
         anyhow::bail!(
-            "Post-login validation failed for {}. Credentials were saved, but jcode could not verify runtime readiness. Re-test with `jcode --provider {} run \"Reply with exactly AUTH_TEST_OK and nothing else.\"` after fixing the provider/runtime.",
+            "Post-login validation failed for {}. Credentials were saved, but Kraivcode could not verify runtime readiness. Re-test with `jcode --provider {} run \"Reply with exactly AUTH_TEST_OK and nothing else.\"` after fixing the provider/runtime.",
             provider.display_name,
             choice.as_arg_value()
         )

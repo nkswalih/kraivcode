@@ -111,7 +111,7 @@ Notes:
   OAuth requests even if the token is otherwise valid.
 
 ### Removed Claude CLI transport
-The old Claude Code CLI shell-out transport has been removed. Jcode always talks
+The old Claude Code CLI shell-out transport has been removed. Kraivcode always talks
 to the Anthropic API directly. `--provider claude-subprocess` is accepted as an
 alias for `--provider claude`, and `JCODE_USE_CLAUDE_CLI` is ignored.
 

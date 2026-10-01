@@ -887,7 +887,7 @@ impl Registry {
             }
             if desktop && matches!(resolved_name, "selfdev" | "debug_socket") {
                 anyhow::bail!(
-                    "Tool '{}' targets Jcode CLI, not Desktop. Use 'desktop_selfdev'.",
+                    "Tool '{}' targets Kraivcode CLI, not Desktop. Use 'desktop_selfdev'.",
                     resolved_name
                 );
             }

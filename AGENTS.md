@@ -4,6 +4,28 @@
 
 - Jcode Desktop is in a separate repository.
 
+## Branding Boundaries
+
+This is a fork of upstream `1jehuang/jcode`. The user-visible name is **Kraivcode**
+(`nkswalih/kraivcode`). When renaming, sort every hit into one of three buckets:
+
+- **Fork-owned - rename it.** User-facing product strings: CLI `name`/`about`,
+  ACP `agentInfo.name`/`title`, process titles (`kraivcode:s:`, `kraivcode:c:`,
+  `kraivcode:d:`, `kraivcode:client`, `kraivcode:selfdev`), the macOS
+  notification broker bundle, notification titles and bodies, and the release
+  pipeline (repo URLs, Homebrew tap, AUR package).
+- **Upstream-hosted - leave it.** `jcode.sh`, `api.jcode.sh`,
+  `telemetry.jcode.sh`, `jcode.sh/pricing`, `jcode.sh/account`, the `jcode`
+  provider and subscription id, and `Jcode Account` copy. The fork still calls
+  these services; renaming the label would make it claim to host them.
+- **Structural - out of scope.** `~/.jcode/`, `JCODE_*` env vars, the
+  `jcode-*` crate names, the `jcode://` URL scheme, the `jcode` provider id,
+  `com.jcode.*` bundle identifiers, and the installed command name `jcode`
+  (`binary_stem()` in `crates/jcode-build-support/src/paths.rs`). These are the
+  engine's data and wire layout, not the brand.
+
+`LICENSE` keeps its MIT upstream attribution, and the README credits the upstream
+project by name. Do not rewrite `changelog/**`: it is a historical record.
 ## Development Workflow
 
 - **Use the user's Git identity** - Create commits with the configured

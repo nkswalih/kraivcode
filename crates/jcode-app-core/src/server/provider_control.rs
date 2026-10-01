@@ -749,7 +749,7 @@ pub(super) async fn handle_refresh_models(
 fn send_catalog_activity(client_event_tx: &mpsc::UnboundedSender<ServerEvent>, message: &str) {
     let _ = client_event_tx.send(ServerEvent::Notification {
         from_session: "jcode".to_string(),
-        from_name: Some("Jcode".to_string()),
+        from_name: Some("Kraivcode".to_string()),
         notification_type: NotificationType::Message {
             scope: Some("catalog_activity".to_string()),
             channel: None,

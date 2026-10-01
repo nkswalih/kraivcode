@@ -198,7 +198,7 @@ fn test_remote_runtime_activity_notification_renders_as_system_message() {
     app.handle_server_event(
         crate::protocol::ServerEvent::Notification {
             from_session: "jcode".to_string(),
-            from_name: Some("Jcode".to_string()),
+            from_name: Some("Kraivcode".to_string()),
             notification_type: crate::protocol::NotificationType::Message {
                 scope: Some("auth_activity".to_string()),
                 channel: None,
@@ -232,7 +232,7 @@ fn test_remote_auth_activity_notification_is_status_only_during_onboarding() {
     app.handle_server_event(
         crate::protocol::ServerEvent::Notification {
             from_session: "jcode".to_string(),
-            from_name: Some("Jcode".to_string()),
+            from_name: Some("Kraivcode".to_string()),
             notification_type: crate::protocol::NotificationType::Message {
                 scope: Some("auth_activity".to_string()),
                 channel: None,
@@ -266,7 +266,7 @@ fn test_remote_final_catalog_activity_is_two_lines_and_completes_model_setup() {
     app.handle_server_event(
         crate::protocol::ServerEvent::Notification {
             from_session: "jcode".to_string(),
-            from_name: Some("Jcode".to_string()),
+            from_name: Some("Kraivcode".to_string()),
             notification_type: crate::protocol::NotificationType::Message {
                 scope: Some("catalog_activity".to_string()),
                 channel: None,
@@ -325,7 +325,7 @@ fn test_remote_onboarding_catalog_activity_completes_model_setup_without_chat_no
     app.handle_server_event(
         crate::protocol::ServerEvent::Notification {
             from_session: "jcode".to_string(),
-            from_name: Some("Jcode".to_string()),
+            from_name: Some("Kraivcode".to_string()),
             notification_type: crate::protocol::NotificationType::Message {
                 scope: Some("catalog_activity".to_string()),
                 channel: None,
@@ -361,7 +361,7 @@ fn test_remote_catalog_activity_notification_upserts_compact_row() {
         app.handle_server_event(
             crate::protocol::ServerEvent::Notification {
                 from_session: "jcode".to_string(),
-                from_name: Some("Jcode".to_string()),
+                from_name: Some("Kraivcode".to_string()),
                 notification_type: crate::protocol::NotificationType::Message {
                     scope: Some("catalog_activity".to_string()),
                     channel: None,

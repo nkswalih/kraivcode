@@ -648,7 +648,7 @@ impl App {
             let opened = App::open_auth_browser(&device.verification_uri_complete);
             publish(
                 format!(
-                    "Jcode Account Login\n\n{}\n\nApprove the request in the same browser. Jcode is waiting for the single-use exchange.{}",
+                    "Kraivcode Account Login\n\n{}\n\nApprove the request in the same browser. Kraivcode is waiting for the single-use exchange.{}",
                     device.verification_uri_complete,
                     if opened {
                         ""
