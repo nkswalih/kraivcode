@@ -7,8 +7,8 @@ use crate::{build, update};
 
 pub fn hot_rebuild(session_id: &str) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    let repo_dir =
-        build::get_repo_dir().ok_or_else(|| anyhow::anyhow!("Could not find Kraivcode repository"))?;
+    let repo_dir = build::get_repo_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not find Kraivcode repository"))?;
 
     eprintln!("Rebuilding Kraivcode with session {}...", session_id);
     pull_latest_changes_for_rebuild(&repo_dir);

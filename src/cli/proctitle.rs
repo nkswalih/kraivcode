@@ -58,7 +58,9 @@ pub(crate) fn initial_title(args: &Args) -> String {
         Some(Command::Browser { .. }) => "kraivcode browser".to_string(),
         Some(Command::Replay { .. }) => "kraivcode replay".to_string(),
         Some(Command::Model(_)) => "kraivcode model".to_string(),
-        Some(Command::ProviderTestCoverage { .. }) => "kraivcode provider-test-coverage".to_string(),
+        Some(Command::ProviderTestCoverage { .. }) => {
+            "kraivcode provider-test-coverage".to_string()
+        }
         Some(Command::ProviderDoctor { .. }) => "kraivcode provider-doctor".to_string(),
         Some(Command::AuthTest { .. }) => "kraivcode auth-test".to_string(),
         Some(Command::Restart { .. }) => "kraivcode restart".to_string(),

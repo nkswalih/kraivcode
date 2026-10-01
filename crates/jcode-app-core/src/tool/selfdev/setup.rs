@@ -104,12 +104,14 @@ impl SelfDevTool {
             } else if git_available {
                 match Self::clone_selfdev_source() {
                     Ok(path) => {
-                        clone_note = Some(format!("Cloned Kraivcode source into {}.", path.display()));
+                        clone_note =
+                            Some(format!("Cloned Kraivcode source into {}.", path.display()));
                         repo_dir = Some(path);
                     }
                     Err(err) => {
-                        clone_note =
-                            Some(format!("Could not clone Kraivcode source automatically: {err}",));
+                        clone_note = Some(format!(
+                            "Could not clone Kraivcode source automatically: {err}",
+                        ));
                     }
                 }
             }

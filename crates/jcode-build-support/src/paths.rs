@@ -882,7 +882,8 @@ mod tests {
     #[test]
     fn resolve_binary_payload_refuses_ambiguous_payloads() {
         let (temp, wrapper, _payload) = release_install_fixture();
-        std::fs::write(temp.path().join("kraivcode-macos-aarch64.bin"), [0u8; 8]).expect("second bin");
+        std::fs::write(temp.path().join("kraivcode-macos-aarch64.bin"), [0u8; 8])
+            .expect("second bin");
         assert_eq!(
             resolve_binary_payload(&wrapper),
             std::fs::canonicalize(&wrapper).expect("canonical wrapper")

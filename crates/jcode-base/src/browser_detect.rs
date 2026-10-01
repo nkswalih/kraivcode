@@ -47,7 +47,9 @@ impl DetectionSource {
         match self {
             DetectionSource::Requested => "requested explicitly",
             DetectionSource::EnvOverride => "set by JCODE_BROWSER",
-            DetectionSource::SavedPreference => "configured by a previous `kraivcode browser setup`",
+            DetectionSource::SavedPreference => {
+                "configured by a previous `kraivcode browser setup`"
+            }
             DetectionSource::SystemDefault => "your default browser",
             DetectionSource::Installed => "installed (your default browser is not supported)",
             DetectionSource::Fallback => "fallback (no supported browser detected)",

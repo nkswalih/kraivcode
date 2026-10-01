@@ -3,7 +3,8 @@ use anyhow::Result;
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
-const SERVER_NOT_RUNNING: &str = "Kraivcode server is not running; start it with kraivcode server start";
+const SERVER_NOT_RUNNING: &str =
+    "Kraivcode server is not running; start it with kraivcode server start";
 
 fn map_socket_connection_error(err: anyhow::Error) -> anyhow::Error {
     let server_is_unavailable = err.chain().any(|cause| {
