@@ -584,6 +584,7 @@ async fn registry_execute_pre_tool_hook_blocks_and_allows() {
     crate::config::invalidate_config_cache();
 
     let ctx = || ToolContext {
+        ask_user_request_tx: None,
         session_id: "test-pre-tool-hook".to_string(),
         message_id: "test".to_string(),
         tool_call_id: "test".to_string(),

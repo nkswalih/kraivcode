@@ -128,6 +128,7 @@ async fn background_command_stdin_is_null() {
 
 fn make_ctx(stdin_tx: Option<mpsc::UnboundedSender<StdinInputRequest>>) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "test-session".to_string(),
         message_id: "test-msg".to_string(),
         tool_call_id: "test-call".to_string(),
@@ -140,6 +141,7 @@ fn make_ctx(stdin_tx: Option<mpsc::UnboundedSender<StdinInputRequest>>) -> ToolC
 
 fn make_agent_ctx(signal: jcode_agent_runtime::InterruptSignal) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "test-session".to_string(),
         message_id: "test-msg".to_string(),
         tool_call_id: "test-call-agent".to_string(),
@@ -966,6 +968,7 @@ fn test_bash_tool_schema_advertises_background_progress_guidance() {
 
 fn gate_ctx(working_dir: &str) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "gate-test".to_string(),
         message_id: "m".to_string(),
         tool_call_id: "c".to_string(),
