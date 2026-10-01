@@ -3,6 +3,7 @@ use super::*;
 
 fn context(session: &str, call: &str) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: session.into(),
         message_id: "msg".into(),
         tool_call_id: call.into(),

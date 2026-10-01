@@ -1659,6 +1659,7 @@ mod tests {
 
     fn test_ctx(session_id: &str) -> ToolContext {
         ToolContext {
+            ask_user_request_tx: None,
             session_id: session_id.to_string(),
             message_id: session_id.to_string(),
             tool_call_id: "call".to_string(),

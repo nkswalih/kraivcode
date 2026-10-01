@@ -12,6 +12,7 @@ async fn initiative_tool_create_and_resume_round_trip() {
 
     let tool = InitiativeTool::new();
     let ctx = ToolContext {
+        ask_user_request_tx: None,
         session_id: "ses_goal_tool".to_string(),
         message_id: "msg1".to_string(),
         tool_call_id: "tool1".to_string(),
@@ -93,6 +94,7 @@ async fn initiative_tool_list_does_not_open_side_panel_by_default() {
 
     let tool = InitiativeTool::new();
     let ctx = ToolContext {
+        ask_user_request_tx: None,
         session_id: "ses_goal_list".to_string(),
         message_id: "msg1".to_string(),
         tool_call_id: "tool1".to_string(),
@@ -145,6 +147,7 @@ async fn initiative_tool_update_refreshes_open_overview_without_stealing_focus()
 
     let tool = InitiativeTool::new();
     let ctx = ToolContext {
+        ask_user_request_tx: None,
         session_id: "ses_goal_update".to_string(),
         message_id: "msg1".to_string(),
         tool_call_id: "tool1".to_string(),

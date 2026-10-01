@@ -1523,6 +1523,7 @@ impl RawClient {
         let id = self.next_id;
         self.next_id += 1;
         self.send_request(Request::Message {
+            persona: None,
             id,
             content: content.to_string(),
             images: vec![],
@@ -1639,6 +1640,7 @@ async fn wait_for_server_socket(
 
 fn test_ctx(session_id: &str, working_dir: &Path) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: session_id.to_string(),
         message_id: "msg-1".to_string(),
         tool_call_id: "call-1".to_string(),
