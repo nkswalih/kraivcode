@@ -87,8 +87,8 @@ while [ "$#" -gt 0 ]; do
 done
 case "$url" in
   *telemetry.jcode.sh*) ;;
-  *jcode.sh/releases/latest/version) printf 'v%s\n' "${EVAL_VERSION:-1.2.3}" ;;
-  *jcode.sh/releases/v*/download-bases)
+  *github.com*/releases/latest/version) printf 'v%s\n' "${EVAL_VERSION:-1.2.3}" ;;
+  *github.com*/releases/v*/download-bases)
     printf 'https://github.com/nkswalih/kraivcode/releases/download/v%s\n' "${EVAL_VERSION:-1.2.3}"
     ;;
   *SHA256SUMS)
@@ -176,7 +176,7 @@ ver=$("$launcher" --version 2>/dev/null || true)
 
 # The success message must not dead-end the user: either Kraivcode is already
 # resolvable or the copy explicitly says future shells will have it.
-printf '%s' "$install_out" | grep -q "Run 'kraivcode' to get started\|Future terminal sessions will have kraivcode on PATH automatically"
+printf '%s' "$install_out" | grep -q "Run 'kraivcode' to get started\|Future terminal sessions will have Kraivcode on PATH automatically"
 check "install output gives a working next step (no dead end)" \
   "a 'run kraivcode' or 'future sessions' line" "neither line found in installer output" "$?"
 
