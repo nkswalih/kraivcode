@@ -49,10 +49,10 @@ pub fn wrap_line(
     // Skip balanced wrapping when a repeated gutter prefix is present
     // (e.g. ┃ for user borders, │ for blockquotes). Balanced wrapping
     // does not preserve the prefix on continuation lines.
-    if repeated_prefix.is_none() {
-        if let Some(balanced) = wrap_line_balanced(&line, width) {
-            return balanced;
-        }
+    if repeated_prefix.is_none()
+        && let Some(balanced) = wrap_line_balanced(&line, width)
+    {
+        return balanced;
     }
 
     let initial_prefix_width = repeated_prefix

@@ -269,7 +269,6 @@ pub fn harden_user_config_permissions() {
         {
             schedule_windows_path_hardening(&jcode_home, true);
         }
-        return;
     }
 
     #[cfg(not(windows))]
@@ -297,7 +296,6 @@ pub fn harden_secret_file_permissions(path: &Path) {
     #[cfg(windows)]
     {
         harden_secret_file_permissions_windows(path);
-        return;
     }
 
     #[cfg(not(windows))]
