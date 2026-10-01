@@ -67,16 +67,18 @@ fn base_system_prompt_parts(
 
 /// Built-in default swarm prompt: model-routing guidance for spawned swarm
 /// agents (which model/effort to pick per task kind). Users can override it by
-/// creating `~/.jcode/swarm-prompt.md` (global) or `./.jcode/swarm-prompt.md`
-/// (project). See [`load_swarm_prompt`].
+/// creating `~/.jcode/swarm-prompt.md` (global) or `./.kraivcode/swarm-prompt.md`
+/// (project; `./.jcode/swarm-prompt.md` is also honoured). See
+/// [`load_swarm_prompt`].
 pub const DEFAULT_SWARM_PROMPT: &str = include_str!("prompt/swarm_prompt.md");
 
 /// Load the swarm prompt used to steer swarm model routing. Precedence:
-/// project `./.jcode/swarm-prompt.md`, then global `~/.jcode/swarm-prompt.md`,
-/// then the built-in [`DEFAULT_SWARM_PROMPT`].
+/// project `./.kraivcode/swarm-prompt.md`, then `./.jcode/swarm-prompt.md`, then
+/// global `~/.jcode/swarm-prompt.md`, then the built-in [`DEFAULT_SWARM_PROMPT`].
 pub fn load_swarm_prompt(working_dir: Option<&Path>) -> String {
     let project_dir = working_dir.unwrap_or(Path::new("."));
     let candidates = [
+        Some(project_dir.join(".kraivcode").join("swarm-prompt.md")),
         Some(project_dir.join(".jcode").join("swarm-prompt.md")),
         crate::storage::jcode_dir()
             .ok()

@@ -166,7 +166,7 @@ impl Default for SetupHintsState {
 ///   connection.
 /// - 3: register three launch hotkeys instead of one. `Cmd+;` opens jcode in
 ///   `$HOME`, `Cmd+'` opens it in the last project directory, and `Cmd+Shift+'`
-///   opens a self-dev session in the last jcode repo. Existing users are
+///   opens a self-dev session in the last Kraivcode repo. Existing users are
 ///   migrated so the extra scripts/registrations are installed on update.
 /// - 4: hotkeys are config-driven. The installer resolves `[launch_hotkeys]`
 ///   from config (empty -> the same three built-ins) into per-entry scripts and
@@ -333,7 +333,7 @@ fn load_launch_hotkeys_config() -> jcode_config_types::LaunchHotkeysConfig {
 /// Called once per interactive launch with the process's working directory.
 /// `$HOME` launches are ignored for the "last project" file so the `Cmd+'`
 /// hotkey keeps pointing at a real project rather than home (which already has
-/// its own `Cmd+;` hotkey). When `dir` is inside a jcode repo, the repo root is
+/// its own `Cmd+;` hotkey). When `dir` is inside a Kraivcode repo, the repo root is
 /// recorded for the self-dev hotkey.
 ///
 /// Best-effort and side-effect-only: failures are logged, never propagated, so
@@ -700,7 +700,7 @@ pub fn run_setup_hotkey(
                 eprintln!("    \x1b[1mCmd+;\x1b[0m       new jcode in your home directory");
                 eprintln!("    \x1b[1mCmd+'\x1b[0m       new jcode in your last project directory");
                 eprintln!(
-                    "    \x1b[1mCmd+Shift+'\x1b[0m new jcode self-dev session (last jcode repo)"
+                    "    \x1b[1mCmd+Shift+'\x1b[0m new jcode self-dev session (last Kraivcode repo)"
                 );
                 install_cli_launch_hints_notice();
                 return Ok(());

@@ -27,7 +27,7 @@ fn create_git_repo_fixture() -> tempfile::TempDir {
     std::fs::create_dir_all(temp.path().join(".git")).expect("create .git dir");
     std::fs::write(
         temp.path().join("Cargo.toml"),
-        "[package]\nname = \"jcode\"\nversion = \"0.0.0\"\n",
+        "[package]\nname = \"kraivcode\"\nversion = \"0.0.0\"\n",
     )
     .expect("write Cargo.toml");
     std::process::Command::new("git")
@@ -179,7 +179,7 @@ fn test_find_repo_in_ancestors_walks_upward() {
     std::fs::create_dir_all(repo.join(".git")).expect("create .git");
     std::fs::write(
         repo.join("Cargo.toml"),
-        "[package]\nname = \"jcode\"\nversion = \"0.0.0\"\n",
+        "[package]\nname = \"kraivcode\"\nversion = \"0.0.0\"\n",
     )
     .expect("write Cargo.toml");
     std::fs::create_dir_all(&nested).expect("create nested dirs");

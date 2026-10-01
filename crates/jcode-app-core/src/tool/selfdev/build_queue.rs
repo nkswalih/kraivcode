@@ -465,7 +465,7 @@ export -f cargo
             })?;
         let repo_dir =
             SelfDevTool::resolve_repo_dir(ctx.working_dir.as_deref()).ok_or_else(|| {
-                anyhow::anyhow!("Could not find the jcode repository directory for selfdev build")
+                anyhow::anyhow!("Could not find the Kraivcode repository directory for selfdev build")
             })?;
 
         let requested_source = SelfDevTool::requested_source_state(&repo_dir)?;
@@ -869,7 +869,7 @@ export -f cargo
             .unwrap_or_else(|| command.clone());
         let repo_dir =
             SelfDevTool::resolve_repo_dir(ctx.working_dir.as_deref()).ok_or_else(|| {
-                anyhow::anyhow!("Could not find the jcode repository directory for selfdev test")
+                anyhow::anyhow!("Could not find the Kraivcode repository directory for selfdev test")
             })?;
         let requested_source = SelfDevTool::requested_source_state(&repo_dir)?;
         let shell_command = SelfDevBuildCommand {

@@ -321,11 +321,11 @@ impl SelfDevTool {
     fn clone_selfdev_source() -> Result<std::path::PathBuf> {
         let repo_dir = Self::selfdev_clone_dir()?;
         if repo_dir.exists() {
-            if build::is_jcode_repo(&repo_dir) {
+            if build::is_kraivcode_repo(&repo_dir) {
                 return Ok(repo_dir);
             }
             anyhow::bail!(
-                "{} exists but is not a jcode repository; move it aside and retry",
+                "{} exists but is not a Kraivcode repository; move it aside and retry",
                 repo_dir.display()
             );
         }
@@ -343,9 +343,9 @@ impl SelfDevTool {
         if !status.success() {
             anyhow::bail!("git clone exited with {status}");
         }
-        if !build::is_jcode_repo(&repo_dir) {
+        if !build::is_kraivcode_repo(&repo_dir) {
             anyhow::bail!(
-                "cloned source at {} is not a valid jcode repository",
+                "cloned source at {} is not a valid Kraivcode repository",
                 repo_dir.display()
             );
         }

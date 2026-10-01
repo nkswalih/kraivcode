@@ -25,12 +25,12 @@ fn resolve_or_clone_repo_dir() -> Result<PathBuf> {
 
     let repo_dir = selfdev_clone_dir()?;
     if repo_dir.exists() {
-        if build::is_jcode_repo(&repo_dir) {
+        if build::is_kraivcode_repo(&repo_dir) {
             return Ok(repo_dir);
         }
 
         anyhow::bail!(
-            "Self-dev source directory exists but is not a jcode repository: {}\n\
+            "Self-dev source directory exists but is not a Kraivcode repository: {}\n\
              Move it aside or clone {} there, then retry.",
             repo_dir.display(),
             JCODE_REPO_URL
@@ -66,9 +66,9 @@ fn resolve_or_clone_repo_dir() -> Result<PathBuf> {
         );
     }
 
-    if !build::is_jcode_repo(&repo_dir) {
+    if !build::is_kraivcode_repo(&repo_dir) {
         anyhow::bail!(
-            "Cloned self-dev source is not a valid jcode repository: {}",
+            "Cloned self-dev source is not a valid Kraivcode repository: {}",
             repo_dir.display()
         );
     }

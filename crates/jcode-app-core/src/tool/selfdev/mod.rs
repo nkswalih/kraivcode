@@ -32,7 +32,7 @@ pub use launch::{enter_selfdev_session, schedule_selfdev_prompt_delivery};
 pub use reload::{ReloadRecoveryDirective, persisted_background_tasks_note};
 pub use status::selfdev_status_output;
 
-/// Public GitHub source used when cloning the jcode repository for self-dev.
+/// Public GitHub source used when cloning the Kraivcode repository for self-dev.
 pub const JCODE_REPO_URL: &str = "https://github.com/nkswalih/kraivcode.git";
 
 #[derive(Debug, Deserialize)]
@@ -754,7 +754,7 @@ impl SelfDevTool {
     fn resolve_repo_dir(working_dir: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
         if let Some(dir) = working_dir {
             for ancestor in dir.ancestors() {
-                if build::is_jcode_repo(ancestor) {
+                if build::is_kraivcode_repo(ancestor) {
                     return Some(ancestor.to_path_buf());
                 }
             }
