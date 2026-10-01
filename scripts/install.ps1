@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
-    Install jcode on Windows.
+    Install Kraivcode on Windows.
 .DESCRIPTION
-    Downloads the latest jcode release and installs it to %LOCALAPPDATA%\jcode\bin.
+    Downloads the latest Kraivcode release and installs it to %LOCALAPPDATA%\jcode\bin.
 
     One-liner install:
       irm https://raw.githubusercontent.com/nkswalih/kraivcode/dev/scripts/install.ps1 | iex
@@ -14,9 +14,9 @@
 .PARAMETER Version
     Override the version tag to install. Required when using a local artifact path.
 .PARAMETER ArtifactExePath
-    Use a local jcode.exe artifact instead of downloading from GitHub.
+    Use a local kraivcode.exe artifact instead of downloading from GitHub.
 .PARAMETER ArtifactTgzPath
-    Use a local jcode .tar.gz artifact instead of downloading from GitHub.
+    Use a local Kraivcode .tar.gz artifact instead of downloading from GitHub.
 .PARAMETER BuildFromSource
     If no prebuilt release asset is available, explicitly allow a source build.
     Source builds require Git, Rust, and the Visual Studio C++ Build Tools.
@@ -450,7 +450,8 @@ function Remove-JcodeStaleLauncherBackups {
         [Parameter(Mandatory = $true)][string]$LauncherDir
     )
 
-    Get-ChildItem -LiteralPath $LauncherDir -Filter '.jcode-launcher-old-*.exe' -File -Force -ErrorAction SilentlyContinue |
+    Get-ChildItem -LiteralPath $LauncherDir -Filter '.jcode-launcher-old-*.exe' -File -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -LiteralPath $LauncherDir -Filter '.kraivcode-launcher-old-*.exe' -File -Force -ErrorAction SilentlyContinue |
         Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
@@ -464,8 +465,8 @@ function Install-JcodeLauncher {
     New-Item -ItemType Directory -Path $launcherDir -Force | Out-Null
 
     $operationId = [guid]::NewGuid().ToString('N')
-    $tempLauncher = Join-Path $launcherDir (".jcode-launcher-{0}.tmp.exe" -f $operationId)
-    $oldLauncher = Join-Path $launcherDir (".jcode-launcher-old-{0}.exe" -f $operationId)
+    $tempLauncher = Join-Path $launcherDir (".kraivcode-launcher-{0}.tmp.exe" -f $operationId)
+    $oldLauncher = Join-Path $launcherDir (".kraivcode-launcher-old-{0}.exe" -f $operationId)
     $movedExistingLauncher = $false
     try {
         Copy-Item -Path $SourcePath -Destination $tempLauncher -Force
@@ -490,7 +491,7 @@ function Install-JcodeLauncher {
 
         if ($movedExistingLauncher) {
             # Removal succeeds immediately for an idle launcher. If an older
-            # jcode process still has the renamed executable loaded, Windows
+            # Kraivcode process still has the renamed executable loaded, Windows
             # keeps it until that process exits and the next install cleans it.
             Remove-Item -LiteralPath $oldLauncher -Force -ErrorAction SilentlyContinue
         }
@@ -549,8 +550,8 @@ function Invoke-ProcessWithTimeout {
     $stdoutPath = $null
     $stderrPath = $null
     if ($CaptureOutput) {
-        $stdoutPath = Join-Path $env:TEMP ("jcode-{0}-{1}-stdout.log" -f $FriendlyName, [guid]::NewGuid().ToString('N'))
-        $stderrPath = Join-Path $env:TEMP ("jcode-{0}-{1}-stderr.log" -f $FriendlyName, [guid]::NewGuid().ToString('N'))
+        $stdoutPath = Join-Path $env:TEMP ("kraivcode-{0}-{1}-stdout.log" -f $FriendlyName, [guid]::NewGuid().ToString('N'))
+        $stderrPath = Join-Path $env:TEMP ("kraivcode-{0}-{1}-stderr.log" -f $FriendlyName, [guid]::NewGuid().ToString('N'))
         $startParams.RedirectStandardOutput = $stdoutPath
         $startParams.RedirectStandardError = $stderrPath
     }
@@ -674,13 +675,13 @@ function Install-Alacritty {
 function Stop-JcodeHotkeyListeners {
     try {
         Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe'" -ErrorAction SilentlyContinue |
-            Where-Object { $_.CommandLine -like '*jcode-hotkey*' } |
+            Where-Object { $_.CommandLine -like '*jcode-hotkey*' -or $_.CommandLine -like '*kraivcode-hotkey*' } |
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     } catch {}
 
     try {
         $currentPid = $PID
-        Get-CimInstance Win32_Process -Filter "Name = 'jcode.exe'" -ErrorAction SilentlyContinue |
+        Get-CimInstance Win32_Process -Filter "Name = 'kraivcode.exe'" -ErrorAction SilentlyContinue |
             Where-Object { $_.ProcessId -ne $currentPid -and $_.CommandLine -like '*--listen-windows-hotkey*' } |
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     } catch {}
@@ -693,8 +694,10 @@ function ConvertFrom-JcodeVersionOutput([string]$Output) {
 
     # A genuinely fresh profile may print the one-time telemetry notice before
     # the version. When output is captured by PowerShell, terminal control
-    # sequences can also leave the final `jcode v...` on the same logical line.
-    if ($Output -match '(?i)\bjcode\s+v?([0-9][0-9A-Za-z.+-]*)') {
+    # sequences can also leave the final `kraivcode v...` on the same logical line.
+    # Accept both names: the fork's binary prints `kraivcode v...`, while a
+    # user may still hand this installer an upstream `jcode` build to inspect.
+    if ($Output -match '(?i)\b(?:jcode|kraivcode)\s+v?([0-9][0-9A-Za-z.+-]*)') {
         return "v$($Matches[1])"
     }
 
@@ -739,7 +742,7 @@ function Assert-JcodeBinaryCandidate {
 
     $reportedVersion = Get-JcodeVersionFromBinary $BinaryPath
     if (-not $reportedVersion) {
-        Write-Err "Downloaded jcode binary could not run '--version'. It may be corrupt, quarantined by antivirus, or built for the wrong architecture."
+        Write-Err "Downloaded Kraivcode binary could not run '--version'. It may be corrupt, quarantined by antivirus, or built for the wrong architecture."
     }
 
     $expectedNumber = $ExpectedVersion.TrimStart('v')
@@ -747,7 +750,7 @@ function Assert-JcodeBinaryCandidate {
         Write-Err "Downloaded binary reports $reportedVersion, but the installer requested $ExpectedVersion"
     }
 
-    Write-Info "Validated jcode binary: $reportedVersion"
+    Write-Info "Validated Kraivcode binary: $reportedVersion"
     return $reportedVersion
 }
 
@@ -841,7 +844,7 @@ function Get-JcodeHotkeyShortcutScript([string]$StartupShortcutPath, [string]$Jc
         "`$shortcut = `$shell.CreateShortcut('$escapedShortcutPath')",
         "`$shortcut.TargetPath = 'powershell.exe'",
         "`$shortcut.Arguments = '$escapedListenerArguments'",
-        "`$shortcut.Description = 'jcode global launch hotkey listener'",
+        "`$shortcut.Description = 'kraivcode global launch hotkey listener'",
         '$shortcut.WindowStyle = 7',
         '$shortcut.Save()',
         "Write-Output 'OK'"
@@ -860,18 +863,18 @@ function Install-JcodeHotkey([string]$JcodeExePath) {
     }
 
     # Upgrade cleanup: v0.47 and earlier wrote a generated PowerShell listener.
-    # The first-party listener now lives in jcode.exe itself and is launched via
-    # `jcode setup-hotkey --listen-windows-hotkey` from a login shortcut.
+    # The first-party listener now lives in kraivcode.exe itself and is launched via
+    # `kraivcode setup-hotkey --listen-windows-hotkey` from a login shortcut.
     Remove-Item -Path (Join-Path $HotkeyDir "jcode-hotkey.ps1") -Force -ErrorAction SilentlyContinue
     Remove-Item -Path (Join-Path $HotkeyDir "jcode-hotkey-launcher.vbs") -Force -ErrorAction SilentlyContinue
     $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
     New-Item -ItemType Directory -Path $startupDir -Force | Out-Null
-    $startupShortcutPath = Join-Path $startupDir "jcode-hotkey.lnk"
+    $startupShortcutPath = Join-Path $startupDir "kraivcode-hotkey.lnk"
     $shortcutScript = Get-JcodeHotkeyShortcutScript -StartupShortcutPath $startupShortcutPath -JcodeExePath $JcodeExePath
 
     if ($env:JCODE_WINDOWS_SETUP_SKIP_EXTERNALS -eq "1") {
-        Set-Content -Path (Join-Path $HotkeyDir "jcode-hotkey-shortcut.ps1") -Value $shortcutScript -Encoding UTF8
-        Write-Info "Configured Alt+; and the Copilot key to launch jcode"
+        Set-Content -Path (Join-Path $HotkeyDir "kraivcode-hotkey-shortcut.ps1") -Value $shortcutScript -Encoding UTF8
+        Write-Info "Configured Alt+; and the Copilot key to launch Kraivcode"
         return $true
     }
 
@@ -890,7 +893,7 @@ function Install-JcodeHotkey([string]$JcodeExePath) {
         }
     }
 
-    Write-Info "Configured Alt+; and the Copilot key to launch jcode"
+    Write-Info "Configured Alt+; and the Copilot key to launch Kraivcode"
     return $true
 }
 function Resolve-JcodeWindowsArtifact([string[]]$ArchitectureCandidates) {
@@ -899,12 +902,12 @@ function Resolve-JcodeWindowsArtifact([string[]]$ArchitectureCandidates) {
     foreach ($arch in @($ArchitectureCandidates)) {
         if (-not $arch) { continue }
         switch -Regex ($arch.Trim()) {
-            '^(Arm64|ARM64|AARCH64|aarch64)$' { return "jcode-windows-aarch64" }
+            '^(Arm64|ARM64|AARCH64|aarch64)$' { return "kraivcode-windows-aarch64" }
             '^(X64|AMD64|x86_64)$' { $sawX64 = $true }
         }
     }
 
-    if ($sawX64) { return "jcode-windows-x86_64" }
+    if ($sawX64) { return "kraivcode-windows-x86_64" }
     return $null
 }
 
@@ -941,7 +944,7 @@ if (-not $Version) {
     if ($ResolvedArtifactExePath) {
         $Version = Get-JcodeVersionFromBinary $ResolvedArtifactExePath
         if (-not $Version) {
-            Write-Err "Could not detect a jcode version from '$ResolvedArtifactExePath'. Pass -Version explicitly if this is a trusted local build."
+            Write-Err "Could not detect a Kraivcode version from '$ResolvedArtifactExePath'. Pass -Version explicitly if this is a trusted local build."
         }
         Write-Info "Detected local artifact version: $Version"
     } elseif ($ResolvedArtifactTgzPath) {
@@ -960,7 +963,7 @@ $DownloadBases = Get-JcodeReleaseDownloadBases $Version
 $BuildsDir = Join-Path (Get-JcodeLocalAppDataDir) "jcode\builds"
 $StableDir = Join-Path $BuildsDir "stable"
 $VersionDir = Join-Path $BuildsDir "versions\$VersionNum"
-$LauncherPath = Join-Path $InstallDir "jcode.exe"
+$LauncherPath = Join-Path $InstallDir "kraivcode.exe"
 
 $Existing = ""
 if (Test-Path $LauncherPath) {
@@ -969,12 +972,12 @@ if (Test-Path $LauncherPath) {
 
 if ($Existing) {
     if ($Existing -match [regex]::Escape($VersionNum)) {
-        Write-Info "jcode $Version is already installed - reinstalling"
+        Write-Info "Kraivcode $Version is already installed - reinstalling"
     } else {
-        Write-Info "Updating jcode $Existing -> $Version"
+        Write-Info "Updating Kraivcode $Existing -> $Version"
     }
 } else {
-    Write-Info "Installing jcode $Version"
+    Write-Info "Installing Kraivcode $Version"
 }
 Write-Info "  launcher: $LauncherPath"
 
@@ -982,12 +985,12 @@ foreach ($d in @($InstallDir, $StableDir, $VersionDir)) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
 }
 
-$TempDir = Join-Path $env:TEMP "jcode-install-$(Get-Random)"
+$TempDir = Join-Path $env:TEMP "kraivcode-install-$(Get-Random)"
 New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
 
 try {
 $DownloadMode = ""
-$DownloadPath = Join-Path $TempDir "jcode.download"
+$DownloadPath = Join-Path $TempDir "kraivcode.download"
 $DownloadedAssetName = $null
 
 if ($ResolvedArtifactExePath) {
@@ -1022,7 +1025,7 @@ if (-not $ResolvedArtifactExePath -and -not $ResolvedArtifactTgzPath -and $Downl
     Assert-JcodeFileChecksum -FilePath $DownloadPath -ExpectedSha256 $expectedSha256 -AssetName $downloadedAssetName | Out-Null
 }
 
-$DestBin = Join-Path $VersionDir "jcode.exe"
+$DestBin = Join-Path $VersionDir "kraivcode.exe"
 
 if ($DownloadMode -eq "tar") {
     Write-Info "Extracting..."
@@ -1043,7 +1046,7 @@ if ($DownloadMode -eq "tar") {
     Write-Info "No prebuilt asset found for $Artifact in $Version; -BuildFromSource was requested"
     Assert-JcodeSourceBuildPrerequisites
 
-    $SrcDir = Join-Path $TempDir "jcode-src"
+    $SrcDir = Join-Path $TempDir "kraivcode-src"
     Write-Info "Cloning $Repo at $Version..."
     $gitCloneResult = Invoke-ProcessWithTimeout -FilePath "git" -ArgumentList @(
         "clone",
@@ -1063,9 +1066,9 @@ if ($DownloadMode -eq "tar") {
         Write-Err "Failed to clone $Repo at $Version (exit code: $($gitCloneResult.ExitCode))"
     }
 
-    Write-Info "Building jcode from source (this can take several minutes)..."
+    Write-Info "Building Kraivcode from source (this can take several minutes)..."
     $cargoResult = Invoke-ProcessWithTimeout -FilePath "cargo" -ArgumentList @(
-        "build", "--release", "--locked", "-p", "jcode", "--bin", "jcode",
+        "build", "--release", "--locked", "-p", "kraivcode", "--bin", "kraivcode",
         "--manifest-path", (Join-Path $SrcDir "Cargo.toml")
     ) -TimeoutSeconds 1800 -FriendlyName "cargo-build" -CaptureOutput
     if ($cargoResult.TimedOut) {
@@ -1079,14 +1082,14 @@ if ($DownloadMode -eq "tar") {
         Write-Err "cargo build failed (exit code: $($cargoResult.ExitCode))"
     }
 
-    $BuiltBin = Join-Path $SrcDir "target\release\jcode.exe"
+    $BuiltBin = Join-Path $SrcDir "target\release\kraivcode.exe"
     if (-not (Test-Path $BuiltBin)) { Write-Err "Built binary not found at $BuiltBin" }
     Copy-Item -Path $BuiltBin -Destination $DestBin -Force
 }
 
 Assert-JcodeBinaryCandidate -BinaryPath $DestBin -ExpectedVersion $Version | Out-Null
 
-$StableBin = Join-Path $StableDir "jcode.exe"
+$StableBin = Join-Path $StableDir "kraivcode.exe"
 Copy-Item -Path $DestBin -Destination $StableBin -Force
 Set-Content -Path (Join-Path $BuildsDir "stable-version") -Value $VersionNum
 Install-JcodeLauncher -SourcePath $StableBin -LauncherPath $LauncherPath | Out-Null
@@ -1111,7 +1114,7 @@ $userPathUpdate = Set-JcodeUserPath -InstallDir $InstallDir
 if ($userPathUpdate.Changed) {
     Write-Info "Updated user PATH with $InstallDir"
     if ($userPathUpdate.RemovedManagedEntries -gt 0 -or $userPathUpdate.RemovedDuplicateEntries -gt 0) {
-        Write-Info "  removed $($userPathUpdate.RemovedManagedEntries) stale jcode PATH entr$(if ($userPathUpdate.RemovedManagedEntries -eq 1) { 'y' } else { 'ies' }) and $($userPathUpdate.RemovedDuplicateEntries) duplicate entr$(if ($userPathUpdate.RemovedDuplicateEntries -eq 1) { 'y' } else { 'ies' })"
+        Write-Info "  removed $($userPathUpdate.RemovedManagedEntries) stale Kraivcode PATH entr$(if ($userPathUpdate.RemovedManagedEntries -eq 1) { 'y' } else { 'ies' }) and $($userPathUpdate.RemovedDuplicateEntries) duplicate entr$(if ($userPathUpdate.RemovedDuplicateEntries -eq 1) { 'y' } else { 'ies' })"
     }
 } else {
     Write-Info "User PATH already contains $InstallDir"
@@ -1147,7 +1150,7 @@ if ($shouldSetupHotkey) {
 Set-SetupHintsState -AlacrittyConfigured:(Test-AlacrittyInstalled) -HotkeyConfigured:$configuredHotkey
 
 Write-Host ""
-Write-Info "jcode $Version installed successfully!"
+Write-Info "Kraivcode $Version installed successfully!"
 Write-Host ""
 
 if (Test-AlacrittyInstalled) {
@@ -1158,19 +1161,19 @@ if (Test-AlacrittyInstalled) {
 }
 
 if ($configuredHotkey) {
-    Write-Info "Global launch keys ready: Alt+; and the Copilot key open jcode"
+    Write-Info "Global launch keys ready: Alt+; and the Copilot key open Kraivcode"
     Write-Host ""
 } elseif (-not $ConfigureHotkey) {
-    Write-Info "Optional: run 'jcode setup-hotkey' to configure global launch hotkeys and terminal preferences."
+    Write-Info "Optional: run 'kraivcode setup-hotkey' to configure global launch hotkeys and terminal preferences."
     Write-Host ""
 }
 
-if (Get-Command jcode -ErrorAction SilentlyContinue) {
-    Write-Info "Run 'jcode' to get started."
+if (Get-Command kraivcode -ErrorAction SilentlyContinue) {
+    Write-Info "Run 'kraivcode' to get started."
 } else {
     Write-Host "  Open a new terminal window, then run:"
     Write-Host ""
-    Write-Host "    jcode" -ForegroundColor Green
+    Write-Host "    kraivcode" -ForegroundColor Green
 }
 }
 
