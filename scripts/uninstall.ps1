@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Uninstall jcode on Windows.
+    Uninstall Kraivcode on Windows.
 .DESCRIPTION
-    Removes the per-user launcher at %LOCALAPPDATA%\jcode\bin\jcode.exe,
-    installed build binaries, and the jcode launcher directory from the user PATH.
+    Removes the per-user launcher at %LOCALAPPDATA%\jcode\bin\kraivcode.exe,
+    installed build binaries, and the Kraivcode launcher directory from the user PATH.
     By default user data under %USERPROFILE%\.jcode is kept.
 
     One-liner uninstall:
@@ -55,12 +55,26 @@ function Get-JcodeRoamingAppDataDir {
 }
 
 function Get-JcodeStartupShortcutPath {
-    return (Join-Path (Get-JcodeRoamingAppDataDir) "Microsoft\Windows\Start Menu\Programs\Startup\jcode-hotkey.lnk")
+    return (Join-Path (Get-JcodeRoamingAppDataDir) "Microsoft\Windows\Start Menu\Programs\Startup\kraivcode-hotkey.lnk")
+}
+
+# Startup shortcut and hotkey artifacts exist under both the current
+# `kraivcode-*` name and the legacy `jcode-*` one. Returning both keeps
+# uninstall complete for machines upgraded from an earlier release.
+function Get-JcodeStartupShortcutPaths {
+    $startupDir = Join-Path (Get-JcodeRoamingAppDataDir) "Microsoft\Windows\Start Menu\Programs\Startup"
+    return @(
+        (Join-Path $startupDir "kraivcode-hotkey.lnk"),
+        (Join-Path $startupDir "jcode-hotkey.lnk")
+    )
 }
 
 function Get-JcodeHotkeyArtifactPaths([string]$UserDataDir) {
     $hotkeyDir = Join-Path $UserDataDir "hotkey"
     return @(
+        (Join-Path $hotkeyDir "kraivcode-hotkey.ps1"),
+        (Join-Path $hotkeyDir "kraivcode-hotkey-launcher.vbs"),
+        (Join-Path $hotkeyDir "kraivcode-hotkey-shortcut.ps1"),
         (Join-Path $hotkeyDir "jcode-hotkey.ps1"),
         (Join-Path $hotkeyDir "jcode-hotkey-launcher.vbs"),
         (Join-Path $hotkeyDir "jcode-hotkey-shortcut.ps1")
@@ -148,7 +162,8 @@ function Test-JcodeManagedExecutablePath([string]$ExecutablePath, [string]$Launc
     $launcherDirKey = ConvertTo-JcodePathKey (Split-Path -Parent $LauncherPath)
     $executableDirKey = ConvertTo-JcodePathKey (Split-Path -Parent $ExecutablePath)
     $executableName = Split-Path -Leaf $ExecutablePath
-    if ($launcherDirKey -and $executableDirKey -eq $launcherDirKey -and $executableName -like '.jcode-launcher-old-*.exe') {
+    if ($launcherDirKey -and $executableDirKey -eq $launcherDirKey -and
+    ($executableName -like '.jcode-launcher-old-*.exe' -or $executableName -like '.kraivcode-launcher-old-*.exe')) {
         return $true
     }
 
@@ -278,7 +293,10 @@ function Invoke-JcodeUninstall {
 if (-not $InstallDir) { $InstallDir = Get-DefaultJcodeInstallDir }
 
 $localJcodeRoot = Join-Path (Get-JcodeLocalAppDataDir) "jcode"
-$launcherPath = Join-Path $InstallDir "jcode.exe"
+$launcherPath = Join-Path $InstallDir "kraivcode.exe"
+# Reclaim the pre-rename launcher too, so an upgraded machine does not keep a
+# stale `jcode.exe` that PATH still resolves.
+$launcherPaths = @($launcherPath, (Join-Path $InstallDir "jcode.exe"))
 $buildsDir = Join-Path $localJcodeRoot "builds"
 $userDataDir = if ($env:JCODE_HOME) {
     $env:JCODE_HOME
@@ -287,23 +305,29 @@ $userDataDir = if ($env:JCODE_HOME) {
 } else {
     Join-Path ([Environment]::GetFolderPath("UserProfile")) ".jcode"
 }
-$startupShortcutPath = Get-JcodeStartupShortcutPath
+$startupShortcutPaths = @(Get-JcodeStartupShortcutPaths)
 $hotkeyArtifactPaths = @(Get-JcodeHotkeyArtifactPaths -UserDataDir $userDataDir)
-$launcherBackupPaths = if (Test-Path -LiteralPath $InstallDir) {
-    @(Get-ChildItem -LiteralPath $InstallDir -Filter '.jcode-launcher-old-*.exe' -File -Force -ErrorAction SilentlyContinue |
+# Get-ChildItem on a missing directory is non-terminating here, so no
+# Test-Path guard is needed. Both the current `.kraivcode-launcher-old-*` and
+# the legacy `.jcode-launcher-old-*` staging names are reclaimed.
+$launcherBackupPaths = @(
+    Get-ChildItem -LiteralPath $InstallDir -Filter '.kraivcode-launcher-old-*.exe' -File -Force -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.FullName }
+    Get-ChildItem -LiteralPath $InstallDir -Filter '.jcode-launcher-old-*.exe' -File -Force -ErrorAction SilentlyContinue |
         ForEach-Object { $_.FullName })
-} else {
-    @()
-}
 if ($Purge -and -not (Test-JcodeSafePurgePath $userDataDir)) {
-    Write-Err "Refusing to purge unsafe JCODE_HOME path '$userDataDir'. Use a dedicated .jcode or jcode-* directory."
+    Write-Err "Refusing to purge unsafe JCODE_HOME path '$userDataDir'. Use a dedicated .jcode directory."
 }
 
 $targets = @()
-if (Test-Path -LiteralPath $launcherPath) { $targets += "$launcherPath (launcher)" }
+foreach ($path in $launcherPaths) {
+    if (Test-Path -LiteralPath $path) { $targets += "$path (launcher)" }
+}
 foreach ($path in $launcherBackupPaths) { $targets += "$path (previous live-upgrade launcher)" }
 if (Test-Path -LiteralPath $buildsDir) { $targets += "$buildsDir (installed binaries)" }
-if (Test-Path -LiteralPath $startupShortcutPath) { $targets += "$startupShortcutPath (launch-hotkey startup shortcut)" }
+foreach ($path in $startupShortcutPaths) {
+    if (Test-Path -LiteralPath $path) { $targets += "$path (launch-hotkey startup shortcut)" }
+}
 foreach ($path in $hotkeyArtifactPaths) {
     if (Test-Path -LiteralPath $path) { $targets += "$path (launch-hotkey artifact)" }
 }
@@ -315,7 +339,7 @@ if ($userPathPreview.RemovedManagedEntries -gt 0) {
 }
 
 if ($targets.Count -eq 0) {
-    Write-Info "Nothing to uninstall: no jcode installation found."
+    Write-Info "Nothing to uninstall: no Kraivcode installation found."
     return 0
 }
 
@@ -339,9 +363,15 @@ if (-not $Yes) {
 }
 
 try {
-    $managedProcessIds = @(Get-CimInstance Win32_Process -Filter "Name = 'jcode.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { Test-JcodeManagedExecutablePath -ExecutablePath $_.ExecutablePath -LauncherPath $launcherPath -BuildsDir $buildsDir } |
-        ForEach-Object { $_.ProcessId })
+    # Match both executable names: the binary was renamed jcode.exe ->
+    # kraivcode.exe, but an upgraded machine may still be running the old one.
+    $managedProcessIds = @(
+        Get-CimInstance Win32_Process -Filter "Name = 'kraivcode.exe' OR Name = 'jcode.exe'" -ErrorAction SilentlyContinue |
+            Where-Object {
+                $launcherPath -and $launcherPath -ne $_.ExecutablePath -and
+                    (Test-JcodeManagedExecutablePath -ExecutablePath $_.ExecutablePath -LauncherPath $launcherPath -BuildsDir $buildsDir)
+            } |
+            ForEach-Object { $_.ProcessId })
     foreach ($processId in $managedProcessIds) {
         $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
         Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
@@ -351,9 +381,11 @@ try {
     }
 } catch {}
 
-if (Test-Path -LiteralPath $startupShortcutPath) {
-    Remove-Item -LiteralPath $startupShortcutPath -Force
-    Write-Info "Removed $startupShortcutPath"
+foreach ($path in $startupShortcutPaths) {
+    if (Test-Path -LiteralPath $path) {
+        Remove-Item -LiteralPath $path -Force
+        Write-Info "Removed $path"
+    }
 }
 
 foreach ($path in $hotkeyArtifactPaths) {
@@ -370,9 +402,11 @@ if (-not $Purge) {
     Clear-JcodeHotkeySetupState -UserDataDir $userDataDir
 }
 
-if (Test-Path -LiteralPath $launcherPath) {
-    Remove-Item -LiteralPath $launcherPath -Force
-    Write-Info "Removed $launcherPath"
+foreach ($path in $launcherPaths) {
+    if (Test-Path -LiteralPath $path) {
+        Remove-Item -LiteralPath $path -Force
+        Write-Info "Removed $path"
+    }
 }
 
 foreach ($path in $launcherBackupPaths) {
@@ -400,10 +434,10 @@ if ($Purge) {
 
 $pathUpdate = Remove-JcodeUserPath -InstallDir $InstallDir
 if ($pathUpdate.Changed) {
-    Write-Info "Removed $($pathUpdate.RemovedManagedEntries) jcode entr$(if ($pathUpdate.RemovedManagedEntries -eq 1) { 'y' } else { 'ies' }) from user PATH"
+    Write-Info "Removed $($pathUpdate.RemovedManagedEntries) jcode Kraivcode PATH entr$(if ($pathUpdate.RemovedManagedEntries -eq 1) { 'y' } else { 'ies' })"
 }
 
-Write-Info "jcode uninstalled."
+Write-Info "Kraivcode uninstalled."
 Write-Info "Reinstall with: irm https://raw.githubusercontent.com/nkswalih/kraivcode/dev/scripts/install.ps1 | iex"
 
 
