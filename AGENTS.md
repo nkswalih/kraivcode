@@ -48,6 +48,27 @@ them during a merge.
   hardcoded `/home/jeremy/...` input paths. It cannot run anywhere but its
   author's machine.
 
+### Naming couplings that break silently
+
+These drift without producing an error message:
+
+- `crates/jcode-base/src/prompt/system_prompt.md` line 3 is the model's
+  identity. Everything the assistant says about itself in chat comes from
+  there. Keep it consistent with the repo name on the next line.
+- `prompt/selfdev_mode.txt` and `prompt/selfdev_focus_tui.txt` tell the agent
+  which cargo package and binary to build. `Cargo.toml` declares `kraivcode`,
+  so `-p jcode` fails with "did not match any packages".
+- `is_kraivcode_repo()` detects the repo by reading `name = "..."` out of
+  `Cargo.toml`. It exists in three places: `jcode-build-support/src/paths.rs`,
+  `jcode-base/src/session.rs`, and
+  `jcode-telemetry-core/src/state_support.rs`. Rename the package without
+  updating all three and self-dev mode silently never activates.
+- `get_asset_name()` in `jcode-update-core` must match the release artifact
+  names in `.github/workflows/release.yml` and `scripts/install.*`. The updater
+  downloads by exact filename.
+- `scripts/install.ps1` builds with `-p <package> --bin <bin>` and then reads
+  `target/release/<bin>.exe`. Both have to agree with `Cargo.toml`.
+
 ## Development Workflow
 
 - **Use the user's Git identity** - Create commits with the configured
