@@ -75,17 +75,17 @@ cargo build --release --bin kraivcode
 ./target/release/kraivcode --version
 ```
 
-Put it on your `PATH`. The installed command keeps the name `jcode` for compatibility with the on-disk layout and the updater:
+Put it on your `PATH`. The installed command is `kraivcode`. Data stays under `~/.jcode/`; only the program name is Kraivcode's:
 
 ```bash
 # macOS & Linux
-install -m 755 target/release/kraivcode ~/.local/bin/jcode
+install -m 755 target/release/kraivcode ~/.local/bin/kraivcode
 ```
 
 ```powershell
 # Windows 11 (PowerShell 5.1+)
 New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\kraivcode\bin" | Out-Null
-Copy-Item target\release\kraivcode.exe "$env:LOCALAPPDATA\kraivcode\bin\jcode.exe"
+Copy-Item target\release\kraivcode.exe "$env:LOCALAPPDATA\jcode\bin\kraivcode.exe"
 ```
 
 **Requirements:** Rust 1.85+ (the workspace uses edition 2024), Git, and a
@@ -98,7 +98,7 @@ Need a faster build loop, or want an agent to set it up for you?
 ### Updating
 
 Run `/update` in the TUI to download the latest binary in the background and
-reload with your session preserved. From a terminal, use `jcode update`,
+reload with your session preserved. From a terminal, use `kraivcode update`,
 then restart the client.
 
 Older or equal versions are skipped. For a development build, Kraivcode also
@@ -959,7 +959,7 @@ Set up Kraivcode on this machine for me.
      git clone https://github.com/nkswalih/kraivcode.git
      cd kraivcode
      cargo build --release --bin kraivcode
-     install -m 755 target/release/kraivcode ~/.local/bin/jcode
+     install -m 755 target/release/kraivcode ~/.local/bin/kraivcode
 
    On Windows, copy target\release\kraivcode.exe to a directory on PATH instead.
 
@@ -1013,12 +1013,12 @@ live under `~/.jcode/` and are left alone:
 
 ```bash
 # macOS & Linux
-rm -f ~/.local/bin/jcode
+rm -f ~/.local/bin/kraivcode
 ```
 
 ```powershell
 # Windows
-Remove-Item "$env:LOCALAPPDATA\kraivcode\bin\jcode.exe"
+Remove-Item "$env:LOCALAPPDATA\jcode\bin\kraivcode.exe"
 ```
 
 ---
