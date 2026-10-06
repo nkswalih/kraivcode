@@ -810,7 +810,7 @@ jobs:
             end
 
             test do
-              assert_match "jcode", shell_output("#{bin}/jcode --version")
+              assert_match "kraivcode", shell_output("#{bin}/kraivcode --version")
             end
           end
           FORMULA

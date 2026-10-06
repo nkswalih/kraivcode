@@ -82,7 +82,7 @@ jobs:
             echo "::endgroup::"
 
             echo "::group::Verify binary launches"
-            ./target/$TARGET_DIR/jcode --version
+            ./target/$TARGET_DIR/kraivcode --version
             echo "::endgroup::"
 
             echo "::group::Compile platform unit tests"
