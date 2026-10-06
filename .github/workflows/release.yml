@@ -499,8 +499,8 @@ jobs:
             export JCODE_CI_BUILD=1
             export JCODE_BUILD_SEMVER="${{ github.ref_name }}"
 
-            echo "::group::cargo build (jcode binary)"
-            cargo build --locked --release -p jcode --bin jcode
+            echo "::group::cargo build (kraivcode binary)"
+            cargo build --locked --release -p kraivcode --bin kraivcode
             echo "::endgroup::"
 
             echo "::group::Verify binary launches"
