@@ -42,6 +42,17 @@ jobs:
 
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+
+            // Fork guard: this repository has its issue tracker disabled, so the
+            // linked-issue gate below is unsatisfiable and would fail every PR
+            // forever. Skip it instead. If issues are ever re-enabled, the gate
+            // resumes unchanged.
+            const { data: repoData } = await github.rest.repos.get({ owner, repo });
+            if (!repoData.has_issues) {
+              core.info('Issues are disabled for this repository; linked-issue gate skipped.');
+              return;
+            }
+
             const text = `${pr.title || ''}\n\n${pr.body || ''}`;
 
             // Collect candidate issue numbers that belong to THIS repo.
