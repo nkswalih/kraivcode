@@ -55,9 +55,9 @@ Commands:
   reset                  Delete the sandbox entirely
   purge-external         Delete copied real credentials/transcripts only
   shell                  Open a clean shell with sandbox env vars set
-  jcode [args...]        Run jcode inside the sandbox
-  auth-status            Run 'jcode auth status' inside the sandbox
-  fresh [args...]        Reset sandbox, then launch jcode with args
+  kraivcode [args...]    Run Kraivcode inside the sandbox
+  auth-status            Run 'kraivcode auth status' inside the sandbox
+  fresh [args...]        Reset sandbox, then launch Kraivcode with args
   seed-real-logins [--with-transcripts|--transcripts-only]
                          Copy your REAL external logins (Codex/Claude/Gemini/
                          Copilot/Cursor/OpenCode/pi) into the sandbox so the
@@ -66,13 +66,13 @@ Commands:
                          transcripts (so "continue where you left off" has data).
                          Originals are never modified.
   fresh-real [--with-transcripts]
-                         Reset sandbox, seed your real logins, then launch jcode
-  login <provider> ...   Run 'jcode --provider <provider> login ...' in sandbox
+                         Reset sandbox, seed your real logins, then launch Kraivcode
+  login <provider> ...   Run 'kraivcode --provider <provider> login ...' in sandbox
   fixture-list           List saved local auth fixtures
   fixture-save <name>    Save current sandbox auth state as a local fixture
   fixture-load <name>    Load a saved auth fixture into this sandbox
   fixture-run <name> -- [args...]
-                         Load a fixture, then run jcode with args
+                         Load a fixture, then run Kraivcode with args
   help                   Show this help
 
 Environment overrides:
@@ -157,7 +157,7 @@ open_shell() {
 
 run_jcode() {
   # The sandbox should behave like a real standalone install, not a self-dev
-  # client. Because we launch from inside the repo, jcode would otherwise
+  # client. Because we launch from inside the repo, Kraivcode would otherwise
   # auto-detect the repository and join the shared self-dev server (remote
   # mode), which both breaks isolation and skips local-only first-run behavior
   # like the new-session model validation. `--no-selfdev` keeps it standalone,
@@ -178,11 +178,11 @@ run_jcode() {
     echo "JCODE_SANDBOX_BIN=$JCODE_SANDBOX_BIN is not executable" >&2
     return 1
   fi
-  local binary_path="$repo_root/target/debug/jcode"
+  local binary_path="$repo_root/target/debug/kraivcode"
   if [[ -x "$binary_path" ]]; then
     run_in_sandbox "$binary_path" "${prefix[@]}" "$@"
   else
-    run_in_sandbox cargo run --bin jcode -- "${prefix[@]}" "$@"
+    run_in_sandbox cargo run --bin kraivcode -- "${prefix[@]}" "$@"
   fi
 }
 
@@ -193,10 +193,10 @@ run_auth_fixture() {
 }
 
 # Copy one real file from $HOME into the sandbox's external/ tree, preserving its
-# relative path. jcode resolves every external credential/transcript lookup to
+# relative path. Kraivcode resolves every external credential/transcript lookup to
 # $JCODE_HOME/external/<same-relative-path-as-$HOME> when JCODE_HOME is set, so
 # seeding here makes your real logins/transcripts visible to the onboarding
-# import + continue steps. Copies (never symlinks: jcode rejects symlinked auth
+# import + continue steps. Copies (never symlinks: Kraivcode rejects symlinked auth
 # files) and never touches the originals.
 seed_one_file() {
   local rel=$1
@@ -308,7 +308,7 @@ seed_real_logins() {
   echo "These are copies; your real \$HOME files are untouched."
   echo "They contain sensitive data and persist until reset or purge-external."
   echo "Onboarding will now offer to import them. Start it with:"
-  echo "  $(basename "$0") jcode"
+  echo "  $(basename "$0") kraivcode"
 }
 
 scenario_arg() {
@@ -335,7 +335,7 @@ case "$command" in
   shell)
     open_shell
     ;;
-  jcode)
+  kraivcode)
     run_jcode "$@"
     ;;
   auth-status)
@@ -352,7 +352,7 @@ case "$command" in
     reset
     seed_real_logins "$@"
     echo
-    echo "Launching sandbox jcode with your real logins available to import..."
+    echo "Launching sandbox Kraivcode with your real logins available to import..."
     if run_jcode; then
       rc=0
     else

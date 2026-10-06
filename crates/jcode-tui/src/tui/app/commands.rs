@@ -3113,9 +3113,13 @@ fn ensure_swarm_prompt_edit_path(
         Some(path) => PathBuf::from(path),
         None => std::env::current_dir()?,
     };
-    let project_path = project_dir.join(".jcode").join("swarm-prompt.md");
-    if file_has_nonblank_content(&project_path) {
-        return Ok(project_path);
+    // `.kraivcode` is checked first; `.jcode` stays so existing user
+    // configs keep loading rather than silently reverting to the default.
+    for dir in [".kraivcode", ".jcode"] {
+        let path = project_dir.join(dir).join("swarm-prompt.md");
+        if file_has_nonblank_content(&path) {
+            return Ok(path);
+        }
     }
 
     let global_path = jcode_dir.join("swarm-prompt.md");

@@ -144,10 +144,11 @@ impl NotificationDispatcher {
 
     /// Send a permission request notification (high priority).
     pub fn dispatch_permission_request(&self, action: &str, description: &str, request_id: &str) {
-        let title = format!("jcode: permission needed ({})", action);
-        let safe_body = "An ambient action needs your approval. Open jcode to review.".to_string();
+        let title = format!("Kraivcode: permission needed ({})", action);
+        let safe_body =
+            "An ambient action needs your approval. Open Kraivcode to review.".to_string();
         let detailed_body = format!(
-            "Action: {}\n{}\n\nRequest ID: {}\nReview in jcode to approve or deny.",
+            "Action: {}\n{}\n\nRequest ID: {}\nReview in Kraivcode to approve or deny.",
             action, description, request_id
         );
 
@@ -156,7 +157,7 @@ impl NotificationDispatcher {
             .config
             .email_from
             .as_deref()
-            .unwrap_or("jcode@localhost");
+            .unwrap_or("kraivcode@localhost");
         let email_html = build_permission_email_html(action, description, request_id, reply_to);
 
         self.send_all_with_email_override(
@@ -316,7 +317,7 @@ async fn send_ntfy(
 // ---------------------------------------------------------------------------
 
 #[cfg(target_os = "macos")]
-const MACOS_NOTIFICATION_BROKER_APP_NAME: &str = "Jcode Notifications.app";
+const MACOS_NOTIFICATION_BROKER_APP_NAME: &str = "Kraivcode Notifications.app";
 #[cfg(target_os = "macos")]
 const MACOS_NOTIFICATION_BROKER_EXECUTABLE: &str = "jcode-notification-broker";
 
@@ -423,7 +424,7 @@ fn macos_notification_broker_app_path() -> Option<std::path::PathBuf> {
     }
     let home = dirs::home_dir()?;
     // Current location: hidden beside the inbox so Spotlight and Launchpad do
-    // not list the faceless helper as a second "Jcode" app. Older CLIs
+    // not list the faceless helper as a second "Kraivcode" app. Older CLIs
     // published it in ~/Applications; keep using that copy until the next
     // interactive launch migrates it.
     let current = home
@@ -539,7 +540,7 @@ fn next_macos_notification_id() -> String {
         .unwrap_or_default()
         .as_nanos();
     format!(
-        "jcode-turn-{timestamp}-{}-{}",
+        "kraivcode-turn-{timestamp}-{}-{}",
         std::process::id(),
         SEQUENCE.fetch_add(1, Ordering::Relaxed)
     )
@@ -575,7 +576,7 @@ fn enqueue_macos_notification(
 
 fn reap_notification_child(mut child: std::process::Child) {
     let _ = std::thread::Builder::new()
-        .name("jcode-notification-child".to_string())
+        .name("kraivcode-notification-child".to_string())
         .spawn(move || {
             let _ = child.wait();
         });
@@ -901,7 +902,7 @@ fn format_cycle_body_safe(transcript: &AmbientTranscript) -> String {
         ));
     }
 
-    lines.push("Check jcode for full details.".to_string());
+    lines.push("Check Kraivcode for full details.".to_string());
     lines.join("\n")
 }
 
@@ -932,7 +933,7 @@ fn format_cycle_body_detailed(transcript: &AmbientTranscript) -> String {
     if transcript.pending_permissions > 0 {
         lines.push(String::new());
         lines.push(format!(
-            "**⚠ {} permission request(s) pending** — review in jcode",
+            "**⚠ {} permission request(s) pending** — review in Kraivcode",
             transcript.pending_permissions
         ));
     }
@@ -974,7 +975,7 @@ mod tests {
         let body = format_cycle_body_safe(&transcript);
         assert!(body.contains("Memories modified: 3"));
         assert!(body.contains("Compactions: 1"));
-        assert!(body.contains("Check jcode for full details"));
+        assert!(body.contains("Check Kraivcode for full details"));
         // Safe body must NOT include model-generated summary
         assert!(!body.contains("Cleaned up"));
         assert!(!body.contains("permission"));
@@ -1027,7 +1028,7 @@ mod tests {
 
         let safe = format_cycle_body_safe(&transcript);
         assert!(safe.contains("2 permission request(s) pending"));
-        assert!(safe.contains("Check jcode for full details"));
+        assert!(safe.contains("Check Kraivcode for full details"));
 
         let detailed = format_cycle_body_detailed(&transcript);
         assert!(detailed.contains("2 permission request(s) pending"));
@@ -1151,8 +1152,8 @@ mod tests {
     fn macos_envelope_roundtrip_preserves_origin_metadata() {
         let envelope = MacosNotificationEnvelope {
             schema_version: MACOS_NOTIFICATION_SCHEMA_VERSION,
-            notification_id: "jcode-turn-test".to_string(),
-            title: "jcode · done".to_string(),
+            notification_id: "kraivcode-turn-test".to_string(),
+            title: "kraivcode · done".to_string(),
             subtitle: Some("2/2 todos".to_string()),
             body: "Finished broker".to_string(),
             sound: Some("Glass".to_string()),

@@ -323,11 +323,11 @@ fn resume_invocation_args_omits_blank_socket() {
     );
 }
 
-/// Pin JCODE_HOME to a tempdir containing a `builds/current/jcode` binary so
-/// `launch_client_executable()` resolves deterministically, independent of
-/// whether the developer machine has a published local build channel and of
-/// other tests mutating JCODE_HOME in parallel. Returns the guards that keep
-/// the environment pinned for the duration of the test.
+/// Pin JCODE_HOME to a tempdir containing the `builds/current/<binary_name()>`
+/// binary, so `launch_client_executable()` resolves deterministically,
+/// independent of whether the developer machine has a published local build
+/// channel and of other tests mutating JCODE_HOME in parallel. Returns the
+/// guards that keep the environment pinned for the duration of the test.
 fn pinned_resume_test_home() -> (
     std::sync::MutexGuard<'static, ()>,
     tempfile::TempDir,
@@ -337,7 +337,8 @@ fn pinned_resume_test_home() -> (
     let temp = tempfile::tempdir().expect("tempdir");
     let current = temp.path().join("builds").join("current");
     std::fs::create_dir_all(&current).expect("create builds/current");
-    std::fs::write(current.join("jcode"), b"#!/bin/sh\n").expect("write fake jcode binary");
+    std::fs::write(current.join(crate::build::binary_name()), b"#!/bin/sh\n")
+        .expect("write the fake client binary into builds/current");
     let home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
     (env_lock, temp, home)
 }
@@ -355,7 +356,7 @@ fn build_resume_command_uses_imported_jcode_session_for_claude_code() {
 
     assert_eq!(
         program.file_name().and_then(|name| name.to_str()),
-        Some("jcode")
+        Some(crate::build::binary_name())
     );
     assert_eq!(
         args,
@@ -382,7 +383,7 @@ fn build_resume_command_uses_imported_jcode_session_for_codex() {
 
     assert_eq!(
         program.file_name().and_then(|name| name.to_str()),
-        Some("jcode")
+        Some(crate::build::binary_name())
     );
     assert_eq!(
         args,

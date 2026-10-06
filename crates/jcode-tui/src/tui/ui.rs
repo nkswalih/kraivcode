@@ -3616,7 +3616,12 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let widget_data_start = Instant::now();
     let widget_data = app.info_widget_data();
     let widget_data_elapsed = widget_data_start.elapsed();
-    let widget_render_ms: Option<f32> = None;
+    // Upstream measures the info-widget overlay pass into `widget_render_ms`;
+    // that measurement is disabled here (see the commented-out assignment
+    // below), so the duration is a constant zero. `widgets_ms` stays `None`
+    // rather than `Some(0.0)` because jcode-tui-visual-debug prints the
+    // `Option` verbatim into the capture dump.
+    let widget_render_ms = 0.0_f32;
     let mut placements: Vec<info_widget::WidgetPlacement> = Vec::new();
     let widget_bounds = messages_area;
     if app.info_widget_overlays_enabled()
@@ -3748,15 +3753,13 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             messages_draw.as_millis(),
             chrome_elapsed.as_millis(),
             widget_data_elapsed.as_millis(),
-            widget_render_ms.unwrap_or_default(),
+            widget_render_ms,
             frame_elapsed
                 .saturating_sub(prep_elapsed)
                 .saturating_sub(messages_draw)
                 .saturating_sub(chrome_elapsed)
                 .saturating_sub(widget_data_elapsed)
-                .saturating_sub(Duration::from_secs_f32(
-                    widget_render_ms.unwrap_or_default() / 1000.0,
-                ))
+                .saturating_sub(Duration::from_secs_f32(widget_render_ms / 1000.0))
                 .as_millis(),
             frame_elapsed.as_millis(),
         ));
@@ -3770,7 +3773,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             draw_ms: total_draw.as_secs_f32() * 1000.0,
             total_ms: total_start.elapsed().as_secs_f32() * 1000.0,
             messages_ms: Some(messages_draw.as_secs_f32() * 1000.0),
-            widgets_ms: widget_render_ms,
+            widgets_ms: None,
         };
 
         let mut capture = capture;

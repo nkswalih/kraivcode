@@ -100,16 +100,18 @@ impl SelfDevTool {
             // synthetic test session.
             let git_available = checks.iter().any(|check| check.name == "git" && check.ok);
             if SelfDevTool::is_test_session() {
-                clone_note = Some("Test mode: skipped cloning the jcode source.".to_string());
+                clone_note = Some("Test mode: skipped cloning the Kraivcode source.".to_string());
             } else if git_available {
                 match Self::clone_selfdev_source() {
                     Ok(path) => {
-                        clone_note = Some(format!("Cloned jcode source into {}.", path.display()));
+                        clone_note =
+                            Some(format!("Cloned Kraivcode source into {}.", path.display()));
                         repo_dir = Some(path);
                     }
                     Err(err) => {
-                        clone_note =
-                            Some(format!("Could not clone jcode source automatically: {err}",));
+                        clone_note = Some(format!(
+                            "Could not clone Kraivcode source automatically: {err}",
+                        ));
                     }
                 }
             }
@@ -123,7 +125,7 @@ impl SelfDevTool {
                     .unwrap_or_else(|_| "~/.jcode/source/jcode".to_string());
                 checks.push(SetupCheck::missing(
                     "repository",
-                    "no local jcode checkout found",
+                    "no local Kraivcode checkout found",
                     format!(
                         "Clone the source manually: `git clone {} {}`.",
                         super::JCODE_REPO_URL,
@@ -143,7 +145,7 @@ impl SelfDevTool {
                 None => checks.push(SetupCheck::missing(
                     "dev binary",
                     "no built binary in target/selfdev or target/release",
-                    "Build it once with `jcode self-dev --build`, or inside a \
+                    "Build it once with `kraivcode self-dev --build`, or inside a \
                      self-dev session run `selfdev build`.",
                 )),
             }
@@ -215,7 +217,7 @@ impl SelfDevTool {
             None => "unavailable".to_string(),
         };
 
-        let mut output = String::from("## jcode config & paths\n\n");
+        let mut output = String::from("## Kraivcode config & paths\n\n");
         output.push_str(&format!(
             "**Config file:** {}\n",
             format_path(config_path.as_deref())
@@ -286,7 +288,7 @@ impl SelfDevTool {
 
         if !server::server_has_newer_binary() {
             return Ok(ToolOutput::new(
-                "Already running the newest installed jcode build; no reload needed.",
+                "Already running the newest installed Kraivcode build; no reload needed.",
             ));
         }
 
@@ -317,15 +319,15 @@ impl SelfDevTool {
         Ok(storage::jcode_dir()?.join("source").join("jcode"))
     }
 
-    /// Clone the jcode source into the default self-dev source directory.
+    /// Clone the Kraivcode source into the default self-dev source directory.
     fn clone_selfdev_source() -> Result<std::path::PathBuf> {
         let repo_dir = Self::selfdev_clone_dir()?;
         if repo_dir.exists() {
-            if build::is_jcode_repo(&repo_dir) {
+            if build::is_kraivcode_repo(&repo_dir) {
                 return Ok(repo_dir);
             }
             anyhow::bail!(
-                "{} exists but is not a jcode repository; move it aside and retry",
+                "{} exists but is not a Kraivcode repository; move it aside and retry",
                 repo_dir.display()
             );
         }
@@ -343,9 +345,9 @@ impl SelfDevTool {
         if !status.success() {
             anyhow::bail!("git clone exited with {status}");
         }
-        if !build::is_jcode_repo(&repo_dir) {
+        if !build::is_kraivcode_repo(&repo_dir) {
             anyhow::bail!(
-                "cloned source at {} is not a valid jcode repository",
+                "cloned source at {} is not a valid Kraivcode repository",
                 repo_dir.display()
             );
         }

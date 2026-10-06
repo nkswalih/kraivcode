@@ -110,7 +110,7 @@ pub(super) fn maybe_notify(source: &str) -> Result<()> {
         source.label(),
         display
     );
-    send_desktop_notification("Jcode shortcut", &body);
+    send_desktop_notification("Kraivcode shortcut", &body);
     Ok(())
 }
 
@@ -166,17 +166,14 @@ fn binary_on_path(binary: &str) -> bool {
         return false;
     };
     std::env::split_paths(&path).any(|dir| {
-        if dir.join(binary).is_file() {
-            return true;
-        }
+        let found = dir.join(binary).is_file();
+        // Windows resolves the PATHEXT extensions too, so probe them explicitly.
         #[cfg(windows)]
-        {
-            return dir.join(format!("{binary}.exe")).is_file()
-                || dir.join(format!("{binary}.cmd")).is_file()
-                || dir.join(format!("{binary}.bat")).is_file();
-        }
-        #[cfg(not(windows))]
-        false
+        let found = found
+            || dir.join(format!("{binary}.exe")).is_file()
+            || dir.join(format!("{binary}.cmd")).is_file()
+            || dir.join(format!("{binary}.bat")).is_file();
+        found
     })
 }
 
@@ -435,7 +432,7 @@ mod tests {
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "jcode setup-hotkey --notify-cli-launch old",
+                            "command": "kraivcode setup-hotkey --notify-cli-launch old",
                             "timeout": 30
                         },
                         {"type": "command", "command": "echo user-owned"}

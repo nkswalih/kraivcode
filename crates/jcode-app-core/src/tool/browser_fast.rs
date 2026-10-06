@@ -47,6 +47,11 @@ pub(super) struct Decision {
     pub confidence: f64,
     pub reason: String,
 }
+// `#[async_trait]` emits a bare `#[must_use]` on each desugared method, and the
+// pinned `dyn Future` it returns is already `#[must_use]` in its own right, so
+// clippy reports the pairing as `double_must_use`. The attribute is generated
+// inside the macro expansion, leaving nowhere here to give it a reason.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub(super) trait DecisionTransport: Send + Sync {
     fn model(&self) -> &str;

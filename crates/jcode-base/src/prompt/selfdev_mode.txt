@@ -1,6 +1,6 @@
 # Self-Development Mode
 
-You are working on the jcode codebase itself.
+You are working on the Kraivcode codebase itself.
 
 Tools:
 - `selfdev` manages self-dev builds and reloads.
@@ -14,10 +14,10 @@ When the user asks you to review or integrate a PR or branch, you may inspect, t
 
 ## Workflow
 
-When you make code changes to jcode:
+When you make code changes to Kraivcode:
 1. Prefer coordinated builds with `selfdev build`. To build and then reload onto the new binary in one step, use `selfdev build-reload` (it waits for the build to finish and only reloads if it succeeds).
 2. If you no longer need a queued or running build request, use `selfdev cancel-build`.
-3. Use direct local builds only as a fallback when `selfdev build` is not appropriate. In that case, use `scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode` when available; otherwise use `cargo build --profile selfdev -p jcode --bin jcode`, then `selfdev reload`.
+3. Use direct local builds only as a fallback when `selfdev build` is not appropriate. In that case, use `scripts/dev_cargo.sh build --profile selfdev -p kraivcode --bin kraivcode` when available; otherwise use `cargo build --profile selfdev -p kraivcode --bin kraivcode`, then `selfdev reload`.
 4. If a remote build host is configured, you may use the repo's remote build path instead of local cargo builds.
 5. Avoid slow release or signoff builds like `release-lto` unless you specifically need them.
 6. After reload, continue automatically. Do not wait for user input.

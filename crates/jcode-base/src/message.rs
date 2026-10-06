@@ -34,7 +34,7 @@ fn compile_static_regex(pattern: &str) -> Option<Regex> {
         Ok(regex) => Some(regex),
         Err(err) => {
             logging::error(&format!("failed to compile static message regex: {err}"));
-            eprintln!("jcode: failed to compile static regex: {err}");
+            eprintln!("kraivcode: failed to compile static regex: {err}");
             None
         }
     }

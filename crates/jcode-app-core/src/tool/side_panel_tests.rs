@@ -39,6 +39,7 @@ async fn side_panel_tool_writes_page() {
                 "content": "# Notes"
             }),
             ToolContext {
+                ask_user_request_tx: None,
                 session_id: "ses_side_panel_tool".to_string(),
                 message_id: "msg1".to_string(),
                 tool_call_id: "tool1".to_string(),
@@ -70,6 +71,7 @@ async fn side_panel_tool_loads_file_with_derived_page_id() {
                 "file_path": "Project Plan.md"
             }),
             ToolContext {
+                ask_user_request_tx: None,
                 session_id: "ses_side_panel_tool_load".to_string(),
                 message_id: "msg1".to_string(),
                 tool_call_id: "tool1".to_string(),

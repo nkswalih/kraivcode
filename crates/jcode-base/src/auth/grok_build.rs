@@ -417,7 +417,7 @@ pub async fn bearer_token(force_refresh: bool) -> Result<String> {
         .and_then(|bytes| parse_credential(&bytes))
         .with_context(|| {
             format!(
-                "No Grok Build login found in {}. Run `jcode login --provider grok-build`",
+                "No Grok Build login found in {}. Run `kraivcode login --provider grok-build`",
                 path.display()
             )
         })?;
@@ -425,7 +425,7 @@ pub async fn bearer_token(force_refresh: bool) -> Result<String> {
         return Ok(credential.access_token);
     }
     let refresh = credential.refresh_token.as_deref().with_context(|| {
-        "Grok Build login expired and has no refresh token. Run `jcode login --provider grok-build`"
+        "Grok Build login expired and has no refresh token. Run `kraivcode login --provider grok-build`"
     })?;
     refresh_tokens(&crate::provider::shared_http_client(), &path, refresh).await?;
     load_credential()
@@ -466,7 +466,7 @@ async fn refresh_tokens_at(
             error_description: None,
         });
         bail!(
-            "Grok Build token refresh failed: {}. Run `jcode login --provider grok-build`",
+            "Grok Build token refresh failed: {}. Run `kraivcode login --provider grok-build`",
             error.error_description.unwrap_or(error.error)
         );
     }

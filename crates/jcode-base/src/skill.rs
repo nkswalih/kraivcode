@@ -285,7 +285,8 @@ impl SkillRegistry {
     }
 
     /// Load only the project-local skill overlay for a workspace root:
-    /// `./.jcode/skills/`, `./.agents/skills/`, and `./.claude/skills/`.
+    /// `./.kraivcode/skills/`, `./.jcode/skills/`, `./.agents/skills/`, and
+    /// `./.claude/skills/`.
     ///
     /// Loaded fresh from disk on access so edits are visible without daemon
     /// restarts and two sessions in different repositories never see each
@@ -328,7 +329,15 @@ impl SkillRegistry {
     }
 
     fn load_project_local_dirs(&mut self, working_dir: Option<&Path>) -> Result<()> {
-        // Load from ./.jcode/skills/ (project-local jcode skills)
+        // Load from ./.kraivcode/skills/ (this repository's bundled skills)
+        let local_kraivcode = Self::project_local_dir(working_dir, ".kraivcode");
+        if local_kraivcode.exists() {
+            self.load_from_dir(&local_kraivcode)?;
+        }
+
+        // Load from ./.jcode/skills/ (legacy project-local jcode skills).
+        // Still scanned: this loader runs in every user project, so dropping
+        // the path would silently stop loading skills users already have.
         let local_jcode = Self::project_local_dir(working_dir, ".jcode");
         if local_jcode.exists() {
             self.load_from_dir(&local_jcode)?;
@@ -747,7 +756,7 @@ pub const ENDORSED_SKILLS: &[EndorsedSkill] = &[
         name: "optimization",
         description: "Improve performance, latency, throughput, memory usage, or general efficiency by defining metrics, measuring, attributing bottlenecks, and prioritizing macro-optimizations.",
         category: "jcode",
-        source: "bundled in jcode repo (.jcode/skills/optimization)",
+        source: "bundled in the Kraivcode repo (.kraivcode/skills/optimization)",
         install: None,
     },
     EndorsedSkill {
@@ -1286,6 +1295,25 @@ mod tests {
         assert!(
             skill.path.starts_with(temp.path()),
             "project-local overlay must win over a same-named global skill"
+        );
+    }
+
+    #[test]
+    fn project_overlay_scans_kraivcode_and_legacy_jcode_scopes() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        write_test_skill(temp.path(), ".kraivcode", "fork-skill");
+        write_test_skill(temp.path(), ".jcode", "legacy-skill");
+
+        let overlay = SkillRegistry::load_project_overlay(Some(temp.path())).expect("load overlay");
+        assert!(
+            overlay.get("fork-skill").is_some(),
+            ".kraivcode/skills/ must be scanned"
+        );
+        assert!(
+            overlay.get("legacy-skill").is_some(),
+            ".jcode/skills/ must stay supported: the same loader runs in every \
+             user project, so dropping the path would silently stop loading \
+             skills users already have on disk"
         );
     }
 

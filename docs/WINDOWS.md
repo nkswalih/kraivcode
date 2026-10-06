@@ -68,7 +68,7 @@ Get-Command jcode
 Get-FileHash (Get-Command jcode).Source -Algorithm SHA256
 ```
 
-Compare the hash with `SHA256SUMS` on the matching [GitHub release](https://github.com/1jehuang/jcode/releases/latest).
+Compare the hash with `SHA256SUMS` on the matching [GitHub release](https://github.com/nkswalih/kraivcode/releases/latest).
 
 After Authenticode signing is enabled, this must report `Valid`:
 
@@ -102,7 +102,7 @@ The release workflow supports [Azure Artifact Signing](https://azure.microsoft.c
 This is a one-time owner setup and may require Azure billing and organization or identity verification:
 
 1. Create an Artifact Signing account and a public-trust certificate profile.
-2. Create a Microsoft Entra application or managed identity with a federated credential for `1jehuang/jcode` GitHub Actions.
+2. Create a Microsoft Entra application or managed identity with a federated credential for `nkswalih/kraivcode` GitHub Actions.
 3. Grant it the **Artifact Signing Certificate Profile Signer** role on the certificate profile.
 4. Add these GitHub Actions secrets:
    - `AZURE_CLIENT_ID`

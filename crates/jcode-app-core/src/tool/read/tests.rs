@@ -4,6 +4,7 @@ use serde_json::json;
 
 fn make_ctx(working_dir: std::path::PathBuf) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "test-session".to_string(),
         message_id: "test-message".to_string(),
         tool_call_id: "test-call".to_string(),

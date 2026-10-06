@@ -278,7 +278,7 @@ pub fn load_tokens() -> Result<GeminiTokens> {
         });
     }
 
-    anyhow::bail!("No Gemini OAuth tokens found. Run `jcode login --provider gemini`.")
+    anyhow::bail!("No Gemini OAuth tokens found. Run `kraivcode login --provider gemini`.")
 }
 
 pub fn save_tokens(tokens: &GeminiTokens) -> Result<()> {

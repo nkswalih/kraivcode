@@ -1523,6 +1523,7 @@ impl RawClient {
         let id = self.next_id;
         self.next_id += 1;
         self.send_request(Request::Message {
+            persona: None,
             id,
             content: content.to_string(),
             images: vec![],
@@ -1639,6 +1640,7 @@ async fn wait_for_server_socket(
 
 fn test_ctx(session_id: &str, working_dir: &Path) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: session_id.to_string(),
         message_id: "msg-1".to_string(),
         tool_call_id: "call-1".to_string(),
@@ -1750,7 +1752,7 @@ fn credential_failure_wave_detected_for_recent_auth_failed_workers() {
     assert!(message.contains("paused dispatching"));
     assert!(message.contains("3 worker(s)"));
     assert!(message.contains("401 Unauthorized"));
-    assert!(message.contains("`jcode login --provider claude`"));
+    assert!(message.contains("`kraivcode login --provider claude`"));
 }
 
 #[test]
@@ -1826,19 +1828,19 @@ fn credential_failure_wave_ignores_foreign_members() {
 fn credential_login_fix_hint_maps_provider_names() {
     assert_eq!(
         super::credential_login_fix_hint(Some("anthropic")),
-        "`jcode login --provider claude`"
+        "`kraivcode login --provider claude`"
     );
     assert_eq!(
         super::credential_login_fix_hint(Some("OpenAI")),
-        "`jcode login --provider openai`"
+        "`kraivcode login --provider openai`"
     );
     assert_eq!(
         super::credential_login_fix_hint(Some("copilot")),
-        "`jcode login --provider copilot`"
+        "`kraivcode login --provider copilot`"
     );
     assert_eq!(
         super::credential_login_fix_hint(None),
-        "`jcode login --provider <provider>`"
+        "`kraivcode login --provider <provider>`"
     );
 }
 

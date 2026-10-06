@@ -2767,6 +2767,7 @@ mod tests {
 
     fn test_ctx() -> crate::tool::ToolContext {
         crate::tool::ToolContext {
+            ask_user_request_tx: None,
             session_id: "test".into(),
             message_id: "test".into(),
             tool_call_id: "test".into(),
