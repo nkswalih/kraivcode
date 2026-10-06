@@ -183,7 +183,7 @@ mod tests {
         );
         assert_eq!(
             terminal_window_title("🐙", None, Some("kraivcode Octopus"), false),
-            "🐙 jcode Octopus"
+            "🐙 kraivcode Octopus"
         );
         assert_eq!(
             terminal_window_title(
