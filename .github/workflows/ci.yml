@@ -544,7 +544,7 @@ jobs:
       - name: Verify built binary launches
         shell: pwsh
         run: |
-          & "target/x86_64-pc-windows-msvc/release/jcode.exe" --version
+          & "target/x86_64-pc-windows-msvc/release/kraivcode.exe" --version
           if ($LASTEXITCODE -ne 0) {
             throw 'Built Windows binary failed to run --version'
           }
@@ -567,7 +567,7 @@ jobs:
           # this identity from the root package version and appends `-dev`.
           $version = 'v' + $cargoVersion.Matches[0].Groups[1].Value + '-dev'
           & ./.github/scripts/verify_windows_install.ps1 `
-            -ArtifactExePath 'target/x86_64-pc-windows-msvc/release/jcode.exe' `
+            -ArtifactExePath 'target/x86_64-pc-windows-msvc/release/kraivcode.exe' `
             -Version $version
 
   fmt:
