@@ -462,7 +462,7 @@ impl App {
             .repo_dir
             .as_ref()
             .map(|p| p.display().to_string())
-            .unwrap_or_else(|| "the jcode repository".to_string());
+            .unwrap_or_else(|| "the Kraivcode repository".to_string());
         let prompt = format!(
             "A jcode self-update could not fast-forward because the local checkout and upstream have diverged.\n\n\
 Repository: {repo}\n\

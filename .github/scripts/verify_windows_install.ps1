@@ -24,8 +24,8 @@ if (-not $Version) {
     }
 
     $artifactVersionText = ($artifactVersionOutput -join "`n")
-    if ($artifactVersionText -notmatch '(?i)\bjcode\s+v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\b') {
-        throw "Could not parse jcode version from local artifact output: $artifactVersionText"
+    if ($artifactVersionText -notmatch '(?i)\b(?:jcode|kraivcode)\s+v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\b') {
+        throw "Could not parse Kraivcode version from local artifact output: $artifactVersionText"
     }
     $Version = 'v' + $Matches[1]
 } else {
@@ -56,9 +56,9 @@ $installScript = Join-Path $repoRoot 'scripts\install.ps1'
     -Version $Version `
     -ArtifactExePath $resolvedArtifact
 
-$launcherPath = Join-Path $installDir 'jcode.exe'
-$versionDir = Join-Path $localAppData ('jcode\builds\versions\' + $Version.TrimStart('v') + '\jcode.exe')
-$stablePath = Join-Path $localAppData 'jcode\builds\stable\jcode.exe'
+$launcherPath = Join-Path $installDir 'kraivcode.exe'
+$versionDir = Join-Path $localAppData ('jcode\builds\versions\' + $Version.TrimStart('v') + '\kraivcode.exe')
+$stablePath = Join-Path $localAppData 'jcode\builds\stable\kraivcode.exe'
 
 foreach ($path in @($launcherPath, $versionDir, $stablePath)) {
     if (-not (Test-Path -LiteralPath $path)) {
@@ -67,7 +67,7 @@ foreach ($path in @($launcherPath, $versionDir, $stablePath)) {
 }
 
 $hotkeyDir = Join-Path $jcodeHome 'hotkey'
-$startupShortcut = Join-Path $appData 'Microsoft\Windows\Start Menu\Programs\Startup\jcode-hotkey.lnk'
+$startupShortcut = Join-Path $appData 'Microsoft\Windows\Start Menu\Programs\Startup\kraivcode-hotkey.lnk'
 if (Test-Path -LiteralPath $hotkeyDir) {
     throw "Default install unexpectedly created optional hotkey files: $hotkeyDir"
 }
@@ -80,7 +80,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Installed launcher failed to run --version"
 }
 
-if ($versionOutput -notmatch 'jcode') {
+if ($versionOutput -notmatch 'kraivcode') {
     throw "Installed launcher returned unexpected version output: $versionOutput"
 }
 

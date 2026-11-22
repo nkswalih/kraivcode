@@ -25,6 +25,7 @@ impl Tool for EchoTool {
 
 fn test_context() -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "batch-registry-lifetime".to_string(),
         message_id: "message".to_string(),
         tool_call_id: "batch-call".to_string(),

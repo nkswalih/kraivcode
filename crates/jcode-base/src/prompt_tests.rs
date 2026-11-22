@@ -49,7 +49,7 @@ fn test_skill_prompt_integration() {
 
     // The prompt should contain our default system prompt
     // Identity line reworded in 24838926e ("docs: refine base agent guidance").
-    assert!(prompt.contains("You are Jcode."));
+    assert!(prompt.contains("You are Kraivcode."));
 
     // The prompt should contain the skill prompt
     assert!(prompt.contains(skill_prompt));
@@ -512,14 +512,14 @@ fn test_non_selfdev_prompt_leaves_selfdev_guidance_to_the_tool_schema() {
     let prompt = build_system_prompt(None, &[]);
     assert!(!prompt.contains("Self-Development Access"));
     assert!(!prompt.contains("You have access to the `selfdev` tool in all sessions"));
-    assert!(!prompt.contains("You are working on the jcode codebase itself."));
+    assert!(!prompt.contains("You are working on the Kraivcode codebase itself."));
 }
 
 #[test]
 fn test_selfdev_prompt_uses_full_selfdev_instructions() {
     let prompt = build_system_prompt_with_selfdev(None, &[], true);
-    assert!(prompt.contains("You are working on the jcode codebase itself."));
-    assert!(prompt.contains("launched from the TUI/root jcode context"));
+    assert!(prompt.contains("You are working on the Kraivcode codebase itself."));
+    assert!(prompt.contains("launched from the TUI/root Kraivcode context"));
     assert!(prompt.contains("selfdev build target=tui"));
     assert!(!prompt.contains("Self-Development Access"));
 }
@@ -531,7 +531,7 @@ fn test_split_selfdev_prompt_defaults_to_tui_focus_for_repo_root() {
     assert!(
         split
             .static_part
-            .contains("launched from the TUI/root jcode context")
+            .contains("launched from the TUI/root Kraivcode context")
     );
     assert!(split.static_part.contains("selfdev build target=tui"));
 }
@@ -543,7 +543,10 @@ fn test_selfdev_prompt_prefers_publish_flow_for_active_builds() {
     assert!(prompt.contains("cancel-build"));
     assert!(prompt.contains("selfdev reload"));
     assert!(prompt.contains("fallback when `selfdev build` is not appropriate"));
-    assert!(prompt.contains("scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode"));
+    assert!(
+        prompt
+            .contains("scripts/dev_cargo.sh build --profile selfdev -p kraivcode --bin kraivcode")
+    );
     assert!(prompt.contains("remote build host is configured"));
     assert!(prompt.contains("Do not wait for user input"));
 }
@@ -701,7 +704,7 @@ fn desktop_prompt_auto_detects_and_overrides_cli_in_full_and_split_modes() {
                 assert!(prompt.contains(DESKTOP_SELFDEV_MODE_PROMPT));
                 assert!(!prompt.contains("# Self-Development Mode"));
                 assert!(!prompt.contains("selfdev build target=tui"));
-                assert!(!prompt.contains("You are working on the jcode codebase itself."));
+                assert!(!prompt.contains("You are working on the Kraivcode codebase itself."));
             }
             assert!(
                 !split

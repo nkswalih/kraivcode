@@ -74,6 +74,11 @@ use std::time::Duration;
 pub type EventStream = Pin<Box<dyn Stream<Item = Result<StreamEvent>> + Send>>;
 
 /// Provider trait for LLM backends.
+// `#[async_trait]` emits a bare `#[must_use]` on each desugared method, and the
+// pinned `dyn Future` it returns is already `#[must_use]` in its own right, so
+// clippy reports the pairing as `double_must_use`. The attribute is generated
+// inside the macro expansion, leaving nowhere here to give it a reason.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait Provider: Send + Sync {
     /// Prepare provider-specific request state before the foreground completion.
@@ -723,7 +728,7 @@ pub fn shared_http_client() -> reqwest::Client {
                 .pool_max_idle_per_host(8)
                 .build()
                 .unwrap_or_else(|err| {
-                    eprintln!("jcode: failed to build shared provider HTTP client: {err}");
+                    eprintln!("kraivcode: failed to build shared provider HTTP client: {err}");
                     match reqwest::Client::builder()
                         .user_agent(JCODE_USER_AGENT)
                         .build()
@@ -731,7 +736,7 @@ pub fn shared_http_client() -> reqwest::Client {
                         Ok(client) => client,
                         Err(fallback_err) => {
                             eprintln!(
-                                "jcode: failed to build fallback provider HTTP client: {fallback_err}"
+                                "kraivcode: failed to build fallback provider HTTP client: {fallback_err}"
                             );
                             reqwest::Client::new()
                         }

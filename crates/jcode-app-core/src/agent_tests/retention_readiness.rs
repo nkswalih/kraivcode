@@ -130,7 +130,17 @@ impl Provider for RetentionReadinessProvider {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .push(transcript.clone());
 
-        let latest = transcript.last().cloned().unwrap_or_default();
+        // The Persona feature (added by the v0.89.3 merge) appends a
+        // `<system-reminder>` block *after* the user turn, so `transcript.last()`
+        // is that reminder rather than the prompt this journey sent. Select the
+        // most recent real message instead, which is what "which journey am I
+        // answering?" actually means.
+        let latest = transcript
+            .iter()
+            .rev()
+            .find(|text| !text.contains("<system-reminder>"))
+            .cloned()
+            .unwrap_or_default();
         if latest.contains("D7_RECOVER")
             && self
                 .fail_d7_once

@@ -21,7 +21,7 @@
 # Exit status is non-zero when any model fails, so this is usable as a gate.
 set -uo pipefail
 
-JC=${JC:-./target/selfdev/jcode}
+JC=${JC:-./target/selfdev/kraivcode}
 TURN_TIMEOUT=${TURN_TIMEOUT:-120}
 MODELS_OVERRIDE=${MODELS:-}
 

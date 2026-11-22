@@ -7,13 +7,13 @@ pub(crate) use crate::mock_provider::MockProvider;
 pub(crate) use anyhow::{Context, Result};
 pub(crate) use async_trait::async_trait;
 pub(crate) use futures::{SinkExt, StreamExt, stream};
-pub(crate) use jcode::agent::Agent;
-pub(crate) use jcode::message::{ContentBlock, Message, Role, StreamEvent, ToolDefinition};
-pub(crate) use jcode::protocol::{Request, ServerEvent};
-pub(crate) use jcode::provider::{EventStream, Provider};
-pub(crate) use jcode::server;
-pub(crate) use jcode::session::{Session, StoredCompactionState};
-pub(crate) use jcode::tool::Registry;
+pub(crate) use kraivcode::agent::Agent;
+pub(crate) use kraivcode::message::{ContentBlock, Message, Role, StreamEvent, ToolDefinition};
+pub(crate) use kraivcode::protocol::{Request, ServerEvent};
+pub(crate) use kraivcode::provider::{EventStream, Provider};
+pub(crate) use kraivcode::server;
+pub(crate) use kraivcode::session::{Session, StoredCompactionState};
+pub(crate) use kraivcode::tool::Registry;
 pub(crate) use std::ffi::OsString;
 pub(crate) use std::io::Read;
 pub(crate) use std::net::TcpListener as StdTcpListener;
@@ -84,19 +84,19 @@ impl TestEnvGuard {
         let runtime_dir = temp_home.path().join("runtime");
         std::fs::create_dir_all(&runtime_dir)?;
 
-        jcode::env::set_var("JCODE_HOME", temp_home.path());
-        jcode::env::set_var("JCODE_RUNTIME_DIR", &runtime_dir);
-        jcode::env::set_var("JCODE_TEST_SESSION", "1");
-        jcode::env::set_var("JCODE_DEBUG_CONTROL", "1");
-        jcode::env::remove_var("JCODE_RUNTIME_PROVIDER");
-        jcode::env::remove_var("JCODE_ACTIVE_PROVIDER");
-        jcode::env::remove_var("JCODE_OPENROUTER_CACHE_NAMESPACE");
+        kraivcode::env::set_var("JCODE_HOME", temp_home.path());
+        kraivcode::env::set_var("JCODE_RUNTIME_DIR", &runtime_dir);
+        kraivcode::env::set_var("JCODE_TEST_SESSION", "1");
+        kraivcode::env::set_var("JCODE_DEBUG_CONTROL", "1");
+        kraivcode::env::remove_var("JCODE_RUNTIME_PROVIDER");
+        kraivcode::env::remove_var("JCODE_ACTIVE_PROVIDER");
+        kraivcode::env::remove_var("JCODE_OPENROUTER_CACHE_NAMESPACE");
         // Disable the memory sidecar/extraction in e2e runs. Its background
         // extraction makes its own provider `complete()` call, which would steal
         // a queued mock response from the scenario under test and make turn
         // outcomes nondeterministic across transports.
-        jcode::env::set_var("JCODE_MEMORY_ENABLED", "0");
-        jcode::env::set_var("JCODE_MEMORY_SIDECAR_ENABLED", "0");
+        kraivcode::env::set_var("JCODE_MEMORY_ENABLED", "0");
+        kraivcode::env::set_var("JCODE_MEMORY_SIDECAR_ENABLED", "0");
 
         Ok(Self {
             _lock: lock,
@@ -115,48 +115,48 @@ impl TestEnvGuard {
 impl Drop for TestEnvGuard {
     fn drop(&mut self) {
         if let Some(prev_home) = &self.prev_home {
-            jcode::env::set_var("JCODE_HOME", prev_home);
+            kraivcode::env::set_var("JCODE_HOME", prev_home);
         } else {
-            jcode::env::remove_var("JCODE_HOME");
+            kraivcode::env::remove_var("JCODE_HOME");
         }
 
         if let Some(prev_runtime_dir) = &self.prev_runtime_dir {
-            jcode::env::set_var("JCODE_RUNTIME_DIR", prev_runtime_dir);
+            kraivcode::env::set_var("JCODE_RUNTIME_DIR", prev_runtime_dir);
         } else {
-            jcode::env::remove_var("JCODE_RUNTIME_DIR");
+            kraivcode::env::remove_var("JCODE_RUNTIME_DIR");
         }
 
         if let Some(prev_test_session) = &self.prev_test_session {
-            jcode::env::set_var("JCODE_TEST_SESSION", prev_test_session);
+            kraivcode::env::set_var("JCODE_TEST_SESSION", prev_test_session);
         } else {
-            jcode::env::remove_var("JCODE_TEST_SESSION");
+            kraivcode::env::remove_var("JCODE_TEST_SESSION");
         }
 
         if let Some(prev_debug_control) = &self.prev_debug_control {
-            jcode::env::set_var("JCODE_DEBUG_CONTROL", prev_debug_control);
+            kraivcode::env::set_var("JCODE_DEBUG_CONTROL", prev_debug_control);
         } else {
-            jcode::env::remove_var("JCODE_DEBUG_CONTROL");
+            kraivcode::env::remove_var("JCODE_DEBUG_CONTROL");
         }
 
         if let Some(prev_runtime_provider) = &self.prev_runtime_provider {
-            jcode::env::set_var("JCODE_RUNTIME_PROVIDER", prev_runtime_provider);
+            kraivcode::env::set_var("JCODE_RUNTIME_PROVIDER", prev_runtime_provider);
         } else {
-            jcode::env::remove_var("JCODE_RUNTIME_PROVIDER");
+            kraivcode::env::remove_var("JCODE_RUNTIME_PROVIDER");
         }
 
         if let Some(prev_active_provider) = &self.prev_active_provider {
-            jcode::env::set_var("JCODE_ACTIVE_PROVIDER", prev_active_provider);
+            kraivcode::env::set_var("JCODE_ACTIVE_PROVIDER", prev_active_provider);
         } else {
-            jcode::env::remove_var("JCODE_ACTIVE_PROVIDER");
+            kraivcode::env::remove_var("JCODE_ACTIVE_PROVIDER");
         }
 
         if let Some(prev_openrouter_cache_namespace) = &self.prev_openrouter_cache_namespace {
-            jcode::env::set_var(
+            kraivcode::env::set_var(
                 "JCODE_OPENROUTER_CACHE_NAMESPACE",
                 prev_openrouter_cache_namespace,
             );
         } else {
-            jcode::env::remove_var("JCODE_OPENROUTER_CACHE_NAMESPACE");
+            kraivcode::env::remove_var("JCODE_OPENROUTER_CACHE_NAMESPACE");
         }
     }
 }
@@ -173,7 +173,7 @@ pub(crate) struct EnvVarGuard {
 impl EnvVarGuard {
     pub(crate) fn set(name: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
         let prev = std::env::var_os(name);
-        jcode::env::set_var(name, value);
+        kraivcode::env::set_var(name, value);
         Self { name, prev }
     }
 }
@@ -181,9 +181,9 @@ impl EnvVarGuard {
 impl Drop for EnvVarGuard {
     fn drop(&mut self) {
         if let Some(prev) = &self.prev {
-            jcode::env::set_var(self.name, prev);
+            kraivcode::env::set_var(self.name, prev);
         } else {
-            jcode::env::remove_var(self.name);
+            kraivcode::env::remove_var(self.name);
         }
     }
 }
@@ -253,14 +253,14 @@ pub(crate) async fn wait_for_tcp_port(port: u16) -> Result<()> {
 }
 
 fn pair_test_device(token: &str) -> Result<()> {
-    let mut registry = jcode::gateway::DeviceRegistry::load();
+    let mut registry = kraivcode::gateway::DeviceRegistry::load();
     let now = chrono::Utc::now().to_rfc3339();
     let mut hasher = sha2::Sha256::new();
     use sha2::Digest;
     hasher.update(token.as_bytes());
     let token_hash = format!("sha256:{}", hex::encode(hasher.finalize()));
     registry.devices.retain(|d| d.id != "test-device-ws");
-    registry.devices.push(jcode::gateway::PairedDevice {
+    registry.devices.push(kraivcode::gateway::PairedDevice {
         id: "test-device-ws".to_string(),
         name: "WS Test Device".to_string(),
         token_hash,
@@ -396,6 +396,7 @@ impl WsTestClient {
             system_reminder: None,
             active_skill: None,
             no_reply: false,
+            persona: None,
         })
         .await
     }
@@ -570,7 +571,7 @@ pub(crate) async fn run_unix_transport_scenario() -> Result<TransportScenarioRes
         StreamEvent::SessionId("provider-session-1".to_string()),
     ]);
 
-    let provider: Arc<dyn jcode::provider::Provider> = Arc::new(provider);
+    let provider: Arc<dyn kraivcode::provider::Provider> = Arc::new(provider);
     let server_instance =
         server::Server::new_with_paths(provider, socket_path.clone(), debug_socket_path.clone());
     let server_handle = tokio::spawn(async move { server_instance.run().await });
@@ -690,10 +691,10 @@ pub(crate) async fn run_websocket_transport_scenario() -> Result<TransportScenar
         StreamEvent::SessionId("provider-session-1".to_string()),
     ]);
 
-    let provider: Arc<dyn jcode::provider::Provider> = Arc::new(provider);
+    let provider: Arc<dyn kraivcode::provider::Provider> = Arc::new(provider);
     let server_instance =
         server::Server::new_with_paths(provider, socket_path.clone(), debug_socket_path.clone())
-            .with_gateway_config(jcode::gateway::GatewayConfig {
+            .with_gateway_config(kraivcode::gateway::GatewayConfig {
                 port: gateway_port,
                 bind_addr: "127.0.0.1".to_string(),
                 enabled: true,
@@ -1170,7 +1171,7 @@ pub(crate) async fn wait_for_selfdev_reload_cycle(
     let mut stable_since: Option<Instant> = None;
 
     while Instant::now() < deadline {
-        let marker_active = jcode::server::reload_marker_active(Duration::from_secs(30));
+        let marker_active = kraivcode::server::reload_marker_active(Duration::from_secs(30));
         let server_info = match tokio::time::timeout(
             Duration::from_millis(750),
             debug_run_command(debug_socket_path.to_path_buf(), "server:info", None),

@@ -323,7 +323,7 @@ pub fn run_auto_update() -> Result<()> {
     use crate::bus::{Bus, BusEvent, UpdateStatus};
 
     let repo_dir =
-        get_repo_dir().ok_or_else(|| anyhow::anyhow!("Could not find jcode repository"))?;
+        get_repo_dir().ok_or_else(|| anyhow::anyhow!("Could not find Kraivcode repository"))?;
 
     update::run_git_pull_ff_only(&repo_dir, true)?;
 

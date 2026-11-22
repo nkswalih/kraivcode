@@ -113,7 +113,7 @@ fn select_candidate_prefers_title_match() {
         },
     ];
 
-    let selected = select_candidate(&candidates, Some("🦀 jcode/sleeping Crab [self-dev]"))
+    let selected = select_candidate(&candidates, Some("🦀 kraivcode/sleeping Crab [self-dev]"))
         .expect("should select matching candidate");
     assert_eq!(selected.short_name, "crab");
 }
@@ -124,21 +124,21 @@ fn read_resumed_session_id_from_cmdline_for_current_process() {
 }
 
 #[test]
-fn extract_session_short_name_from_jcode_window_title() {
+fn extract_session_short_name_from_kraivcode_window_title() {
     assert_eq!(
-        extract_session_short_name_from_window_title("🦢 jcode/cliff Swan [self-dev]"),
+        extract_session_short_name_from_window_title("🦢 kraivcode/cliff Swan [self-dev]"),
         Some("swan".to_string())
     );
     assert_eq!(
-        extract_session_short_name_from_window_title("🦊 jcode Fox"),
+        extract_session_short_name_from_window_title("🦊 kraivcode Fox"),
         Some("fox".to_string())
     );
     assert_eq!(
-        extract_session_short_name_from_window_title("🌐 jcode Fox · last ~18s"),
+        extract_session_short_name_from_window_title("🌐 kraivcode Fox · last ~18s"),
         Some("fox".to_string())
     );
     assert_eq!(
-        extract_session_short_name_from_window_title("🌐 jcode Mushroom · +2 -2 · last ~16s"),
+        extract_session_short_name_from_window_title("🌐 kraivcode Mushroom · +2 -2 · last ~16s"),
         Some("mushroom".to_string())
     );
 }
@@ -190,12 +190,12 @@ fn focused_jcode_session_uses_niri_window_title_when_process_name_is_generic() {
     std::fs::create_dir_all(&active_dir).expect("create active_pids");
     std::fs::write(active_dir.join("session_swan_123"), "12345").expect("write active pid");
 
-    let focused_process = ChildGuard::spawn_named("jcode");
+    let focused_process = ChildGuard::spawn_named("kraivcode");
     let bin_dir = temp.path().join("bin");
     install_fake_niri(
         &bin_dir,
         focused_process.pid(),
-        "🦢 jcode/cliff Swan [self-dev]",
+        "🦢 kraivcode/cliff Swan [self-dev]",
     );
 
     let prev_path = std::env::var_os("PATH").unwrap_or_default();

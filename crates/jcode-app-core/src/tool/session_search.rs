@@ -155,7 +155,7 @@ pub fn spawn_recent_index_warmup() {
             Ok(collection.files.len())
         })()
         .unwrap_or_else(|err| {
-            crate::logging::info(&format!("jcode session index warmup skipped: {err}"));
+            crate::logging::info(&format!("Kraivcode session index warmup skipped: {err}"));
             0
         });
 

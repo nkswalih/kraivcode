@@ -95,9 +95,9 @@ pub fn resumed_window_title(session_id: &str) -> String {
     let fallback_label = if let Some(server_info) =
         crate::registry::find_server_by_socket_sync(&server::socket_path())
     {
-        format!("jcode/{} {}", server_info.name, session_label)
+        format!("kraivcode/{} {}", server_info.name, session_label)
     } else {
-        format!("jcode {}", session_label)
+        format!("kraivcode {}", session_label)
     };
     crate::process_title::terminal_window_title(
         icon,
@@ -348,21 +348,20 @@ fn find_wezterm_gui_binary() -> Option<String> {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                if let Some(line) = stdout.lines().next() {
-                    let trimmed = line.trim();
-                    if !trimmed.is_empty() {
-                        if *bin == "wezterm" {
-                            let p = std::path::Path::new(trimmed);
-                            let gui = p.with_file_name("wezterm-gui.exe");
-                            if gui.exists() {
-                                return Some(gui.to_string_lossy().into_owned());
-                            }
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Some(line) = stdout.lines().next() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    if *bin == "wezterm" {
+                        let p = std::path::Path::new(trimmed);
+                        let gui = p.with_file_name("wezterm-gui.exe");
+                        if gui.exists() {
+                            return Some(gui.to_string_lossy().into_owned());
                         }
-                        return Some(trimmed.to_string());
                     }
+                    return Some(trimmed.to_string());
                 }
             }
         }

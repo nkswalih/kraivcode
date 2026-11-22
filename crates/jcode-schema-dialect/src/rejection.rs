@@ -4,7 +4,7 @@
 //! construct, but it cannot be complete: a provider may reject something jcode
 //! believed was fine. When that happens the failure is currently a hard 400 the
 //! user reports as a GitHub issue days later. Parsing the error instead lets the
-//! same turn recover, and lets jcode report exactly which keyword to add.
+//! same turn recover, and lets Kraivcode report exactly which keyword to add.
 //!
 //! The three shapes below are verbatim from the filed issues, so the parser is
 //! tested against real provider output rather than invented strings.

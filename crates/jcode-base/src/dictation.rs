@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 use tokio::time::{Duration, timeout};
 
-const CLIENT_TITLE_PREFIXES: &[&str] = &["jcode:d:", "jcode:c:"];
+const CLIENT_TITLE_PREFIXES: &[&str] = &["kraivcode:d:", "kraivcode:c:"];
 
 #[derive(Debug, Clone)]
 pub struct DictationRun {
@@ -199,7 +199,7 @@ pub fn send_transcript_blocking(
     while std::time::Instant::now() < deadline {
         line.clear();
         if reader.read_line(&mut line)? == 0 {
-            anyhow::bail!("jcode server closed the connection");
+            anyhow::bail!("kraivcode server closed the connection");
         }
         match serde_json::from_str::<crate::protocol::ServerEvent>(line.trim()) {
             Ok(crate::protocol::ServerEvent::Done { id: 1 }) => return Ok(()),
@@ -257,9 +257,9 @@ fn registered_client_session(pid: u32) -> Option<String> {
     (!session_id.is_empty()).then_some(session_id)
 }
 
-/// A running `jcode` TUI client, not a server or one-shot subcommand.
-fn is_jcode_client_process(pid: u32) -> bool {
-    if process_exe_name(pid).as_deref() != Some("jcode") {
+/// A running `kraivcode` TUI client, not a server or one-shot subcommand.
+fn is_kraivcode_client_process(pid: u32) -> bool {
+    if process_exe_name(pid).as_deref() != Some("kraivcode") {
         return false;
     }
     let Ok(bytes) = std::fs::read(format!("/proc/{pid}/cmdline")) else {
@@ -357,10 +357,10 @@ fn resolve_session_for_window(window: &NiriFocusedWindow) -> Option<String> {
         return resolve_candidate_session_id(&selected);
     }
 
-    // A generic `jcode` client (no session in its title or argv) is running in
+    // A generic `kraivcode` client (no session in its title or argv) is running in
     // this window. The TUI records its session on focus, so the last-focused
     // session belongs to it.
-    if tree.iter().any(|&pid| is_jcode_client_process(pid)) {
+    if tree.iter().any(|&pid| is_kraivcode_client_process(pid)) {
         return last_focused_session().ok().flatten();
     }
     None
@@ -382,8 +382,8 @@ fn resolve_session_from_window_title(title: &str) -> Option<String> {
 
 fn extract_session_short_name_from_window_title(title: &str) -> Option<String> {
     let (_, rest) = title
-        .split_once("jcode/")
-        .or_else(|| title.split_once("jcode "))?;
+        .split_once("kraivcode/")
+        .or_else(|| title.split_once("kraivcode "))?;
     // The TUI appends live metrics after " · " (for example "· last ~18s").
     let rest = rest.split(" · ").next().unwrap_or(rest);
     let candidate = rest.split('[').next().unwrap_or(rest).trim();

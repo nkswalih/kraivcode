@@ -1051,7 +1051,7 @@ fn test_selfdev_command_spawns_session_in_test_mode() {
     crate::env::set_var("JCODE_HOME", temp_home.path());
     crate::env::set_var("JCODE_TEST_SESSION", "1");
 
-    let repo = create_jcode_repo_fixture();
+    let repo = create_kraivcode_repo_fixture();
     let mut app = create_test_app();
     app.session.working_dir = Some(repo.path().display().to_string());
 

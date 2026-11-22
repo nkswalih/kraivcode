@@ -1,6 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
-//! Self-development tool - manage canary builds when working on jcode itself
+//! Self-development tool - manage canary builds when working on Kraivcode itself
 
 use crate::background::{self, TaskResult};
 use crate::build;
@@ -32,8 +32,8 @@ pub use launch::{enter_selfdev_session, schedule_selfdev_prompt_delivery};
 pub use reload::{ReloadRecoveryDirective, persisted_background_tasks_note};
 pub use status::selfdev_status_output;
 
-/// Public GitHub source used when cloning the jcode repository for self-dev.
-pub const JCODE_REPO_URL: &str = "https://github.com/1jehuang/jcode.git";
+/// Public GitHub source used when cloning the Kraivcode repository for self-dev.
+pub const JCODE_REPO_URL: &str = "https://github.com/nkswalih/kraivcode.git";
 
 #[derive(Debug, Deserialize)]
 struct SelfDevInput {
@@ -487,9 +487,9 @@ impl SelfDevTool {
     /// reload/find-config); inside self-dev it manages builds and reloads.
     pub fn description_for(is_selfdev: bool) -> &'static str {
         if is_selfdev {
-            "Manage self-dev builds, tests, and reloads while working on jcode itself."
+            "Manage self-dev builds, tests, and reloads while working on Kraivcode itself."
         } else {
-            "Enter self-dev mode to work on jcode itself: setup, reload, find config/paths."
+            "Enter self-dev mode to work on Kraivcode itself: setup, reload, find config/paths."
         }
     }
 
@@ -614,7 +614,7 @@ impl Tool for SelfDevTool {
             }
 
             // Self-dev-only actions: building, testing, and low-level socket
-            // access only make sense once you are working on jcode itself.
+            // access only make sense once you are working on Kraivcode itself.
             "build" => {
                 self.do_build(
                     params.reason,
@@ -754,7 +754,7 @@ impl SelfDevTool {
     fn resolve_repo_dir(working_dir: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
         if let Some(dir) = working_dir {
             for ancestor in dir.ancestors() {
-                if build::is_jcode_repo(ancestor) {
+                if build::is_kraivcode_repo(ancestor) {
                     return Some(ancestor.to_path_buf());
                 }
             }
@@ -767,7 +767,7 @@ impl SelfDevTool {
         build::client_update_candidate(true)
             .map(|(path, _label)| path)
             .or_else(|| std::env::current_exe().ok())
-            .ok_or_else(|| anyhow::anyhow!("Could not resolve jcode executable to launch"))
+            .ok_or_else(|| anyhow::anyhow!("Could not resolve Kraivcode executable to launch"))
     }
 
     fn build_command(repo_dir: &Path, target: build::SelfDevBuildTarget) -> SelfDevBuildCommand {

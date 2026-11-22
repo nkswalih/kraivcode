@@ -116,7 +116,7 @@ pub fn recommended_actions(
     let mut actions = Vec::new();
     match assessment.state {
         AuthState::NotConfigured => actions.push(format!(
-            "Connect it: jcode login --provider {}",
+            "Connect it: kraivcode login --provider {}",
             provider.id
         )),
         AuthState::Expired
@@ -126,12 +126,12 @@ pub fn recommended_actions(
             ) =>
         {
             actions.push(format!(
-                "Re-run login; this provider cannot auto-refresh: jcode login --provider {}",
+                "Re-run login; this provider cannot auto-refresh: kraivcode login --provider {}",
                 provider.id
             ));
         }
         AuthState::Expired => actions.push(format!(
-            "Refresh or replace the current login: jcode login --provider {}",
+            "Refresh or replace the current login: kraivcode login --provider {}",
             provider.id
         )),
         AuthState::Available => {}
@@ -145,7 +145,7 @@ pub fn recommended_actions(
         let lower = error.to_ascii_lowercase();
         if lower.contains("invalid_grant") || lower.contains("refresh token") {
             actions.push(format!(
-                "Replace the stale OAuth account/token: jcode login --provider {}",
+                "Replace the stale OAuth account/token: kraivcode login --provider {}",
                 provider.id
             ));
         } else if lower.contains("rate_limit")
@@ -216,12 +216,12 @@ pub fn recommended_actions(
         || matches!(provider.auth_kind, LoginProviderAuthKind::Hybrid)
     {
         actions.push(format!(
-            "For browser/callback issues, use the manual-safe flow: jcode login --provider {} --print-auth-url",
+            "For browser/callback issues, use the manual-safe flow: kraivcode login --provider {} --print-auth-url",
             provider.id
         ));
     }
 
-    actions.push("Review current state: jcode auth status --json".to_string());
+    actions.push("Review current state: kraivcode auth status --json".to_string());
     actions.dedup();
     actions
 }

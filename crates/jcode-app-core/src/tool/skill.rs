@@ -171,7 +171,8 @@ impl SkillTool {
             "No skills loaded.\n\n\
             Skills are loaded from:\n\
             - ~/.jcode/skills/<skill-name>/SKILL.md (global)\n\
-            - ./.jcode/skills/<skill-name>/SKILL.md (project-local)\n\
+            - ./.kraivcode/skills/<skill-name>/SKILL.md (project-local)\n\
+            - ./.jcode/skills/<skill-name>/SKILL.md (project-local, legacy)\n\
             - ./.claude/skills/<skill-name>/SKILL.md (compatibility)\n\n\
             Create a SKILL.md file with YAML frontmatter:\n\
             ---\n\
@@ -401,6 +402,7 @@ mod tests {
 
     fn create_test_context() -> ToolContext {
         ToolContext {
+            ask_user_request_tx: None,
             session_id: "test-session".to_string(),
             message_id: "test-message".to_string(),
             tool_call_id: "test-tool-call".to_string(),

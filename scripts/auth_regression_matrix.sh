@@ -16,7 +16,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/auth_regression_matrix.sh [options]
 
-Runs jcode auth-test across the auth/provider matrix and writes one JSON report per provider.
+Runs Kraivcode auth-test across the auth/provider matrix and writes one JSON report per provider.
 By default it only tests providers that are configured enough for auth-test to run.
 
 Options:
@@ -24,7 +24,7 @@ Options:
   --configured          Test only configured providers (default)
   --provider NAME       Test one provider. Can be repeated.
   --out DIR             Report directory (default: target/auth-test-reports)
-  --bin PATH            jcode binary to run (default: cargo run --bin jcode --)
+  --bin PATH            Kraivcode binary to run (default: cargo run --bin kraivcode --)
   --login               Run login before validation for each provider
   --no-smoke            Skip runtime model smoke
   --no-tool-smoke       Skip tool-enabled runtime smoke
@@ -137,7 +137,7 @@ run_jcode() {
   if [[ -n "$bin" ]]; then
     timeout "$per_command_timeout" "$bin" "$@"
   else
-    timeout "$per_command_timeout" cargo run --quiet --bin jcode -- "$@"
+    timeout "$per_command_timeout" cargo run --quiet --bin kraivcode -- "$@"
   fi
 }
 

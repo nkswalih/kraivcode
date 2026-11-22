@@ -81,9 +81,9 @@ async fn bash_executes_with_null_optional_arguments() {
 fn repository_commands_export_a_logged_cargo_function() {
     let repo =
         crate::build::find_repo_in_ancestors(std::path::Path::new(env!("CARGO_MANIFEST_DIR")))
-            .expect("test runs inside the jcode repository");
+            .expect("test runs inside the Kraivcode repository");
     let wrapped = wrap_repo_cargo_commands("cargo test -p demo && echo done", Some(&repo))
-        .expect("jcode repository has dev_cargo.sh");
+        .expect("Kraivcode repository has dev_cargo.sh");
 
     assert!(wrapped.contains("export JCODE_DEV_CARGO_SCRIPT="));
     assert!(wrapped.contains("JCODE_IN_DEV_CARGO=1 \"$JCODE_DEV_CARGO_SCRIPT\" \"$@\""));
@@ -92,7 +92,7 @@ fn repository_commands_export_a_logged_cargo_function() {
 }
 
 #[test]
-fn cargo_routing_is_limited_to_the_jcode_repository() {
+fn cargo_routing_is_limited_to_the_kraivcode_repository() {
     assert!(wrap_repo_cargo_commands("cargo test", Some(std::path::Path::new("/"))).is_none());
     assert!(wrap_repo_cargo_commands("cargo test", None).is_none());
 }
@@ -128,6 +128,7 @@ async fn background_command_stdin_is_null() {
 
 fn make_ctx(stdin_tx: Option<mpsc::UnboundedSender<StdinInputRequest>>) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "test-session".to_string(),
         message_id: "test-msg".to_string(),
         tool_call_id: "test-call".to_string(),
@@ -140,6 +141,7 @@ fn make_ctx(stdin_tx: Option<mpsc::UnboundedSender<StdinInputRequest>>) -> ToolC
 
 fn make_agent_ctx(signal: jcode_agent_runtime::InterruptSignal) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "test-session".to_string(),
         message_id: "test-msg".to_string(),
         tool_call_id: "test-call-agent".to_string(),
@@ -966,6 +968,7 @@ fn test_bash_tool_schema_advertises_background_progress_guidance() {
 
 fn gate_ctx(working_dir: &str) -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "gate-test".to_string(),
         message_id: "m".to_string(),
         tool_call_id: "c".to_string(),

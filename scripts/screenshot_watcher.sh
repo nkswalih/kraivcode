@@ -27,7 +27,7 @@ echo "   Output dir: $OUTPUT_DIR"
 echo "   Window ID: ${WINDOW_ID:-<focused>}"
 echo ""
 echo "Waiting for signals... (Ctrl+C to stop)"
-echo "Enable in jcode with: /screenshot-mode on"
+echo "Enable in Kraivcode with: /screenshot-mode on"
 echo ""
 
 capture_signal() {

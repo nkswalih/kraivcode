@@ -158,6 +158,7 @@ async fn the_write_tool_reports_config_changes_end_to_end() {
     assert!(!crate::config::config().display.centered);
 
     let ctx = ToolContext {
+        ask_user_request_tx: None,
         session_id: "test".to_string(),
         message_id: "test".to_string(),
         tool_call_id: "test".to_string(),
@@ -208,6 +209,7 @@ async fn apply_patch_reports_config_changes() {
     assert!(!crate::config::config().display.centered);
 
     let ctx = ToolContext {
+        ask_user_request_tx: None,
         session_id: "test".to_string(),
         message_id: "test".to_string(),
         tool_call_id: "test".to_string(),

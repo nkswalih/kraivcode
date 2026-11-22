@@ -230,7 +230,7 @@ maybe_enable_sccache() {
   case "$force_sccache" in
     1|true|yes|on|force) force_sccache="1" ;;
     0|false|no|off|never)
-      sccache_status="disabled-by-jcode-sccache"
+      sccache_status="disabled-by-kraivcode-sccache"
       log "sccache disabled by JCODE_SCCACHE"
       return
       ;;
@@ -907,7 +907,7 @@ remote_cargo_preflight() {
     -o ConnectTimeout="$connect_timeout" \
     -o ServerAliveInterval="$server_alive_interval" \
     -o ServerAliveCountMax="$server_alive_count" \
-    "$remote" "printf 'jcode-remote-ok\\n'" 2>&1); then
+    "$remote" "printf 'kraivcode-remote-ok\\n'" 2>&1); then
     log "remote cargo preflight failed for $remote after ~${connect_timeout}s: $output"
     record_remote_down
     return 1

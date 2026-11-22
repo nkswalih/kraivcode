@@ -107,7 +107,7 @@ rm -f "$OUT"
 echo
 if echo "$HEX" | grep -qiE "1b5b313031|1b65|1b45"; then
   echo "✅ PASS: niri forwarded Alt+Shift+E to the focused terminal."
-  echo "   (terminal received an 'e' key event; jcode will see it.)"
+  echo "   (terminal received an 'e' key event; Kraivcode will see it.)"
   exit 0
 else
   echo "❌ FAIL: focused terminal received no 'e' key event."

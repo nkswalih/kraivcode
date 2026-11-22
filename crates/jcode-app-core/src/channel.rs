@@ -4,6 +4,11 @@ use crate::logging;
 use async_trait::async_trait;
 use std::sync::Arc;
 
+// `#[async_trait]` emits a bare `#[must_use]` on each desugared method, and the
+// pinned `dyn Future` it returns is already `#[must_use]` in its own right, so
+// clippy reports the pairing as `double_must_use`. The attribute is generated
+// inside the macro expansion, leaving nowhere here to give it a reason.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait MessageChannel: Send + Sync {
     fn name(&self) -> &str;
@@ -652,7 +657,7 @@ impl MessageChannel for JadeRelayChannel {
     fn is_reply_enabled(&self) -> bool {
         // Inbound Jade relay prompts are delivered by server::jade_relay so they
         // work even when ambient mode is disabled and target the configured live
-        // Jcode session directly. Keep this channel for outbound notifications
+        // Kraivcode session directly. Keep this channel for outbound notifications
         // only; otherwise ambient mode would start a second poller.
         let _configured_for_server_listener = self.reply_enabled;
         false

@@ -23,7 +23,7 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-build_cmd=(scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode)
+build_cmd=(scripts/dev_cargo.sh build --profile selfdev -p kraivcode --bin kraivcode)
 
 run_build() {
     # Per-phase logs survive later phases, so a mid-benchmark failure (often a

@@ -555,7 +555,7 @@ mod tests {
         assert_eq!(
             transport.provider_name(),
             "jcode",
-            "Set JCODE_BROWSER_JEV_PROVIDER=jcode and sign in with jcode account login. BYOK is not subscription validation."
+            "Set JCODE_BROWSER_JEV_PROVIDER=jcode and sign in with kraivcode account login. BYOK is not subscription validation."
         );
         let decision = transport.decide(&request()).await.unwrap();
         assert_eq!(decision.choice, "a0");

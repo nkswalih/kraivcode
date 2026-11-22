@@ -357,7 +357,7 @@ fn telemetry_header_lines(width: u16) -> Vec<Line<'static>> {
     let align = Alignment::Center;
     let dim = Style::default().fg(dim_color());
     let lines = vec![
-        "jcode collects anonymous usage statistics (version, OS, session",
+        "kraivcode collects anonymous usage statistics (version, OS, session",
         "activity, and crash reasons). No code, prompts, or personal data.",
         "Change anytime: /telemetry (or export JCODE_NO_TELEMETRY=1)",
     ];

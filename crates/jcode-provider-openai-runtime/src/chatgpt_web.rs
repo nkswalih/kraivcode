@@ -749,7 +749,7 @@ async fn bridge_command(action: &str, params: Value) -> Result<Value> {
     let binary = jcode_base::browser::browser_binary_path();
     if !binary.exists() {
         anyhow::bail!(
-            "Browser bridge binary is not installed. Run `jcode browser setup` once, then log in at chatgpt.com in Firefox"
+            "Browser bridge binary is not installed. Run `kraivcode browser setup` once, then log in at chatgpt.com in Firefox"
         );
     }
 

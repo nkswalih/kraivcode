@@ -166,10 +166,10 @@ during first-run onboarding. Please fix the login for the user.\n\n",
     brief.push_str(
         "  # OAuth providers (OpenAI/ChatGPT, Anthropic/Claude, Gemini, Copilot, Cursor):\n",
     );
-    brief.push_str(&format!("  jcode login --provider {provider}\n\n"));
+    brief.push_str(&format!("  kraivcode login --provider {provider}\n\n"));
     brief.push_str("  # API-key providers (pass the key directly):\n");
     brief.push_str(&format!(
-        "  jcode login --provider {provider} --api-key \"$THE_API_KEY\"\n\n",
+        "  kraivcode login --provider {provider} --api-key \"$THE_API_KEY\"\n\n",
     ));
     brief.push_str(
         "  # Custom OpenAI-compatible endpoint (adds a named profile + stores the key on stdin, no echo):\n",
@@ -256,7 +256,10 @@ mod tests {
             brief.contains("jcode auth-test --provider openai --json"),
             "{brief}"
         );
-        assert!(brief.contains("jcode login --provider openai"), "{brief}");
+        assert!(
+            brief.contains("kraivcode login --provider openai"),
+            "{brief}"
+        );
         assert!(brief.contains("--api-key-stdin"), "{brief}");
         assert!(brief.contains("jcode provider add"), "{brief}");
         // Points at the logs.

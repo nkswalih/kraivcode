@@ -644,7 +644,7 @@ pub async fn run_claude_native_e2e(
             label_for(checkpoints::AUTH_CREDENTIAL_LOADED),
             format!(
                 "could not select the Claude OAuth credential path: {error}. \
-                 Run `jcode login --provider claude` to mint a fresh OAuth token."
+                 Run `kraivcode login --provider claude` to mint a fresh OAuth token."
             ),
         ));
         return Ok(finish_report(
@@ -694,7 +694,7 @@ pub async fn run_claude_native_e2e(
                     label_for(checkpoints::AUTH_CREDENTIAL_LOADED),
                     format!(
                         "could not resolve a Claude credential: {error}. \
-                         Run `jcode login --provider claude` to mint a fresh OAuth token."
+                         Run `kraivcode login --provider claude` to mint a fresh OAuth token."
                     ),
                 ));
                 return Ok(finish_report(
@@ -964,7 +964,7 @@ fn native_antigravity_wiring_contract() -> WiringContract {
 }
 
 /// Credential descriptor for the native Antigravity doctor. Antigravity uses
-/// Google OAuth tokens minted by `jcode login --provider antigravity`; the
+/// Google OAuth tokens minted by `kraivcode login --provider antigravity`; the
 /// tokens rotate and are never persisted here, so we record only the source
 /// (and the resolved Google account email when available) without a secret.
 fn native_antigravity_auth(account: &str) -> LiveVerificationAuth {
@@ -1052,7 +1052,7 @@ pub async fn run_antigravity_native_e2e(
                     label_for(checkpoints::AUTH_CREDENTIAL_LOADED),
                     format!(
                         "could not resolve an Antigravity credential: {error}. \
-                         Run `jcode login --provider antigravity` to sign in."
+                         Run `kraivcode login --provider antigravity` to sign in."
                     ),
                 ));
                 return Ok(finish_report(
@@ -1344,7 +1344,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "OpenAI ChatGPT OAuth / API key via auth.json",
                 auth_env_key: None,
-                login_hint: "jcode login --provider openai",
+                login_hint: "kraivcode login --provider openai",
             },
             Self::Gemini => NativeProviderSpec {
                 provider_id: "gemini",
@@ -1358,7 +1358,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "Gemini Code Assist Google OAuth via gemini_oauth.json",
                 auth_env_key: None,
-                login_hint: "jcode login --provider gemini",
+                login_hint: "kraivcode login --provider gemini",
             },
             Self::Cursor => NativeProviderSpec {
                 provider_id: "cursor",
@@ -1372,7 +1372,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "Cursor API key / CLI session via auth.json",
                 auth_env_key: Some("CURSOR_API_KEY"),
-                login_hint: "jcode login --provider cursor",
+                login_hint: "kraivcode login --provider cursor",
             },
             Self::Copilot => NativeProviderSpec {
                 provider_id: "copilot",
@@ -1386,7 +1386,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "GitHub Copilot device-flow token via hosts.json",
                 auth_env_key: None,
-                login_hint: "jcode login --provider copilot",
+                login_hint: "kraivcode login --provider copilot",
             },
             Self::Bedrock => NativeProviderSpec {
                 provider_id: "bedrock",
@@ -1400,7 +1400,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "AWS Bedrock API key / AWS credentials",
                 auth_env_key: Some("AWS_BEARER_TOKEN_BEDROCK"),
-                login_hint: "jcode login --provider bedrock",
+                login_hint: "kraivcode login --provider bedrock",
             },
             Self::Jcode => NativeProviderSpec {
                 provider_id: "jcode",
@@ -1419,7 +1419,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "Jcode subscription API key (JCODE_API_KEY)",
                 auth_env_key: Some("JCODE_API_KEY"),
-                login_hint: "jcode login --provider jcode",
+                login_hint: "kraivcode login --provider jcode",
             },
             Self::Azure => NativeProviderSpec {
                 provider_id: "azure-openai",
@@ -1437,7 +1437,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "Azure OpenAI API key / Entra ID (AZURE_OPENAI_*)",
                 auth_env_key: Some("AZURE_OPENAI_API_KEY"),
-                login_hint: "jcode login --provider azure",
+                login_hint: "kraivcode login --provider azure",
             },
         }
     }
@@ -1522,7 +1522,7 @@ impl NativeProviderKind {
         match self {
             Self::OpenAi => {
                 let credentials = jcode_base::auth::codex::load_credentials()
-                    .context("load OpenAI credentials (run `jcode login --provider openai`)")?;
+                    .context("load OpenAI credentials (run `kraivcode login --provider openai`)")?;
                 if credentials.access_token.trim().is_empty() {
                     anyhow::bail!("resolved an empty OpenAI access token");
                 }
@@ -1539,15 +1539,16 @@ impl NativeProviderKind {
             }
             Self::Cursor => {
                 let key = jcode_base::auth::cursor::load_api_key()
-                    .context("load Cursor credential (run `jcode login --provider cursor`)")?;
+                    .context("load Cursor credential (run `kraivcode login --provider cursor`)")?;
                 if key.trim().is_empty() {
                     anyhow::bail!("resolved an empty Cursor credential");
                 }
                 Ok("Cursor credential resolved".to_string())
             }
             Self::Copilot => {
-                let token = jcode_base::auth::copilot::load_github_token()
-                    .context("load GitHub Copilot token (run `jcode login --provider copilot`)")?;
+                let token = jcode_base::auth::copilot::load_github_token().context(
+                    "load GitHub Copilot token (run `kraivcode login --provider copilot`)",
+                )?;
                 if token.trim().is_empty() {
                     anyhow::bail!("resolved an empty GitHub Copilot token");
                 }
@@ -1566,7 +1567,7 @@ impl NativeProviderKind {
                 if !jcode_base::subscription_catalog::has_credentials() {
                     anyhow::bail!(
                         "no Jcode subscription credential found (set JCODE_API_KEY or run \
-                         `jcode login --provider jcode`)"
+                         `kraivcode login --provider jcode`)"
                     );
                 }
                 Ok("Jcode subscription credential resolved".to_string())
@@ -1575,7 +1576,7 @@ impl NativeProviderKind {
                 if !jcode_base::auth::azure::has_configuration() {
                     anyhow::bail!(
                         "Azure OpenAI is not fully configured (need AZURE_OPENAI_ENDPOINT plus an \
-                         API key or Entra ID); run `jcode login --provider azure`"
+                         API key or Entra ID); run `kraivcode login --provider azure`"
                     );
                 }
                 Ok(format!(

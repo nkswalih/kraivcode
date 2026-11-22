@@ -77,12 +77,12 @@ jobs:
               TARGET_DIR="debug"
             fi
 
-            echo "::group::cargo build (jcode binary)"
-            cargo build --locked $PROFILE_FLAG -p jcode --bin jcode
+            echo "::group::cargo build (kraivcode binary)"
+            cargo build --locked $PROFILE_FLAG -p kraivcode --bin kraivcode
             echo "::endgroup::"
 
             echo "::group::Verify binary launches"
-            ./target/$TARGET_DIR/jcode --version
+            ./target/$TARGET_DIR/kraivcode --version
             echo "::endgroup::"
 
             echo "::group::Compile platform unit tests"

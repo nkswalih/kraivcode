@@ -119,6 +119,7 @@ impl DecisionTransport for MockTransport {
 }
 fn ctx() -> ToolContext {
     ToolContext {
+        ask_user_request_tx: None,
         session_id: "browser-test".into(),
         message_id: "m".into(),
         tool_call_id: "t".into(),

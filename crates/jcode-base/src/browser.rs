@@ -87,7 +87,7 @@ fn setup_marker_path() -> PathBuf {
     browser_dir().join(".setup-complete")
 }
 
-/// Records which browser `jcode browser setup` last configured, so detection
+/// Records which browser `kraivcode browser setup` last configured, so detection
 /// stays stable even if the system default browser changes later.
 fn browser_preference_path() -> PathBuf {
     browser_dir().join(".browser")
@@ -350,7 +350,7 @@ pub async fn ensure_browser_setup_for(target: BrowserDetection) -> Result<String
         && target.source != browser_detect::DetectionSource::EnvOverride
     {
         log.push_str(
-            "Override with `jcode browser setup <firefox|chrome|edge|brave|chromium|safari>` or JCODE_BROWSER.\n",
+            "Override with `kraivcode browser setup <firefox|chrome|edge|brave|chromium|safari>` or JCODE_BROWSER.\n",
         );
     }
 
@@ -488,7 +488,7 @@ pub async fn ensure_browser_setup_for(target: BrowserDetection) -> Result<String
                         Ok(false) => {
                             log.push_str("timed out\n");
                             log.push_str(&format!(
-                                "       Finish the steps above, then re-run `jcode browser setup {}`.\n",
+                                "       Finish the steps above, then re-run `kraivcode browser setup {}`.\n",
                                 kind.id()
                             ));
                         }
@@ -1587,7 +1587,7 @@ async fn install_safari_extension() -> Result<String> {
             .unwrap_or(false);
         anyhow::ensure!(
             has_xcode,
-            "Xcode is required to package Safari extensions. Install Xcode from the App Store, run `xcode-select --install`, then re-run `jcode browser setup safari`."
+            "Xcode is required to package Safari extensions. Install Xcode from the App Store, run `xcode-select --install`, then re-run `kraivcode browser setup safari`."
         );
         let project = safari_app_project_dir();
         if project.exists() {

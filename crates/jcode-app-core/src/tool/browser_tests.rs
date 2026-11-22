@@ -386,6 +386,7 @@ async fn handoff_disabled_switch_removes_schema_and_rejects_execution_before_pro
             !disabled
         );
         let ctx = ToolContext {
+            ask_user_request_tx: None,
             session_id: "browser-disable-test".into(),
             message_id: "m".into(),
             tool_call_id: "t".into(),

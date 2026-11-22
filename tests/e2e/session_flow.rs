@@ -137,7 +137,7 @@ async fn test_simple_response() -> Result<()> {
         StreamEvent::SessionId("test-session-123".to_string()),
     ]);
 
-    let provider: Arc<dyn jcode::provider::Provider> = Arc::new(provider);
+    let provider: Arc<dyn kraivcode::provider::Provider> = Arc::new(provider);
     let registry = Registry::new(provider.clone()).await;
     let mut agent = Agent::new(provider, registry);
 
@@ -153,7 +153,7 @@ async fn test_simple_response() -> Result<()> {
 async fn test_agent_clear_preserves_debug_flag() -> Result<()> {
     let _env = setup_test_env()?;
     let provider = MockProvider::new();
-    let provider: Arc<dyn jcode::provider::Provider> = Arc::new(provider);
+    let provider: Arc<dyn kraivcode::provider::Provider> = Arc::new(provider);
     let registry = Registry::new(provider.clone()).await;
     let mut agent = Agent::new(provider, registry);
     agent.set_debug(true);
@@ -181,7 +181,7 @@ async fn test_debug_create_session_marks_debug() -> Result<()> {
     let debug_socket_path = runtime_dir.join("jcode-debug.sock");
 
     let provider = MockProvider::new();
-    let provider: Arc<dyn jcode::provider::Provider> = Arc::new(provider);
+    let provider: Arc<dyn kraivcode::provider::Provider> = Arc::new(provider);
     let server_instance =
         server::Server::new_with_paths(provider, socket_path.clone(), debug_socket_path.clone());
     let server_handle = tokio::spawn(async move { server_instance.run().await });
@@ -212,7 +212,7 @@ async fn test_debug_create_selfdev_session_marks_canary() -> Result<()> {
     let debug_socket_path = runtime_dir.join("jcode-debug.sock");
 
     let provider = MockProvider::new();
-    let provider: Arc<dyn jcode::provider::Provider> = Arc::new(provider);
+    let provider: Arc<dyn kraivcode::provider::Provider> = Arc::new(provider);
     let server_instance =
         server::Server::new_with_paths(provider, socket_path.clone(), debug_socket_path.clone());
     let server_handle = tokio::spawn(async move { server_instance.run().await });
@@ -248,7 +248,7 @@ async fn test_clear_preserves_debug_for_resumed_debug_session() -> Result<()> {
     let debug_socket_path = runtime_dir.join("jcode-debug.sock");
 
     let provider = MockProvider::new();
-    let provider: Arc<dyn jcode::provider::Provider> = Arc::new(provider);
+    let provider: Arc<dyn kraivcode::provider::Provider> = Arc::new(provider);
     let server_instance =
         server::Server::new_with_paths(provider, socket_path.clone(), debug_socket_path.clone());
     let server_handle = tokio::spawn(async move { server_instance.run().await });

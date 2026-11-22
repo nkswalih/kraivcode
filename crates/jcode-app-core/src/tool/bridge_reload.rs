@@ -66,7 +66,7 @@ pub(crate) fn cli_bridge_launch() -> Result<BridgeLaunch> {
         .ok()
         .filter(|path| path.exists())
         .or_else(|| std::env::current_exe().ok())
-        .context("could not resolve a jcode binary for the bridge")?;
+        .context("could not resolve a Kraivcode binary for the bridge")?;
     Ok(BridgeLaunch {
         program,
         args: vec!["api-bridge".into()],

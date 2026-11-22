@@ -782,7 +782,7 @@ mod tests {
                 category: "Loaded".to_string(),
                 description: "Improve performance by measuring and attributing bottlenecks."
                     .to_string(),
-                source: ".jcode/skills/optimization".to_string(),
+                source: ".kraivcode/skills/optimization".to_string(),
                 install: None,
                 installed: true,
                 active: true,

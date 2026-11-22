@@ -489,7 +489,7 @@ fn with_reasoning_current_home<T>(f: impl FnOnce() -> T) -> T {
     })
 }
 
-fn create_jcode_repo_fixture() -> tempfile::TempDir {
+fn create_kraivcode_repo_fixture() -> tempfile::TempDir {
     let temp = tempfile::TempDir::new().expect("temp repo");
     std::fs::create_dir_all(temp.path().join(".git")).expect("git dir");
     std::fs::write(

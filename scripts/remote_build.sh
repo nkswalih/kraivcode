@@ -31,7 +31,7 @@ Behavior:
   - Default cargo subcommand is 'build'
   - Sync-back defaults to ON for 'build', OFF for other subcommands
   - For build sync-back, copies target/{debug|release}/<artifact> from remote to local
-    (artifact defaults to 'jcode', or '--bin <name>' when provided)
+    (artifact defaults to 'kraivcode', or '--bin <name>' when provided)
   - Default config file is ~/.config/jcode/remote-build.env
 EOF
 }
@@ -185,7 +185,7 @@ else
     build_mode="debug"
 fi
 
-artifact_name="jcode"
+artifact_name="kraivcode"
 if [[ "$SUBCOMMAND" == "build" ]]; then
     for ((i=0; i<${#POSITIONAL[@]}; i++)); do
         if [[ "${POSITIONAL[$i]}" == "--bin" && $((i + 1)) -lt ${#POSITIONAL[@]} ]]; then
@@ -221,7 +221,7 @@ echo "SSH timeout: ${SSH_CONNECT_TIMEOUT}s"
 
 echo ""
 echo "[0/3] Checking remote SSH..."
-if ! preflight_output="$(remote_ssh "printf 'jcode-remote-ok\\n'" 2>&1)"; then
+if ! preflight_output="$(remote_ssh "printf 'kraivcode-remote-ok\\n'" 2>&1)"; then
     echo "error: remote host '$REMOTE' is not reachable within ${SSH_CONNECT_TIMEOUT}s" >&2
     echo "$preflight_output" >&2
     echo "hint: set JCODE_REMOTE_CARGO=0 to force local cargo, or fix JCODE_REMOTE_HOST/JCODE_REMOTE_CONNECT_TIMEOUT." >&2

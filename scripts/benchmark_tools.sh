@@ -8,7 +8,7 @@ set -euo pipefail
 ITERATIONS=${1:-5}
 RESULTS_FILE="/tmp/jcode_tool_benchmark_$(date +%Y%m%d_%H%M%S).csv"
 
-echo "=== jcode Tool Call Benchmark ==="
+echo "=== Kraivcode Tool Call Benchmark ==="
 echo "Iterations per tool: $ITERATIONS"
 echo "Results file: $RESULTS_FILE"
 echo ""
@@ -65,7 +65,7 @@ DEBUG_SOCK="${JCODE_DEBUG_SOCK:-/run/user/$(id -u)/jcode-debug.sock}"
 
 if [ ! -S "$DEBUG_SOCK" ]; then
     echo "ERROR: Debug socket not found at $DEBUG_SOCK"
-    echo "Make sure jcode is running with debug control enabled."
+    echo "Make sure Kraivcode is running with debug control enabled."
     exit 1
 fi
 

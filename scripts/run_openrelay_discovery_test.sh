@@ -16,7 +16,7 @@ case "${1:-}" in
     cat <<EOF
 Usage: ${0##*/} [--help|--print-prompt|--dry-run]
 
-Runs a local-only OpenRelay Discovery fixture and an isolated Jcode agent test.
+Runs a local-only OpenRelay Discovery fixture and an isolated Kraivcode agent test.
 Environment overrides:
   JCODE_BIN, JCODE_OPENRELAY_TEST_MODEL, JCODE_OPENRELAY_TEST_PROVIDER
   JCODE_OPENRELAY_TEST_PROMPT, JCODE_OPENRELAY_TEST_OUTPUT
@@ -187,7 +187,7 @@ validation_status=$?
 set -e
 
 if [[ $status -ne 0 ]]; then
-  printf 'Jcode exited with status %s\n' "$status" >&2
+  printf 'Kraivcode exited with status %s\n' "$status" >&2
   exit "$status"
 fi
 if [[ $validation_status -ne 0 ]]; then

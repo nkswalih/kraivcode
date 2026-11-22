@@ -1032,7 +1032,7 @@ mod newest_reload_candidate_integration_tests {
     }
 
     /// Install a release-archive-style version dir: a tiny `jcode` wrapper
-    /// script plus the real `jcode-linux-x86_64.bin` payload, with independently
+    /// script plus the real `kraivcode-linux-x86_64.bin` payload, with independently
     /// settable mtimes. This is exactly what `/update`'s tar.gz install path
     /// produces on disk.
     fn install_release_style_binary(
@@ -1045,7 +1045,7 @@ mod newest_reload_candidate_integration_tests {
             .join("versions")
             .join(version);
         std::fs::create_dir_all(&dir).expect("create version dir");
-        let payload = dir.join("jcode-linux-x86_64.bin");
+        let payload = dir.join("kraivcode-linux-x86_64.bin");
         std::fs::write(&payload, format!("payload for {version}")).expect("write payload");
         std::fs::File::open(&payload)
             .expect("open payload")
@@ -1054,7 +1054,7 @@ mod newest_reload_candidate_integration_tests {
         let wrapper = dir.join(build::binary_name());
         std::fs::write(
             &wrapper,
-            "#!/usr/bin/env sh\nexec ./jcode-linux-x86_64.bin \"$@\"\n",
+            "#!/usr/bin/env sh\nexec ./kraivcode-linux-x86_64.bin \"$@\"\n",
         )
         .expect("write wrapper");
         std::fs::File::open(&wrapper)

@@ -3611,12 +3611,12 @@ pub(crate) fn input_chip_spans(input: &str) -> Vec<InputChip> {
     let mut chips = Vec::new();
     let mut i = 0;
     while i < input.len() {
-        if bytes[i] == b'[' {
-            if let Some(chip) = match_image_chip(input, i).or_else(|| match_pasted_chip(input, i)) {
-                chips.push(chip);
-                i = chip.end;
-                continue;
-            }
+        if bytes[i] == b'['
+            && let Some(chip) = match_image_chip(input, i).or_else(|| match_pasted_chip(input, i))
+        {
+            chips.push(chip);
+            i = chip.end;
+            continue;
         }
         i += 1;
     }
@@ -3688,7 +3688,7 @@ fn cleanup_removed_chip(app: &mut App, chip_start: usize, removed_text: &str) {
         else {
             return;
         };
-        if k == 0 || k - 1 >= app.pending_images.len() {
+        if k == 0 || k > app.pending_images.len() {
             return;
         }
         app.pending_images.remove(k - 1);
@@ -4846,7 +4846,7 @@ impl App {
             // daemon-side `skill_manage reload_all` can update a different process.
             // On a slash miss, synchronously refresh from the active session working
             // directory before reporting Unknown skill so project-local skills such
-            // as .jcode/skills/optimization work immediately after reload/build.
+            // as .kraivcode/skills/optimization work immediately after reload/build.
             if skill.is_none() {
                 self.refresh_skills_snapshot();
                 skill = self.current_skills_snapshot().get(&skill_name).cloned();

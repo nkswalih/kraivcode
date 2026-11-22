@@ -947,7 +947,7 @@ fn detect_project_profile() -> ProjectProfile {
     let Some(root) = cwd.as_deref() else {
         return profile;
     };
-    profile.repo_present = root.join(".git").exists() || is_jcode_repo_dir(root);
+    profile.repo_present = root.join(".git").exists() || is_kraivcode_repo_dir(root);
     let mut scanned_files = 0usize;
     for entry in walkdir::WalkDir::new(root)
         .max_depth(3)
@@ -2728,11 +2728,11 @@ fn show_first_run_notice() {
         ("", "")
     };
     eprintln!("{dim}");
-    eprintln!("  jcode collects anonymous usage statistics (install count, version, OS,");
+    eprintln!("  kraivcode collects anonymous usage statistics (install count, version, OS,");
     eprintln!("  session activity, tool counts, and crash/exit reasons). No code, filenames,");
     eprintln!("  prompts, or personal data is sent.");
     eprintln!("  To opt out: export JCODE_NO_TELEMETRY=1");
-    eprintln!("  Details: https://github.com/1jehuang/jcode/blob/master/TELEMETRY.md");
+    eprintln!("  Details: https://github.com/nkswalih/kraivcode/blob/dev/TELEMETRY.md");
     eprintln!("{reset}");
 }
 

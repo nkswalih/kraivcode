@@ -1416,15 +1416,13 @@ impl App {
                 self.close_model_detail_popup();
                 if let Some(entry_index) = entry_index
                     && let Some(ref mut picker) = self.inline_interactive_state
-                {
-                    if let Some(position) = picker
+                    && let Some(position) = picker
                         .filtered
                         .iter()
                         .position(|&index| index == entry_index)
-                    {
-                        picker.selected = position;
-                        picker.column = 0;
-                    }
+                {
+                    picker.selected = position;
+                    picker.column = 0;
                 }
                 // Reuse the normal Enter commit path so session switching,
                 // notices, and effort handling stay identical to keyboard use.

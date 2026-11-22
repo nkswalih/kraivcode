@@ -8,7 +8,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
 DEFAULT_BINARY_DIR=${JCODE_HARBOR_BINARY_DIR:-/tmp/jcode-compat-dist}
-DEFAULT_BINARY_PATH=${JCODE_HARBOR_BINARY:-$DEFAULT_BINARY_DIR/jcode-linux-x86_64.bin}
+DEFAULT_BINARY_PATH=${JCODE_HARBOR_BINARY:-$DEFAULT_BINARY_DIR/kraivcode-linux-x86_64.bin}
 DEFAULT_MODEL=${JCODE_TB_MODEL:-anthropic-api/claude-opus-4-8}
 DEFAULT_PATH=${JCODE_TB_PATH:-/tmp/terminal-bench-2.1}
 
@@ -31,7 +31,7 @@ for arg in "$@"; do
 done
 
 if [[ ! -x "$DEFAULT_BINARY_PATH" ]]; then
-  echo "Building Linux-compatible jcode binary into $DEFAULT_BINARY_DIR" >&2
+  echo "Building Linux-compatible Kraivcode binary into $DEFAULT_BINARY_DIR" >&2
   "$REPO_ROOT/scripts/build_linux_compat.sh" "$DEFAULT_BINARY_DIR"
 fi
 
@@ -69,7 +69,7 @@ fi
 cmd+=("$@")
 
 {
-  echo "Running Harbor with jcode Opus 4.8 adapter"
+  echo "Running Harbor with Kraivcode Opus 4.8 adapter"
   echo "  binary: $JCODE_HARBOR_BINARY"
   echo "  model:  ${DEFAULT_MODEL}"
 } >&2

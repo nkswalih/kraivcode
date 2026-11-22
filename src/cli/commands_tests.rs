@@ -71,7 +71,7 @@ async fn server_reload_without_listener_is_a_successful_json_noop() {
     assert!(
         report["detail"]
             .as_str()
-            .is_some_and(|detail| { detail.contains("No running jcode server found") })
+            .is_some_and(|detail| { detail.contains("No running Kraivcode server found") })
     );
 }
 
