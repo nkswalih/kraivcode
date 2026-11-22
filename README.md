@@ -1,13 +1,8 @@
 <div align="center">
 
-```text
-██╗  ██╗██████╗  █████╗ ██╗██╗   ██╗ ██████╗ ██████╗ ██████╗ ███████╗
-██║ ██╔╝██╔══██╗██╔══██╗██║██║   ██║██╔════╝██╔═══██╗██╔══██╗██╔════╝
-█████╔╝ ██████╔╝███████║██║██║   ██║██║     ██║   ██║██║  ██║█████╗
-██╔═██╗ ██╔══██╗██╔══██║██║╚██╗ ██╔╝██║     ██║   ██║██║  ██║██╔══╝
-██║  ██╗██║  ██║██║  ██║██║ ╚████╔╝ ╚██████╗╚██████╔╝██████╔╝███████╗
-╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
-```
+<img width="331" height="122" alt="ascii-art-text (8)" src="https://github.com/user-attachments/assets/ef149dd2-7ec1-4c63-a2e7-926560b05c3c" /> </br>
+
+
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square)](#platform-support)
